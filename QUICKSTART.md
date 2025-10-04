@@ -1,185 +1,265 @@
 # QuantumFlux Trading Platform - Quick Start Guide
 
-## 🚀 Simplified Architecture Solution
+## 🎯 Current Status
 
-The backend integration issues have been resolved with a **capabilities-first approach** that eliminates complex adapter layers and uses `data_streaming.py` as the core engine.
+The platform now has **GUI backtesting fully integrated**! You can test trading strategies on historical data through a modern React interface.
 
-### ✅ What's Fixed
+## 🚀 Quick Start Options
 
-- **Direct Capabilities Integration**: Backend imports capabilities directly, no complex adapters
-- **Chrome Session Management**: Simplified attachment using workspace `Chrome_profile`
-- **Data Streaming Core**: `RealtimeDataStreaming` handles all WebSocket data collection and CSV export
-- **Clean API Endpoints**: Minimal FastAPI backend with essential trading operations
-- **CLI Interface**: Simple `qf.py` command-line tool for all operations
+### Option 1: GUI Backtesting (Recommended for Testing)
 
-### 🎯 Best Solution: Minimal Complexity
+Perfect for strategy development and testing without live trading.
 
-Instead of fixing complex architectural conflicts, we've created a **clean, minimal solution**:
-
-1. **New `backend.py`**: Direct capabilities integration, no adapter complexity
-2. **PowerShell Launcher**: `scripts/start_all.ps1` starts Chrome + backend together
-3. **CLI Tool**: `qf.py` provides command-line access to all capabilities
-4. **Smoke Test**: `test_smoke.py` verifies everything works
-
-## 🏃‍♂️ Quick Start (3 Steps)
-
-### Step 1: Start the Platform
-```powershell
-# Option A: Start everything together (recommended)
-.\scripts\start_all.ps1
-
-# Option B: Start components separately
-python start_hybrid_session.py  # Start Chrome
-python backend.py               # Start API (in another terminal)
+**Step 1: Start Backend**
+```bash
+cd gui/Data-Visualizer-React
+uv run python streaming_server.py
 ```
 
-### Step 2: Test the System
-```powershell
-# Run smoke test to verify everything works
-python test_smoke.py
+Expected output:
+```
+Starting streaming server on http://0.0.0.0:3001
+(xxxx) wsgi starting up on http://0.0.0.0:3001
+```
 
-# Or test individual components
+**Step 2: Start Frontend** (New Terminal)
+```bash
+cd gui/Data-Visualizer-React
+npm install  # First time only
+npm run dev
+```
+
+Expected output:
+```
+VITE v5.4.20  ready in 399 ms
+➜  Local:   http://localhost:5000/
+➜  Network: http://172.31.70.130:5000/
+```
+
+**Step 3: Open Dashboard**
+
+Navigate to: **http://localhost:5000**
+
+**Step 4: Run a Backtest**
+1. Click **"Strategy Backtest"** in the navigation
+2. Select a data file from dropdown (100+ files available)
+3. Configure settings (or use defaults)
+4. Click **"Run Backtest"**
+5. View results instantly!
+
+### Option 2: Full Platform (Live Trading)
+
+For live data collection and automated trading.
+
+**Step 1: Start Chrome Session**
+```bash
+python start_hybrid_session.py
+```
+- Chrome will open automatically
+- Log into PocketOption
+- Navigate to the trading interface
+
+**Step 2: Start Main Backend** (New Terminal)
+```bash
+python backend.py
+```
+
+Expected output:
+```
+INFO:     Started server process [xxxx]
+INFO:     Uvicorn running on http://0.0.0.0:8000
+[...] WebDriver initialized successfully
+[...] Connected to platform successfully
+```
+
+**Step 3: Start GUI Backend** (New Terminal)
+```bash
+cd gui/Data-Visualizer-React
+uv run python streaming_server.py
+```
+
+**Step 4: Start Frontend** (New Terminal)
+```bash
+cd gui/Data-Visualizer-React
+npm run dev
+```
+
+**Step 5: Access Platform**
+- Main Backend: http://localhost:8000
+- GUI: http://localhost:5000
+- API Docs: http://localhost:8000/docs
+
+## 📊 What's Available
+
+### GUI Features
+- **Strategy Backtest**: Test strategies on 100+ historical CSV files
+- **Live Trading**: Real-time data streaming and signals
+- **Data Analysis**: Interactive charts and technical indicators
+- **Real-time Updates**: Socket.IO for instant results
+
+### Data Files
+Located in `gui/Data-Visualizer-React/data_history/pocket_option/`:
+- OTC format: `AUDCAD_otc_otc_1m_2025_10_04...csv`
+- HLOC format: In `data_1m/`, `data_5m/` subdirectories
+- **Total**: 100+ files automatically discovered
+
+### Strategy
+**Quantum Flux Strategy** includes:
+- RSI (14 period)
+- MACD (12, 26, 9)
+- Bollinger Bands (20, 2 std dev)
+- EMAs (12, 26)
+
+## 💡 CLI Interface (Advanced)
+
+```bash
+# Attach to Chrome session
 python qf.py attach --port 9222
+
+# Check status
 python qf.py status
-python qf.py stream snapshot --period 1
+
+# Collect data snapshot
+python qf.py stream snapshot --period 1 --mode candle
+
+# Scan profile and favorites
+python qf.py quick-scan
+
+# Generate signals
+python qf.py signal EURUSD --types SMA,RSI
+
+# Execute trade (dry-run)
+python qf.py trade buy --dry-run
 ```
-
-### Step 3: Use the Platform
-```powershell
-# CLI Operations
-python qf.py profile                    # Scan user profile
-python qf.py favorites --min-pct 92     # Scan favorites
-python qf.py session                    # Check session state
-python qf.py signal EURUSD              # Generate signals
-python qf.py trade buy --dry-run        # Test trade (safe)
-
-# API Operations (if backend running)
-curl http://localhost:8000/status       # Check status
-curl http://localhost:8000/health       # Health check
-```
-
-## 📊 Core Capabilities
-
-### Data Streaming (`data_streaming.py`)
-- **WebSocket Data Collection**: Real-time market data from PocketOption
-- **Candle Formation**: OHLC candles with configurable timeframes
-- **CSV Export**: Automatic data persistence to `Historical_Data/data_stream/`
-- **Session Sync**: Detects user's selected asset and timeframe
-
-### Trading Operations
-- **Profile Scan**: Account info, balance, user details
-- **Favorites Scan**: Find assets with payout ≥ threshold
-- **Session Scan**: Current account state and trade amount
-- **Trade Execution**: BUY/SELL with confirmation and diagnostics
-- **Signal Generation**: Technical analysis (SMA, RSI, MACD)
-
-### Chrome Session Management
-- **Hybrid Approach**: Persistent Chrome session with remote debugging
-- **Workspace Profile**: Uses `Chrome_profile/` directory for session persistence
-- **Auto-Attachment**: Backend and CLI automatically connect to existing session
 
 ## 🔧 API Endpoints
 
-### Session Management
-- `POST /session/attach` - Attach to Chrome session
-- `POST /session/disconnect` - Disconnect from Chrome
-- `GET /status` - System status and connection info
+### GUI Backend (Port 3001) - Socket.IO
+```javascript
+// Connect to backend
+socket.connect('http://localhost:3001');
 
-### Data Operations
-- `POST /stream/snapshot` - Collect data snapshot
-- `GET /stream/status` - Streaming status
-- `GET /candles/{asset}` - Get candle data
-- `GET /assets` - List available assets
+// Get available data files
+socket.emit('get_available_data');
+socket.on('available_data', (data) => {
+  console.log(data.files);
+});
 
-### Trading Operations
-- `GET /operations/profile` - Scan user profile
-- `GET /operations/favorites` - Scan favorites bar
-- `GET /operations/session` - Scan current session
-- `POST /operations/trade` - Execute trade
+// Run backtest
+socket.emit('run_backtest', {
+  file_path: 'path/to/data.csv',
+  strategy: 'quantum_flux'
+});
+socket.on('backtest_complete', (results) => {
+  console.log(results);
+});
 
-### Analysis
-- `GET /signal/{asset}` - Generate trading signals
-- `GET /health` - Health check
-- `WebSocket /ws/data` - Real-time data stream
-
-## 💡 Usage Examples
-
-### CLI Workflow
-```powershell
-# 1. Start platform
-.\scripts\start_all.ps1
-
-# 2. In another terminal, test connection
-python qf.py attach
-python qf.py status
-
-# 3. Collect data
-python qf.py stream snapshot --period 1 --mode candle
-
-# 4. Analyze account
-python qf.py quick-scan
-
-# 5. Generate signals
-python qf.py signal EURUSD --types SMA,RSI
-
-# 6. Execute trade (with confirmation)
-python qf.py trade buy
+// Generate signal
+socket.emit('generate_signal', {
+  candles: [...],
+  strategy: 'quantum_flux'
+});
 ```
 
-### API Workflow
+### Main Backend (Port 8000) - REST
 ```bash
-# 1. Check if backend is running
+# Health check
 curl http://localhost:8000/health
 
-# 2. Attach to Chrome session
-curl -X POST http://localhost:8000/session/attach
+# Get status
+curl http://localhost:8000/status
 
-# 3. Collect data snapshot
-curl -X POST "http://localhost:8000/stream/snapshot?period=1&mode=candle"
+# Get profile
+curl http://localhost:8000/api/profile
 
-# 4. Get profile info
-curl http://localhost:8000/operations/profile
+# Get favorites
+curl "http://localhost:8000/api/favorites?min_pct=92"
 
-# 5. Generate signals
-curl http://localhost:8000/signal/EURUSD
-```
-
-### Continuous Data Streaming
-```powershell
-# Stream real-time data to terminal
-python qf.py stream continuous --period 1 --mode candle
-
-# Or use data_streaming.py directly
-python capabilities/data_streaming.py --stream --period 1 --candle_only
+# Execute trade
+curl -X POST http://localhost:8000/api/operations/trade \
+  -H "Content-Type: application/json" \
+  -d '{"side": "buy", "timeout": 5}'
 ```
 
 ## 📁 File Structure
 
 ```
-QuFLX/
-├── backend.py                 # New minimal FastAPI backend
-├── qf.py                     # CLI interface
-├── test_smoke.py             # Smoke test
-├── start_hybrid_session.py   # Chrome session starter
-├── scripts/
-│   └── start_all.ps1         # Platform launcher
+QuantumFlux/
+├── gui/Data-Visualizer-React/
+│   ├── streaming_server.py        # Flask-SocketIO backend (Port 3001)
+│   ├── data_loader.py             # CSV loading & backtest engine
+│   ├── data_history/              # Historical data (100+ files)
+│   └── src/
+│       ├── pages/
+│       │   ├── StrategyBacktest.jsx  # Backtesting interface
+│       │   ├── LiveTrading.jsx       # Real-time trading
+│       │   └── DataAnalysis.jsx      # Data analysis
+│       └── services/
+│           └── StrategyService.js    # Socket.IO integration
+├── strategies/
+│   ├── quantum_flux_strategy.py   # Main strategy
+│   └── base.py                    # Strategy base class
 ├── capabilities/
-│   ├── data_streaming.py     # Core data engine
-│   ├── session_scan.py       # Session operations
-│   ├── profile_scan.py       # Profile operations
-│   ├── favorite_select.py    # Favorites operations
-│   ├── trade_click_cap.py    # Trade execution
-│   └── signal_generation.py  # Signal analysis
-├── Chrome_profile/           # Persistent Chrome session
-└── Historical_Data/
-    └── data_stream/          # CSV exports
+│   ├── data_streaming.py          # WebSocket data collection
+│   ├── session_scan.py            # Session monitoring
+│   └── trade_click_cap.py         # Trade execution
+├── backend.py                     # FastAPI backend (Port 8000)
+├── start_hybrid_session.py        # Chrome launcher
+└── qf.py                          # CLI interface
 ```
 
 ## 🔍 Troubleshooting
 
+### GUI Backend Not Starting
+```bash
+# Check Python version
+python --version  # Should be 3.11+
+
+# Install/update uv
+pip install --upgrade uv
+
+# Try running directly
+cd gui/Data-Visualizer-React
+python streaming_server.py
+```
+
+### Frontend Not Starting
+```bash
+# Clear cache and reinstall
+cd gui/Data-Visualizer-React
+rm -rf node_modules package-lock.json
+npm install
+
+# Try with pnpm
+pnpm install
+pnpm dev
+```
+
+### No Data Files Found
+```bash
+# Check if files exist
+ls gui/Data-Visualizer-React/data_history/pocket_option/*.csv
+
+# Check subdirectories
+ls gui/Data-Visualizer-React/data_history/pocket_option/data_1m/*.csv
+ls gui/Data-Visualizer-React/data_history/pocket_option/data_5m/*.csv
+```
+
+### Backend Connection Errors
+```bash
+# Check if ports are available
+netstat -an | findstr "3001 8000"
+
+# Kill processes on port (if needed)
+# Windows PowerShell:
+Get-Process -Id (Get-NetTCPConnection -LocalPort 3001).OwningProcess | Stop-Process
+
+# Restart services
+```
+
 ### Chrome Connection Issues
-```powershell
-# Check if Chrome is running with remote debugging
+```bash
+# Check Chrome remote debugging port
 netstat -an | findstr 9222
 
 # Restart Chrome session
@@ -189,43 +269,49 @@ python start_hybrid_session.py
 python qf.py attach --port 9222
 ```
 
-### Backend Issues
-```powershell
-# Check if backend is running
-curl http://localhost:8000/health
+## 🎯 Usage Examples
 
-# Start backend manually
-python backend.py
+### Example 1: Quick Backtest
+1. Start both backend and frontend
+2. Go to Strategy Backtest page
+3. Select first file in dropdown
+4. Click "Run Backtest"
+5. Review win rate and profit/loss
 
-# Check logs for errors
-```
+### Example 2: Live Data Collection
+1. Start Chrome and log into PocketOption
+2. Start main backend (`python backend.py`)
+3. Use CLI: `python qf.py stream snapshot --period 1`
+4. CSV files saved to `Historical_Data/data_stream/`
 
-### Data Collection Issues
-```powershell
-# Test data streaming directly
-python capabilities/data_streaming.py --verbose
+### Example 3: Signal Generation
+1. Collect some candle data
+2. Use CLI: `python qf.py signal EURUSD`
+3. Review BUY/PUT/NEUTRAL signal with confidence
 
-# Check CSV output
-dir Historical_Data\data_stream\*.csv
+## 📈 Next Steps
 
-# Run smoke test
-python test_smoke.py
-```
+1. **Test Backtesting**: Try different CSV files and compare results
+2. **Collect Live Data**: Use Chrome session to gather fresh data
+3. **Analyze Signals**: Generate signals on various assets
+4. **Experiment**: Modify strategy parameters in `quantum_flux_strategy.py`
 
-## 🎯 Key Benefits
+## ✅ Success Checklist
 
-1. **Minimal Complexity**: Direct capabilities integration, no complex adapters
-2. **Proven Foundation**: Uses existing `data_streaming.py` that already works
-3. **Easy Testing**: Simple CLI and smoke test for verification
-4. **Clean Architecture**: Eliminates architectural conflicts and confusion
-5. **Immediate Usability**: Works out of the box with existing Chrome sessions
+- [ ] Backend running on port 3001
+- [ ] Frontend running on port 5000
+- [ ] Can access GUI at http://localhost:5000
+- [ ] Data files visible in dropdown
+- [ ] Backtest completes successfully
+- [ ] Results display correctly
 
-## 🚀 Next Steps
+## 🚀 You're Ready!
 
-1. **Test the Solution**: Run `python test_smoke.py` to verify everything works
-2. **Collect Real Data**: Use `python qf.py stream snapshot` to collect market data
-3. **Explore Capabilities**: Try `python qf.py --help` to see all available commands
-4. **API Integration**: Use the FastAPI backend for GUI or external integrations
-5. **Extend as Needed**: Add new capabilities or endpoints based on requirements
+The platform is fully operational for:
+- ✅ Strategy backtesting
+- ✅ Historical data analysis
+- ✅ Signal generation
+- ✅ Live data collection (with Chrome session)
+- ✅ Automated trading (with Chrome session)
 
-This solution provides a **clean, working foundation** that eliminates the backend integration complexity while maintaining all the powerful capabilities of the QuantumFlux platform.
+**Start with backtesting to test strategies risk-free!**

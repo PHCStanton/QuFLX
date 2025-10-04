@@ -1,343 +1,290 @@
-# QuantumFlux Trading Dashboard
+# QuantumFlux Trading Platform
 
-A comprehensive trading dashboard for AI-powered binary options trading with real-time data visualization and strategy testing capabilities.
+A sophisticated automated trading platform for PocketOption combining real-time WebSocket data streaming, browser automation, and AI-driven technical analysis with an integrated React GUI for backtesting and strategy execution.
 
-## 🎯 **Current Status: Phase 2.5 COMPLETED - Ready for Phase 3**
+## 🎯 Current Status: GUI Backtesting Integration Complete ✅
 
-### ✅ **Architectural Foundation Solidified**
-- **Clean Architecture**: Eliminated dual API confusion, established capabilities-only approach
-- **Zero Breaking Changes**: All existing functionality preserved
-- **Phase 3 Ready**: Strategy engine and automation development can begin immediately
+### ✅ **Recently Completed** (October 4, 2025)
+- **GUI Backtesting System**: Full React-based backtesting interface with Socket.IO integration
+- **Historical Data Support**: Smart discovery of 100+ CSV files (OTC & HLOC formats)
+- **Strategy Integration**: Quantum Flux strategy working with both backtesting and live data
+- **Socket.IO Backend**: 4 handlers for backtest execution, data discovery, signal generation
+- **Code Quality**: Cleaned up type hints, removed unused code, simplified architecture
 
-### 🚀 **Next Phase: Strategy Engine & Automation**
-- Signal generation engine implementation
-- Automated trading logic development
-- Strategy testing and backtesting framework
-- A/B testing capabilities
+### 🚀 **Core Capabilities**
+- **Real-time WebSocket Data Streaming**: 22,000+ messages from PocketOption
+- **Chrome Session Management**: Persistent hybrid session with remote debugging (port 9222)
+- **Trading Capabilities**: Profile, favorites, session scanning, trade execution
+- **Strategy Engine**: Quantum Flux with RSI, MACD, Bollinger Bands, EMAs
+- **React Dashboard**: Modern UI for data analysis, backtesting, and live trading
+- **Historical Backtesting**: Test strategies on CSV data with detailed results
 
-## Features
-
-### ✅ **Completed & Operational**
-- **Real-time WebSocket Data Streaming**: Processing 22,000+ messages from PocketOption
-- **Chrome Session Management**: Persistent session attachment and reconnection
-- **Trading Capabilities**: Profile scanning, favorites management, trade execution with diagnostics
-- **FastAPI Backend**: Comprehensive API endpoints with error handling and health monitoring
-- **Capabilities Framework**: Clean integration between trading operations and backend
-- **Data Collection**: Historical candle data collection (~100 candles capability)
-
-### 🚧 **Phase 3: Strategy Engine & Automation (Next)**
-- Signal generation engine implementation
-- Automated trading logic development
-- Strategy testing and backtesting framework
-- A/B testing capabilities
-
-### 🎨 **Frontend (Phase 5)**
-- Interactive charts and analytics with TradingView
-- Modern React-based UI with Tailwind CSS
-- Real-time WebSocket connectivity
-- Risk management and trade execution controls
-
-## 🚀 Quick Start Guide
+## Quick Start
 
 ### Prerequisites
-
-- **Python 3.11+** (specifically Python 3.11.13)
+- **Python 3.11+** (Python 3.11.13 recommended)
 - **Node.js 16+** with npm/pnpm
-- **Windows PowerShell** (for conda environment)
 - **Chrome browser** (for PocketOption integration)
+- **uv** (Python package installer)
 
----
+### Option 1: GUI Backtesting (Simplest)
 
-## 📋 Step-by-Step Setup Instructions
-
-### Step 1: Activate Conda Environment
-
-**This is CRITICAL - Must be done first in every session:**
-
-```powershell
-PS C:\FinRL\quantumFlux> (& C:\Users\piete\anaconda3\shell\condabin\conda-hook.ps1) ; (conda activate quantumFlux)
-(quantumFlux) PS C:\FinRL\quantumFlux>
+**Start Backend** (Terminal 1):
+```bash
+cd gui/Data-Visualizer-React
+uv run python streaming_server.py
 ```
 
-**Expected output:**
-```
-(quantumFlux) PS C:\FinRL\quantumFlux>
-```
-
-### Step 2: Start Backend Server
-
-```powershell
-(quantumFlux) PS C:\FinRL\quantumFlux> python backend.py
+**Start Frontend** (Terminal 2):
+```bash
+cd gui/Data-Visualizer-React
+npm install  # First time only
+npm run dev
 ```
 
-**Expected output:**
-```
-Warning: Could not import MockTradingEngine
-INFO:     Started server process [22356]
-INFO:     Waiting for application startup.
-[2025-08-21 12:20:13] Failed to set registry: [WinError 5] Access is denied
-[2025-08-21 12:20:42] WebDriver initialized successfully
-[2025-08-21 12:20:42] Connecting to https://pocket2.click/cabinet/demo-quick-high-low
-[2025-08-21 12:20:57] Authentication verified - trading interface accessible
-[2025-08-21 12:20:57] Connected to platform successfully
-[2025-08-21 12:20:57] WebSocket data collection started
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-```
+**Access Dashboard**: http://localhost:5000
 
-**Keep this terminal running!**
+**Navigate to**:
+- **Strategy Backtest** page to test strategies on historical data
+- **Live Trading** page for real-time data and signals
+- **Data Analysis** page for chart analysis
 
-### Step 3: Start Frontend Dashboard (New Terminal)
+### Option 2: Full Platform (Live Trading)
 
-Open a **NEW PowerShell terminal** and run:
-
-```powershell
-PS C:\FinRL\quantumFlux> cd dashboard
-PS C:\FinRL\quantumFlux\dashboard> pnpm dev
+1. **Start Chrome Session**:
+```bash
+python start_hybrid_session.py
+# Log into PocketOption manually, navigate to trading interface
 ```
 
-**Expected output:**
-```
-> react-template@0.0.0 dev C:\FinRL\quantumFlux\dashboard
-> vite
-
-  VITE v5.4.19  ready in 2085 ms
-
-  ➜  Local:   http://localhost:5173/
-  ➜  Network: use --host to expose
-  ➜  press h + enter to show help
+2. **Start Backend**:
+```bash
+python backend.py
 ```
 
-**Keep this terminal running too!**
+3. **Start GUI** (in new terminal):
+```bash
+cd gui/Data-Visualizer-React
+npm run dev
+```
 
-### Step 4: Access Your Dashboard
-
-Open your web browser and navigate to:
-**http://localhost:5173/**
-
----
-
-## 🖥️ Application URLs
+## Application URLs
 
 | Component | URL | Status |
 |-----------|-----|--------|
-| **Frontend Dashboard** | http://localhost:5173/ | ✅ Running |
+| **React GUI** | http://localhost:5000 | ✅ Running |
 | **Backend API** | http://localhost:8000 | ✅ Running |
-| **API Documentation** | http://localhost:8000/docs | ✅ Available |
+| **GUI Backend** | http://localhost:3001 | ✅ Running |
+| **API Docs** | http://localhost:8000/docs | ✅ Available |
 
----
+## Features
 
-## 🛠️ Troubleshooting
+### GUI Backtesting (New! ✨)
+- **File Selection**: Auto-discover 100+ historical CSV files
+- **Strategy Testing**: Run Quantum Flux on historical data
+- **Results Dashboard**: Win rate, profit/loss, trade history
+- **Real-time Updates**: Socket.IO for instant results
+- **Multiple Formats**: Supports OTC and HLOC CSV formats
 
-### If Backend Fails to Start
+### Real-time Trading
+- **Live Data Streaming**: Real-time tick and candle updates via WebSocket
+- **Signal Generation**: AI-driven buy/sell signals with confidence scores
+- **Trade Execution**: Automated trade placement with verification
+- **Session Management**: Persistent Chrome sessions across restarts
 
-1. **Check Python Version:**
-```powershell
-python --version
-# Should show: Python 3.11.13
+### Data Collection
+- **WebSocket Interception**: Capture market data from PocketOption
+- **Candle Formation**: OHLC candles with multiple timeframes (1m, 5m, 15m, 1h)
+- **CSV Export**: Organized storage by timeframe
+- **Smart Detection**: Automatic asset and timeframe identification
+
+### Strategy Engine
+- **Quantum Flux**: Multi-indicator strategy (RSI, MACD, Bollinger Bands, EMAs)
+- **Confidence Scoring**: Signal strength evaluation (0-100%)
+- **Backtesting**: Historical performance analysis
+- **Live Execution**: Real-time strategy application
+
+## Project Structure
+
+```
+QuantumFlux/
+├── gui/Data-Visualizer-React/       # React GUI
+│   ├── src/                         # Frontend source
+│   │   ├── pages/
+│   │   │   ├── StrategyBacktest.jsx # Backtesting interface ✨
+│   │   │   ├── LiveTrading.jsx      # Real-time trading
+│   │   │   └── DataAnalysis.jsx     # Data analysis
+│   │   ├── services/
+│   │   │   └── StrategyService.js   # Socket.IO integration ✨
+│   │   └── components/              # UI components
+│   ├── data_loader.py               # CSV loading & backtest engine ✨
+│   ├── streaming_server.py          # Flask-SocketIO backend ✨
+│   └── data_history/pocket_option/  # Historical CSV files (100+)
+├── strategies/
+│   ├── quantum_flux_strategy.py     # Main strategy ✨
+│   ├── base.py                      # Strategy base class
+│   └── technical_indicators.py      # Indicator calculations
+├── capabilities/
+│   ├── data_streaming.py            # WebSocket data collection
+│   ├── session_scan.py              # Account state monitoring
+│   ├── profile_scan.py              # Profile extraction
+│   ├── favorite_select.py           # Asset selection
+│   └── trade_click_cap.py           # Trade execution
+├── backend.py                       # FastAPI backend
+├── start_hybrid_session.py          # Chrome session launcher
+└── qf.py                            # CLI interface
 ```
 
-2. **Verify Conda Environment:**
-```powershell
-conda env list
-# Should show quantumFlux environment as active
+## API Endpoints
+
+### GUI Backend (Port 3001) - Socket.IO
+- `run_backtest` - Execute strategy backtest on CSV data
+- `get_available_data` - List available historical files
+- `generate_signal` - Generate trading signal from candles
+- `execute_strategy` - Execute strategy on live data
+- `start_stream` / `stop_stream` - Control real-time data flow
+
+### Main Backend (Port 8000) - REST/WebSocket
+- `GET /status` - Connection status
+- `GET /health` - Health check
+- `GET /api/profile` - User profile
+- `GET /api/favorites` - Asset favorites
+- `POST /api/operations/trade` - Trade execution
+- `WS /ws/data` - Real-time data stream
+
+## CLI Interface
+
+```bash
+# Attach to Chrome session
+python qf.py attach --port 9222
+
+# Collect data snapshot
+python qf.py stream snapshot --period 1
+
+# Scan profile and favorites
+python qf.py quick-scan
+
+# Generate signals
+python qf.py signal EURUSD
+
+# Execute trade (dry-run)
+python qf.py trade buy --dry-run
 ```
 
-3. **Install Missing Dependencies:**
-```powershell
-pip install -r requirements.txt
-```
-
-### If Frontend Fails to Start
-
-1. **Install Node Dependencies:**
-```powershell
-cd dashboard
-pnpm install
-```
-
-2. **Clear Node Modules and Reinstall:**
-```powershell
-rm -rf node_modules package-lock.json
-pnpm install
-```
-
-### If Dashboard Won't Load
-
-1. **Check Backend is Running:**
-   - Visit http://localhost:8000
-   - Should show JSON response with API info
-
-2. **Check CORS Issues:**
-   - Backend automatically handles CORS for React frontend
-
-3. **Clear Browser Cache:**
-   - Hard refresh: Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac)
-
----
-
-## 📊 API Endpoints
-
-### ✅ **Operational Endpoints**
-- `GET /status` - Get connection status ✅
-- `GET /health` - Comprehensive health check ✅
-- `GET /api/profile` - User profile scanning ✅
-- `GET /api/favorites` - Asset favorites scanning ✅
-- `POST /api/operations/trade` - Trade execution ✅
-- `GET /api/session` - Session status ✅
-- `WS /ws/data` - Real-time WebSocket data stream ✅
-
-### 🚧 **Phase 3 Endpoints (Next)**
-- `POST /strategies` - Add new trading strategy
-- `GET /strategies` - List all strategies
-- `GET /trade/signal/{asset}` - Generate trading signals
-- `POST /auto-trading/start` - Start automated trading
-- `POST /tests/ab` - Start A/B strategy test
-- `GET /tests/{test_id}` - Get test status
-
----
-
-## 🎯 Dashboard Features
-
-### Real-time Features
-- Live market data from PocketOption
-- Real-time candle updates
-- WebSocket connectivity status
-- Live strategy performance
-
-### Analytics & Charts
-- Interactive charts with Recharts
-- Performance metrics visualization
-- Strategy comparison tools
-- Risk management displays
-
-### Trading Tools
-- Strategy testing interface
-- Backtesting capabilities
-- Trade execution monitoring
-- Risk management controls
-
----
-
-## 🔧 Configuration
-
-### Environment Variables
-Create a `.env` file in the root directory:
-
-```env
-# API Keys (if needed)
-POCKET_OPTION_API_KEY=your_key_here
-
-# Database Configuration
-DATABASE_URL=sqlite:///./quantumflux.db
-
-# Trading Configuration
-DEFAULT_STRATEGY=quantum_flux
-MAX_TRADE_AMOUNT=100.0
-RISK_PERCENTAGE=0.02
-```
+## Configuration
 
 ### Strategy Configuration
-Strategies are configured in `config/strategies/quantum_flux_1min.json`:
+Located in `strategies/quantum_flux_strategy.py`:
+- RSI Period: 14
+- MACD: Fast 12, Slow 26, Signal 9
+- Bollinger Bands: Period 20, Std Dev 2
+- EMAs: 12, 26
 
-```json
-{
-  "bot_name": "Quantum-Flux-Binary-Optimized",
-  "version": "2.1.0",
-  "description": "Binary options optimized version with 63.2% win rate",
-  "optimization_date": "2025-08-09",
-  "strategy": {
-    "name": "Quantum-Flux-Binary-Optimized",
-    "type": "multi_phase",
-    "target_market": "binary_options_1min",
-    "phases": {
-      "neural": {
-        "weight": 0.4,
-        "enabled": true
-      },
-      "beast": {
-        "weight": 0.35,
-        "enabled": true
-      },
-      "quantum": {
-        "weight": 0.25,
-        "enabled": true
-      }
-    }
-  }
-}
-```
+### Data Configuration
+CSV files in `gui/Data-Visualizer-React/data_history/pocket_option/`:
+- Format: `timestamp,open,close,high,low`
+- Timeframe detection: From filename or directory
+- Volume: Defaults to 1000.0 if missing
 
----
-
-## 🚀 Development
+## Development
 
 ### Backend Development
-```powershell
-# Install development dependencies
-pip install -r requirements-dev.txt
+```bash
+# Main backend (FastAPI)
+uvicorn backend:app --reload --port 8000
 
-# Run tests
-pytest
-
-# Run with auto-reload
-uvicorn backend:app --reload --host 0.0.0.0 --port 8000
+# GUI backend (Flask-SocketIO)
+cd gui/Data-Visualizer-React
+uv run python streaming_server.py
 ```
 
 ### Frontend Development
-```powershell
-cd dashboard
-
-# Install dependencies
-pnpm install
-
-# Start development server
-pnpm dev
-
-# Build for production
-pnpm build
-
-# Preview production build
-pnpm preview
+```bash
+cd gui/Data-Visualizer-React
+npm install
+npm run dev          # Development server
+npm run build        # Production build
+npm run preview      # Preview production
 ```
 
----
+### Testing
+```bash
+# Run smoke tests
+python test_smoke.py
 
-## 📝 Support
+# Test capabilities
+python capabilities/data_streaming.py --verbose
+```
 
-If you encounter issues:
+## Troubleshooting
 
-1. **Check the terminals** for error messages
-2. **Verify all URLs** are accessible
-3. **Check browser console** for JavaScript errors
-4. **Ensure conda environment** is activated
-5. **Verify Python and Node versions**
+### GUI Backend Issues
+```bash
+# Check backend status
+curl http://localhost:3001/health
 
-For technical support, check the AGENT-MEMORY folder for detailed system status and troubleshooting information.
+# Verify data files
+ls gui/Data-Visualizer-React/data_history/pocket_option/
+```
 
----
+### Chrome Connection Issues
+```bash
+# Check if Chrome is on port 9222
+netstat -an | findstr 9222
 
-## 🎉 Success!
+# Restart Chrome session
+python start_hybrid_session.py
+```
 
-### ✅ **Current Achievements**
-Once both servers are running, you'll have a fully functional trading backend with:
-- ✅ Real-time WebSocket data streaming (22,000+ messages processed)
-- ✅ Chrome session management and reconnection
-- ✅ Complete trading capabilities (profile, favorites, trade execution)
-- ✅ Comprehensive API with health monitoring
-- ✅ Clean capabilities-only architecture
+### Frontend Issues
+```bash
+# Clear and reinstall
+cd gui/Data-Visualizer-React
+rm -rf node_modules package-lock.json
+npm install
 
-### 🚀 **Next Phase: Strategy Engine & Automation**
-Phase 3 development can begin immediately with:
-- Signal generation engine implementation
-- Automated trading logic development
-- Strategy testing and backtesting framework
-- A/B testing capabilities
+# Check browser console for errors (F12)
+```
 
-### 🎨 **Future: GUI Integration (Phase 5)**
-- Interactive charts with TradingView
-- Modern React-based UI with Tailwind CSS
-- Real-time WebSocket connectivity
-- Risk management and trade execution controls
+## Recent Updates
 
-**The foundation is solid - Phase 3 development ready to launch! 🚀**
+### October 4, 2025
+- ✅ Integrated backtesting into React GUI
+- ✅ Socket.IO backend with 4 event handlers
+- ✅ Smart CSV file discovery (100+ files)
+- ✅ Fixed profit calculation in backtest engine
+- ✅ Code quality improvements (type hints, removed unused code)
+- ✅ Simplified price mapping architecture
+
+## Support
+
+For issues or questions:
+1. Check `.agent-memory/project-status.md` for latest system state
+2. Review workflow logs for error messages
+3. Verify both backend and frontend are running
+4. Check browser console for JavaScript errors
+5. Ensure CSV data files are accessible
+
+## Next Steps
+
+### Immediate
+- Test backtesting with various CSV files
+- Experiment with strategy parameters
+- Collect more historical data
+
+### Near Future
+- Add more strategy options
+- Implement strategy comparison
+- Enhanced performance metrics
+- Trade execution from GUI
+
+## Success Metrics
+
+✅ GUI backtesting fully functional  
+✅ 100+ CSV files discoverable and loadable  
+✅ Quantum Flux strategy integrated  
+✅ Real-time data streaming working  
+✅ Socket.IO backend operational  
+✅ Both workflows running without errors  
+
+**The platform is ready for backtesting and strategy development! 🚀**
