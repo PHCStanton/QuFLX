@@ -7,7 +7,7 @@ Streams data from the binary options platform to the frontend via WebSocket
 import eventlet
 eventlet.monkey_patch()
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 import json
@@ -15,6 +15,13 @@ import time
 import random
 from datetime import datetime
 import threading
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent.parent))
+
+from strategies.quantum_flux_strategy import QuantumFluxStrategy
+from data_loader import DataLoader, BacktestEngine
 
 app = Flask(__name__)
 CORS(app)
@@ -152,6 +159,126 @@ def stream_data():
             time.sleep(0.1)  # 10 updates per second
         else:
             time.sleep(0.5)  # Check less frequently when not streaming
+
+
+@socketio.on('run_backtest')
+def handle_run_backtest(data):
+    """Run strategy backtest on historical data"""
+    try:
+        file_path = data.get('file_path')
+        strategy_type = data.get('strategy', 'quantum_flux')
+        
+        if not file_path:
+            emit('backtest_error', {'error': 'No file path provided'})
+            return
+        
+        # Load data
+        loader = DataLoader()
+        df = loader.load_csv(file_path)
+        candles = loader.df_to_candles(df)
+        
+        # Initialize strategy
+        if strategy_type == 'quantum_flux':
+            strategy = QuantumFluxStrategy()
+        else:
+            emit('backtest_error', {'error': f'Unknown strategy: {strategy_type}'})
+            return
+        
+        # Run backtest
+        engine = BacktestEngine(strategy)
+        results = engine.run_backtest(candles)
+        
+        emit('backtest_complete', {
+            'results': results,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        emit('backtest_error', {'error': str(e)})
+
+
+@socketio.on('get_available_data')
+def handle_get_available_data():
+    """Get list of available data files"""
+    try:
+        loader = DataLoader()
+        files = loader.get_available_files()
+        emit('available_data', {'files': files})
+    except Exception as e:
+        emit('data_error', {'error': str(e)})
+
+
+@socketio.on('generate_signal')
+def handle_generate_signal(data):
+    """Generate trading signal from current candle data"""
+    try:
+        candles = data.get('candles', [])
+        strategy_type = data.get('strategy', 'quantum_flux')
+        
+        if not candles:
+            emit('signal_error', {'error': 'No candles provided'})
+            return
+        
+        # Initialize strategy
+        if strategy_type == 'quantum_flux':
+            strategy = QuantumFluxStrategy()
+        else:
+            emit('signal_error', {'error': f'Unknown strategy: {strategy_type}'})
+            return
+        
+        # Generate signal
+        signal_result = strategy.generate_signal(candles)
+        
+        if signal_result:
+            emit('signal_generated', {
+                'signal': signal_result.direction.value,
+                'confidence': signal_result.confidence,
+                'strength': signal_result.strength,
+                'indicators': signal_result.indicators,
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            emit('signal_generated', {
+                'signal': 'neutral',
+                'confidence': 0.0,
+                'strength': 0.0,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+    except Exception as e:
+        emit('signal_error', {'error': str(e)})
+
+
+@socketio.on('execute_strategy')
+def handle_execute_strategy(data):
+    """Execute strategy on live streaming data"""
+    try:
+        candles = data.get('candles', [])
+        strategy_type = data.get('strategy', 'quantum_flux')
+        
+        if not candles:
+            emit('strategy_error', {'error': 'No candles provided'})
+            return
+        
+        # Initialize strategy
+        if strategy_type == 'quantum_flux':
+            strategy = QuantumFluxStrategy()
+        else:
+            emit('strategy_error', {'error': f'Unknown strategy: {strategy_type}'})
+            return
+        
+        # Execute strategy
+        signal = strategy.execute(candles)
+        
+        emit('strategy_result', {
+            'signal': signal if signal else 'neutral',
+            'asset': current_asset,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        emit('strategy_error', {'error': str(e)})
+
 
 if __name__ == '__main__':
     # Start background streaming thread
