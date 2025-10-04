@@ -43,7 +43,7 @@ class QuantumSignal:
 class QuantumFluxStrategy(BaseStrategy):
     """Quantum Flux strategy for binary options trading."""
     
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize Quantum Flux Strategy."""
         super().__init__(config)
         self.min_candles = 50
