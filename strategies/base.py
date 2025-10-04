@@ -4,18 +4,18 @@ Base Strategy Class - Common interface for all trading strategies.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import numpy as np
+import logging
 
-from ..utils.logging import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class BaseStrategy(ABC):
     """Base class for all trading strategies."""
     
-    def __init__(self):
+    def __init__(self, config: Dict[str, Any] = None):
         self.name = self.__class__.__name__
+        self.config = config or {}
     
     @abstractmethod
     def execute(self, candles) -> Optional[str]:
