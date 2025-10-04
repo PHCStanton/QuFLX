@@ -31,14 +31,12 @@ class DataLoader:
             logger.error(f"Error loading CSV {file_path}: {e}")
             raise
     
-    def load_asset_data(self, asset: str, timeframe: str = "1m", 
-                        date: Optional[str] = None) -> pd.DataFrame:
+    def load_asset_data(self, asset: str, timeframe: str = "1m") -> pd.DataFrame:
         """Load asset data from standard naming convention or direct path.
         
         Args:
             asset: Asset name (e.g., 'AUDCAD_otc_otc') or full file path
             timeframe: Timeframe ('1m' or '5m') - ignored if asset is a file path
-            date: Optional date in format '2025_10_04_18_57_10'
         
         Returns:
             DataFrame with OHLC data

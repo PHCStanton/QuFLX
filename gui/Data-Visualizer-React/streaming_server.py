@@ -31,10 +31,18 @@ app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
+# Asset base prices
+ASSET_PRICES = {
+    "EURUSD_OTC": 1.0856,
+    "GBPUSD_OTC": 1.2645,
+    "AUDCAD_OTC": 0.8923,
+    "EURJPY_OTC": 156.45,
+}
+
 # Global state for streaming
 current_asset = "EURUSD_OTC"
 streaming_active = False
-base_price = 1.0856
+base_price = ASSET_PRICES[current_asset]
 
 @app.route('/health')
 def health():
@@ -72,15 +80,7 @@ def handle_start_stream(data):
         current_asset = data['asset']
     
     streaming_active = True
-    
-    # Set different base prices for different assets
-    price_map = {
-        "EURUSD_OTC": 1.0856,
-        "GBPUSD_OTC": 1.2645,
-        "AUDCAD_OTC": 0.8923,
-        "EURJPY_OTC": 156.45,
-    }
-    base_price = price_map.get(current_asset, 1.0)
+    base_price = ASSET_PRICES.get(current_asset, 1.0)
     
     print(f"Starting stream for {current_asset} at {datetime.now().isoformat()}")
     emit('stream_started', {
@@ -104,15 +104,7 @@ def handle_change_asset(data):
     
     if data and 'asset' in data:
         current_asset = data['asset']
-        
-        # Set different base prices for different assets
-        price_map = {
-            "EURUSD_OTC": 1.0856,
-            "GBPUSD_OTC": 1.2645,
-            "AUDCAD_OTC": 0.8923,
-            "EURJPY_OTC": 156.45,
-        }
-        base_price = price_map.get(current_asset, 1.0)
+        base_price = ASSET_PRICES.get(current_asset, 1.0)
         
         print(f"Asset changed to {current_asset}")
         emit('asset_changed', {
@@ -126,13 +118,7 @@ def generate_price_update():
     global base_price, current_asset
     
     # Get the original base price for mean reversion
-    price_map = {
-        "EURUSD_OTC": 1.0856,
-        "GBPUSD_OTC": 1.2645,
-        "AUDCAD_OTC": 0.8923,
-        "EURJPY_OTC": 156.45,
-    }
-    original_base = price_map.get(current_asset, 1.0)
+    original_base = ASSET_PRICES.get(current_asset, 1.0)
     
     # Random walk with mean reversion to original base price
     change = random.gauss(0, 0.0002)  # Small random changes
