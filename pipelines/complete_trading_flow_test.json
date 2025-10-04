@@ -1,0 +1,123 @@
+{
+  "debug": true,
+  "dry_run": true,
+  "stop_on_error": false,
+  "artifacts_root": "API-test-space/data_output",
+  "description": "Complete trading flow test: streaming → indicators → strategy → trade execution",
+  "steps": [
+    {
+      "id": "session_init",
+      "cap": "session_scan",
+      "enabled": true,
+      "inputs": {},
+      "description": "Initialize session and verify authentication"
+    },
+    {
+      "id": "profile_check",
+      "cap": "profile_scan",
+      "enabled": true,
+      "inputs": {},
+      "description": "Scan user profile and account information"
+    },
+    {
+      "id": "timeframe_setup",
+      "cap": "topdown_select",
+      "enabled": true,
+      "inputs": {
+        "stack": "1m",
+        "delay_ms": 500,
+        "save": true,
+        "screenshots_subdir": "timeframe_setup"
+      },
+      "description": "Set up 1-minute timeframe for quantum_flux_1min strategy"
+    },
+    {
+      "id": "asset_selection",
+      "cap": "favorite_select",
+      "enabled": true,
+      "inputs": {
+        "min_pct": 85,
+        "select": "first"
+      },
+      "description": "Select high-probability asset for trading"
+    },
+    {
+      "id": "historical_data_collection",
+      "cap": "collect_historical_data",
+      "enabled": true,
+      "inputs": {
+        "asset": "GBPUSD",
+        "timeframe": 1,
+        "duration_minutes": 5,
+        "save_artifacts": true,
+        "screenshots_subdir": "historical_data"
+      },
+      "description": "Collect historical candle data for indicator calculations"
+    },
+    {
+      "id": "realtime_streaming",
+      "cap": "data_streaming",
+      "enabled": true,
+      "inputs": {
+        "duration_minutes": 3,
+        "tick_data_mode": false,
+        "save_artifacts": true,
+        "apply_indicators": true,
+        "strategy_config_path": "config/Strategies/quantum_flux_1min.json",
+        "screenshots_subdir": "streaming_data"
+      },
+      "description": "Stream real-time data, apply technical indicators, and generate trading signals"
+    },
+    {
+      "id": "trade_execution_buy",
+      "cap": "trade_click",
+      "enabled": true,
+      "inputs": {
+        "side": "buy",
+        "timeout": 8,
+        "root": "#put-call-buttons-chart-1"
+      },
+      "description": "Execute BUY trade based on generated signals (dry-run mode)"
+    },
+    {
+      "id": "trade_execution_sell",
+      "cap": "trade_click",
+      "enabled": false,
+      "inputs": {
+        "side": "sell",
+        "timeout": 8,
+        "root": "#put-call-buttons-chart-1"
+      },
+      "description": "Execute SELL trade based on generated signals (disabled for this test)"
+    },
+    {
+      "id": "final_screenshot",
+      "cap": "screenshot_control",
+      "enabled": true,
+      "inputs": {
+        "mode": "single",
+        "subdir": "final_state",
+        "filename": "complete_flow_test_final"
+      },
+      "description": "Capture final state after complete trading flow test"
+    }
+  ],
+  "test_configuration": {
+    "strategy": "quantum_flux_1min",
+    "target_asset": "EURUSD",
+    "timeframe": "1m",
+    "expected_indicators": ["RSI", "MACD", "Bollinger Bands", "SMA"],
+    "signal_types": ["BUY", "SELL", "NEUTRAL"],
+    "min_confidence_threshold": 0.65,
+    "test_duration_minutes": 10
+  },
+  "validation_criteria": {
+    "session_authenticated": true,
+    "timeframe_detected": true,
+    "historical_data_collected": true,
+    "realtime_streaming_active": true,
+    "indicators_calculated": true,
+    "signals_generated": true,
+    "trade_execution_attempted": true
+  }
+}

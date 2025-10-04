@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightweight Charts Test</title>
+    <style>
+        body { margin: 0; padding: 20px; background: #1e293b; color: white; font-family: Arial, sans-serif; }
+        #chart { width: 600px; height: 400px; background: #334155; margin: 20px 0; }
+        .info { background: #374151; padding: 10px; margin: 10px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Lightweight Charts Library Test</h1>
+    <div id="info" class="info">Loading...</div>
+    <div id="chart"></div>
+    
+    <script type="module">
+        import { createChart } from 'lightweight-charts';
+        
+        const info = document.getElementById('info');
+        const chartContainer = document.getElementById('chart');
+        
+        try {
+            info.innerHTML = `
+                <strong>Library Status:</strong><br>
+                - createChart type: ${typeof createChart}<br>
+                - createChart function: ${createChart ? 'Available' : 'Not Available'}
+            `;
+            
+            if (typeof createChart === 'function') {
+                const chart = createChart(chartContainer, {
+                    width: 600,
+                    height: 400,
+                    layout: { background: { color: '#1e293b' }, textColor: '#94a3b8' },
+                    grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } }
+                });
+                
+                info.innerHTML += `<br>
+                    <strong>Chart Object:</strong><br>
+                    - Chart created: ${chart ? 'Yes' : 'No'}<br>
+                    - Constructor: ${chart?.constructor?.name || 'Unknown'}<br>
+                    - addCandlestickSeries: ${typeof chart?.addCandlestickSeries}<br>
+                    - addLineSeries: ${typeof chart?.addLineSeries}<br>
+                    - Methods available: ${Object.getOwnPropertyNames(Object.getPrototypeOf(chart)).join(', ')}
+                `;
+                
+                if (typeof chart.addCandlestickSeries === 'function') {
+                    const candleSeries = chart.addCandlestickSeries({
+                        upColor: '#10b981',
+                        downColor: '#ef4444',
+                        borderUpColor: '#10b981',
+                        borderDownColor: '#ef4444',
+                        wickUpColor: '#10b981',
+                        wickDownColor: '#ef4444',
+                    });
+                    
+                    // Add some test data
+                    candleSeries.setData([
+                        { time: '2023-01-01', open: 100, high: 110, low: 95, close: 105 },
+                        { time: '2023-01-02', open: 105, high: 115, low: 100, close: 108 },
+                        { time: '2023-01-03', open: 108, high: 112, low: 102, close: 110 },
+                        { time: '2023-01-04', open: 110, high: 118, low: 108, close: 115 },
+                        { time: '2023-01-05', open: 115, high: 120, low: 110, close: 112 }
+                    ]);
+                    
+                    info.innerHTML += '<br><strong>Result:</strong> Chart rendered successfully with candlestick data!';
+                } else {
+                    info.innerHTML += '<br><strong>Error:</strong> addCandlestickSeries method not available';
+                }
+            }
+        } catch (error) {
+            info.innerHTML += `<br><strong>Error:</strong> ${error.message}`;
+            console.error('Chart test error:', error);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "steps_by_id": {
+    "updown_1m": {
+      "inputs": {
+        "reopen_each": true,
+        "labels": ["H1", "M15", "M5", "M1"],
+        "menu_toggle_selectors": [
+          "[aria-label*='Time']",
+          "button[aria-label*='Time']",
+          ".timeframe",
+          ".timeframes",
+          ".tf-button",
+          ".chart-controls [aria-label*='Time']",
+          ".toolbar [aria-label*='Time']",
+          "[class*='interval']",
+          "[class*='period']",
+          "[data-testid*='time']",
+          "[data-testid*='timeframe']",
+          "[data-test*='time']",
+          "[data-test*='period']",
+          "[data-qa*='time']",
+          "[data-qa*='period']",
+          ".button-interval",
+          ".current-interval",
+          ".interval",
+          ".chart-interval",
+          ".chart__interval",
+          "[role='button'][aria-expanded]"
+        ]
+      }
+    }
+  }
+}

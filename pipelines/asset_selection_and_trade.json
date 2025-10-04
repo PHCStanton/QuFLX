@@ -1,0 +1,13 @@
+{
+  "debug": false,
+  "dry_run": false,
+  "stop_on_error": true,
+  "artifacts_root": "API-test-space/data_output",
+  "steps": [
+    { "id": "session", "cap": "session_scan", "enabled": true },
+    { "id": "profile", "cap": "profile_scan", "enabled": true },
+    { "id": "updown_1m", "cap": "topdown_select", "enabled": true, "inputs": { "stack": "1m", "delay_ms": 300, "save": true, "screenshots_subdir": "updown" } },
+    { "id": "favorites", "cap": "favorite_select", "enabled": true, "inputs": { "min_pct": 92, "select": "first" } },
+    { "id": "buy_demo", "cap": "trade_click", "enabled": true, "inputs": { "side": "buy", "timeout": 5 } }
+  ]
+}

@@ -1,0 +1,252 @@
+# QuantumFlux Trading Platform - Dependencies
+# Clean Architecture Implementation
+
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database & ORM
+sqlalchemy==2.0.23
+alembic==1.13.1
+psycopg2-binary==2.9.9
+aiosqlite==0.19.0
+
+# Async Support
+aiohttp==3.9.1
+aiofiles==23.2.1
+aioredis==2.0.1
+
+# Data Processing & Analysis
+pandas==2.1.4
+numpy==1.25.2
+scipy==1.11.4
+scikit-learn==1.3.2
+ta==0.10.2
+plotly==5.17.0
+
+# Web Automation
+selenium==4.16.0
+webdriver-manager==4.0.1
+beautifulsoup4==4.12.2
+requests==2.31.0
+
+# WebSocket & Real-time
+websockets==12.0
+socketio==5.10.0
+python-socketio[asyncio]==5.10.0
+
+# Configuration & Environment
+pyyaml==6.0.1
+python-dotenv==1.0.0
+click==8.1.7
+
+# Security & Authentication
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+cryptography==41.0.8
+
+# Monitoring & Logging
+prometheus-client==0.19.0
+structlog==23.2.0
+loguru==0.7.2
+sentry-sdk[fastapi]==1.38.0
+
+# Caching
+redis==5.0.1
+cachetools==5.3.2
+
+# Task Queue
+celery==5.3.4
+kombu==5.3.4
+
+# HTTP Client
+httpx==0.25.2
+
+# Validation & Serialization
+marshmallow==3.20.1
+cerberus==1.3.5
+
+# Date & Time
+python-dateutil==2.8.2
+pytz==2023.3
+arrow==1.3.0
+
+# Development Dependencies
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-xdist==3.5.0
+factory-boy==3.3.0
+faker==20.1.0
+hypothesis==6.92.1
+responses==0.24.1
+httpretty==1.1.4
+
+# Code Quality
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+pylint==3.0.3
+bandit==1.7.5
+safety==2.3.5
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==1.3.0
+mkdocs==1.5.3
+mkdocs-material==9.4.8
+
+# Development Tools
+pre-commit==3.6.0
+tox==4.11.4
+cookiecutter==2.5.0
+
+# Type Checking
+types-requests==2.31.0.10
+types-PyYAML==6.0.12.12
+types-redis==4.6.0.11
+types-python-dateutil==2.8.19.14
+
+# Performance & Profiling
+memory-profiler==0.61.0
+line-profiler==4.1.1
+py-spy==0.3.14
+
+# Database Migrations
+yoyo-migrations==8.2.0
+
+# API Documentation
+fastapi-users==12.1.2
+fastapi-limiter==0.1.5
+
+# Environment Management
+pipenv==2023.11.15
+poetry==1.7.1
+
+# Containerization Support
+gunicorn==21.2.0
+gevent==23.9.1
+
+# Machine Learning (Optional)
+tensorflow==2.15.0
+torch==2.1.1
+xgboost==2.0.2
+lightgbm==4.1.0
+
+# Financial Data
+yfinance==0.2.28
+quandl==3.7.0
+ccxt==4.1.64
+
+# Utilities
+rich==13.7.0
+typer==0.9.0
+tqdm==4.66.1
+more-itertools==10.1.0
+toolz==0.12.0
+
+# Email
+email-validator==2.1.0
+
+# Image Processing (for screenshots)
+Pillow==10.1.0
+
+# Excel/CSV Processing
+openpyxl==3.1.2
+xlsxwriter==3.1.9
+
+# Backup & Storage
+boto3==1.34.0
+azure-storage-blob==12.19.0
+google-cloud-storage==2.10.0
+
+# Message Queues
+pika==1.3.2
+kafka-python==2.0.2
+
+# Circuit Breaker
+circuitbreaker==1.4.0
+retrying==1.3.4
+tenacity==8.2.3
+
+# Health Checks
+healthcheck==1.3.3
+
+# Metrics & APM
+ddtrace==2.5.0
+newrelic==9.2.0
+
+# Development Server
+watchdog==3.0.0
+
+# JSON Processing
+orjson==3.9.10
+ujson==5.8.0
+
+# XML Processing
+lxml==4.9.3
+
+# Compression
+zstandard==0.22.0
+
+# Networking
+netifaces==0.11.0
+
+# System Information
+psutil==5.9.6
+
+# Timezone
+pytz-deprecation-shim==0.1.0.post0
+
+# Development Environment
+ipython==8.17.2
+jupyter==1.0.0
+
+# API Rate Limiting
+slowapi==0.1.9
+
+# Background Tasks
+rq==1.15.1
+
+# File Watching
+watchfiles==0.21.0
+
+# Process Management
+supervisor==4.2.5
+
+# Configuration Validation
+configparser==6.0.0
+
+# Dependency Injection
+dependency-injector==4.41.0
+
+# Event Sourcing
+eventsourcing==9.2.21
+
+# CQRS
+axon-python==0.1.0
+
+# Message Bus
+nameko==2.14.1
+
+# Distributed Tracing
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+
+# Feature Flags
+flagsmith==3.6.0
+
+# A/B Testing
+split-io==8.3.0
+
+# Secrets Management
+hashicorp-hvac==2.0.0
+
+# Load Testing
+locust==2.17.0

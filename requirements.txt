@@ -1,0 +1,43 @@
+# Backend API Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# Web Automation & Browser Control
+selenium>=4.15.0
+undetected-chromedriver>=3.5.5
+websocket-client>=1.6.0
+
+# Data Processing & Analysis
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Async Operations
+asyncio-throttle>=1.0.0
+
+# Configuration Management
+pyyaml>=6.0
+python-dotenv>=1.0.0
+toml>=0.10.0
+
+# Logging
+structlog>=23.0.0
+
+# Testing Framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+
+# Code Quality Tools
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0
+isort>=5.12.0
+
+# Development Tools
+pre-commit>=3.4.0
+watchdog>=3.0.0
+
+# System Dependencies (Missing from original)
+psutil>=5.9.0
+pywin32>=306; sys_platform == "win32"

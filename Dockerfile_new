@@ -1,0 +1,152 @@
+# QuantumFlux Trading Platform - Clean Architecture
+# Multi-stage Docker build for production deployment
+
+# Build stage
+FROM python:3.11-slim as builder
+
+# Set build arguments
+ARG BUILD_ENV=production
+ARG APP_VERSION=2.0.0
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Set work directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements_new.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements_new.txt
+
+# Production stage
+FROM python:3.11-slim as production
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    ENVIRONMENT=production \
+    APP_VERSION=2.0.0
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    gnupg \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Chrome for WebDriver
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list && \
+    apt-get update && \
+    apt-get install -y google-chrome-stable && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install ChromeDriver
+RUN CHROME_DRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE) && \
+    wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/$CHROME_DRIVER_VERSION/chromedriver_linux64.zip && \
+    unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/ && \
+    rm /tmp/chromedriver.zip && \
+    chmod +x /usr/local/bin/chromedriver
+
+# Create app user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Create directories
+RUN mkdir -p /app /var/log/quantumflux /var/lib/quantumflux && \
+    chown -R appuser:appuser /app /var/log/quantumflux /var/lib/quantumflux
+
+# Set work directory
+WORKDIR /app
+
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY --chown=appuser:appuser src_new/ ./src_new/
+COPY --chown=appuser:appuser config_new/ ./config_new/
+COPY --chown=appuser:appuser tests_new/ ./tests_new/
+COPY --chown=appuser:appuser scripts_new/ ./scripts_new/
+COPY --chown=appuser:appuser docs_new/ ./docs_new/
+
+# Copy configuration files
+COPY --chown=appuser:appuser pytest_new.ini ./pytest.ini
+COPY --chown=appuser:appuser requirements_new.txt ./requirements.txt
+
+# Copy startup scripts
+COPY --chown=appuser:appuser scripts_new/docker/entrypoint.sh ./entrypoint.sh
+COPY --chown=appuser:appuser scripts_new/docker/healthcheck.sh ./healthcheck.sh
+
+# Make scripts executable
+RUN chmod +x ./entrypoint.sh ./healthcheck.sh
+
+# Switch to app user
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD ./healthcheck.sh
+
+# Set entrypoint
+ENTRYPOINT ["./entrypoint.sh"]
+
+# Default command
+CMD ["uvicorn", "src_new.presentation.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Development stage
+FROM production as development
+
+# Switch back to root for development tools
+USER root
+
+# Install development dependencies
+RUN apt-get update && apt-get install -y \
+    vim \
+    htop \
+    tree \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install development Python packages
+RUN pip install \
+    ipython \
+    jupyter \
+    pytest-xvfb \
+    pytest-html
+
+# Set development environment
+ENV ENVIRONMENT=development \
+    DEBUG=true
+
+# Switch back to app user
+USER appuser
+
+# Development command with auto-reload
+CMD ["uvicorn", "src_new.presentation.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+# Testing stage
+FROM development as testing
+
+# Set testing environment
+ENV ENVIRONMENT=testing \
+    TESTING=true
+
+# Run tests by default
+CMD ["pytest", "tests_new/", "-v", "--cov=src_new", "--cov-report=html"]

@@ -1,0 +1,140 @@
+# Development Environment Configuration
+# QuantumFlux Trading Platform
+
+app:
+  name: "QuantumFlux Trading Platform"
+  version: "2.0.0"
+  environment: "development"
+  debug: true
+  log_level: "DEBUG"
+
+api:
+  host: "localhost"
+  port: 8000
+  reload: true
+  workers: 1
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:5173"
+  rate_limiting:
+    enabled: true
+    default_limit: 100
+    default_window: 60
+
+database:
+  type: "sqlite"
+  url: "sqlite:///./data_new/development.db"
+  echo: true
+  pool_size: 5
+  max_overflow: 10
+
+trading:
+  platform: "pocket_option"
+  demo_mode: true
+  default_stake_amount: 10.0
+  max_concurrent_trades: 3
+  max_daily_trades: 50
+  risk_management:
+    max_risk_per_trade: 0.02  # 2% of account
+    max_daily_risk: 0.10      # 10% of account
+    stop_loss_enabled: true
+    take_profit_enabled: true
+
+market_data:
+  providers:
+    primary: "pocket_option_websocket"
+    fallback: "pocket_option_rest"
+  cache:
+    enabled: true
+    ttl_seconds: 30
+  real_time:
+    enabled: true
+    buffer_size: 1000
+    update_interval_ms: 100
+
+strategy:
+  default_timeframe: "1m"
+  signal_strength_threshold: "MODERATE"
+  backtest:
+    enabled: true
+    initial_balance: 10000.0
+    commission: 0.0
+  validation:
+    min_historical_data_points: 100
+    required_indicators:
+      - "rsi"
+      - "macd"
+      - "bollinger_bands"
+
+webdriver:
+  browser: "chrome"
+  headless: false
+  implicit_wait: 10
+  page_load_timeout: 30
+  window_size:
+    width: 1920
+    height: 1080
+  options:
+    - "--disable-blink-features=AutomationControlled"
+    - "--disable-extensions"
+    - "--no-sandbox"
+    - "--disable-dev-shm-usage"
+
+logging:
+  level: "DEBUG"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  handlers:
+    console:
+      enabled: true
+      level: "DEBUG"
+    file:
+      enabled: true
+      level: "INFO"
+      path: "logs_new/application/app.log"
+      max_bytes: 10485760  # 10MB
+      backup_count: 5
+    trading:
+      enabled: true
+      level: "INFO"
+      path: "logs_new/trading/trades.log"
+      max_bytes: 10485760
+      backup_count: 10
+
+monitoring:
+  metrics:
+    enabled: true
+    port: 9090
+  health_check:
+    enabled: true
+    endpoint: "/health"
+    interval_seconds: 30
+  alerts:
+    enabled: true
+    email_notifications: false
+    webhook_url: null
+
+security:
+  secret_key: "dev-secret-key-change-in-production"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+  session_timeout_minutes: 60
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+
+external_services:
+  pocket_option:
+    base_url: "https://pocketoption.com"
+    login_url: "https://pocketoption.com/en/login"
+    trading_url: "https://pocketoption.com/en/cabinet/demo-quick-high-low/"
+    websocket_url: "wss://pocketoption.com/ws/"
+    timeout_seconds: 30
+    retry_attempts: 3
+    retry_delay_seconds: 1
+
+testing:
+  fixtures_path: "tests_new/fixtures/data"
+  mock_external_services: true
+  test_database_url: "sqlite:///./data_new/test.db"
+  parallel_execution: false
+  coverage_threshold: 80

@@ -1,0 +1,11 @@
+{
+  "debug": true,
+  "dry_run": true,
+  "stop_on_error": true,
+  "artifacts_root": "API-test-space/data_output",
+  "steps": [
+    { "id": "session", "cap": "session_scan", "enabled": true },
+    { "id": "updown_1m", "cap": "topdown_select", "enabled": true, "inputs": { "stack": "1m", "delay_ms": 300, "save": true, "screenshots_subdir": "updown" } },
+    { "id": "updown_5m", "cap": "topdown_select", "enabled": false, "inputs": { "stack": "5m", "delay_ms": 300, "save": true, "screenshots_subdir": "updown" } }
+  ]
+}

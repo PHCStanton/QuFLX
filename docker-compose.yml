@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  quantumflux-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quantumflux-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - APP_VERSION=2.0.0
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./Chrome_profile:/tmp/chrome-profile
+    networks:
+      - quantumflux-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  quantumflux-frontend:
+    image: nginx:alpine
+    container_name: quantumflux-frontend
+    ports:
+      - "80:80"
+    volumes:
+      - ./gui/Trading_Data_Visualizer/dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - quantumflux-network
+    restart: unless-stopped
+    depends_on:
+      - quantumflux-backend
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+
+networks:
+  quantumflux-network:
+    driver: bridge
+
+volumes:
+  logs:
+    driver: local
+  data:
+    driver: local

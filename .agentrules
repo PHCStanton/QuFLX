@@ -1,0 +1,102 @@
+# QuantumFlux Project Guidelines
+
+## Documentation Requirements
+- Update relevant documentation when modifying features
+- Keep README.md in sync with new capabilities
+- Maintain changelog entries for significant changes
+- Update .agent-memory/ files when project context changes significantly
+
+## Architecture
+- Follow established patterns in .agent-memory/systemPatterns.md
+- Document significant architectural decisions
+- Maintain capabilities-first architecture approach
+- Use direct capabilities integration without complex adapter layers
+- Keep data_streaming.py as the core engine for all data operations
+
+## Code Style & Patterns
+- Follow the coding standards outlined in .agent-memory/techContext.md
+- Maintain consistency with existing codebase
+- Use type hints for all function parameters and returns
+- Follow PEP 8 Python style guidelines
+- Include comprehensive docstrings for all classes and functions
+
+## Testing Standards
+- Follow testing requirements in .agent-memory/techContext.md
+- Ensure adequate test coverage for new features
+- Run smoke tests before committing changes: `python test_smoke.py`
+- Test CLI operations: `python qf.py --help`
+- Verify API endpoints when backend changes are made
+
+## Chrome Session Management
+- Always use workspace Chrome_profile/ directory for session persistence
+- Maintain Chrome remote debugging on port 9222
+- Test Chrome session attachment before implementing new features
+- Ensure PocketOption demo account is used for all testing
+
+## Data Handling
+- All market data must be exported to CSV in Historical_Data/data_stream/
+- Use timestamp-based filenames for all data exports
+- Maintain data quality validation in all data processing operations
+- Ensure WebSocket data collection remains the primary data source
+
+## Security
+- Never commit sensitive files (.env, credentials, API keys)
+- Use environment variables for configuration
+- Keep credentials out of logs and output
+- Always use PocketOption demo accounts for development and testing
+- Restrict API CORS to localhost development ports only
+
+## Capabilities Framework
+- All new trading operations must be implemented as capabilities
+- Follow existing capability patterns in capabilities/ directory
+- Use proper Ctx object for all capability operations
+- Include comprehensive error handling and diagnostics
+- Generate artifacts for debugging when ctx.debug is enabled
+
+## Backend Integration
+- Maintain minimal FastAPI backend with direct capabilities integration
+- Keep API endpoints simple and focused on specific operations
+- Use proper HTTP status codes and error responses
+- Include rate limiting for all API endpoints
+- Maintain WebSocket support for real-time data streaming
+
+## CLI Interface
+- Keep qf.py as the primary CLI interface for all operations
+- Include comprehensive help text for all commands
+- Provide clear error messages and usage examples
+- Support both interactive and scripted usage patterns
+- Maintain backward compatibility for existing commands
+
+## Development Workflow
+- Start Chrome session before development: `python start_hybrid_session.py`
+- Use PowerShell launcher for full system startup: `.\scripts\start_all.ps1`
+- Run smoke tests to verify system functionality
+- Test both CLI and API interfaces for new features
+- Update documentation before completing feature development
+
+## Memory System Maintenance
+- Update .agent-memory/activeContext.md when starting new work
+- Document architectural changes in .agent-memory/systemPatterns.md
+- Keep .agent-memory/progress.md current with development status
+- Review and update .agent-memory/ files before ending development sessions
+
+## Performance Requirements
+- API response times must be <500ms for all endpoints
+- WebSocket data processing must handle real-time streaming
+- CSV export must be efficient for large datasets
+- Chrome session management must be stable across restarts
+- Memory usage must be optimized for long-running sessions
+
+## Error Handling
+- Use try-catch blocks with specific exception types
+- Provide detailed error messages with context
+- Log errors appropriately without exposing sensitive information
+- Include recovery mechanisms where possible
+- Generate diagnostic artifacts for complex failures
+
+## Deployment Considerations
+- Maintain Docker containerization for production deployment
+- Keep environment configuration separate from code
+- Ensure all dependencies are properly specified in requirements.txt
+- Test deployment configurations before production use
+- Maintain security hardening for production environments
