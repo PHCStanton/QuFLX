@@ -1,7 +1,64 @@
+import { io } from 'socket.io-client';
+
 class StrategyService {
   constructor() {
     this.strategies = new Map();
     this.runningStrategies = new Map();
+    this.socket = null;
+    this.backtestCallbacks = new Map();
+    this.signalCallbacks = new Map();
+  }
+
+  initializeSocket(url = 'http://localhost:3001') {
+    if (this.socket) return this.socket;
+
+    this.socket = io(url, {
+      transports: ['websocket', 'polling'],
+      reconnection: true
+    });
+
+    // Set up event listeners
+    this.socket.on('backtest_complete', (data) => {
+      const callback = this.backtestCallbacks.get('current');
+      if (callback) {
+        callback({ success: true, results: data.results });
+        this.backtestCallbacks.delete('current');
+      }
+    });
+
+    this.socket.on('backtest_error', (data) => {
+      const callback = this.backtestCallbacks.get('current');
+      if (callback) {
+        callback({ success: false, error: data.error });
+        this.backtestCallbacks.delete('current');
+      }
+    });
+
+    this.socket.on('signal_generated', (data) => {
+      const callback = this.signalCallbacks.get('current');
+      if (callback) {
+        callback({ success: true, signal: data });
+        this.signalCallbacks.delete('current');
+      }
+    });
+
+    this.socket.on('signal_error', (data) => {
+      const callback = this.signalCallbacks.get('current');
+      if (callback) {
+        callback({ success: false, error: data.error });
+        this.signalCallbacks.delete('current');
+      }
+    });
+
+    this.socket.on('available_data', (data) => {
+      const callback = this.backtestCallbacks.get('data_files');
+      if (callback) {
+        callback({ success: true, files: data.files });
+        this.backtestCallbacks.delete('data_files');
+      }
+    });
+
+    return this.socket;
   }
 
   registerStrategy(id, strategy) {
@@ -17,7 +74,7 @@ class StrategyService {
   }
 
   validateStrategy(strategy) {
-    const requiredFields = ['name', 'type', 'execute'];
+    const requiredFields = ['name', 'type'];
     return requiredFields.every(field => strategy.hasOwnProperty(field));
   }
 
@@ -72,14 +129,24 @@ class StrategyService {
 
   createPythonStrategyExecutor(code) {
     return async (candles, indicators) => {
-      const response = await fetch('/api/strategy/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, candles, indicators })
-      });
+      if (!this.socket) {
+        this.initializeSocket();
+      }
 
-      const result = await response.json();
-      return result.signals || [];
+      return new Promise((resolve) => {
+        this.signalCallbacks.set('current', (result) => {
+          if (result.success) {
+            resolve([result.signal]);
+          } else {
+            resolve([]);
+          }
+        });
+
+        this.socket.emit('generate_signal', {
+          candles,
+          strategy: 'quantum_flux'
+        });
+      });
     };
   }
 
@@ -98,13 +165,13 @@ class StrategyService {
 
         if (fastPrev < slowPrev && fastCurr > slowCurr) {
           return {
-            type: 'BUY',
+            type: 'CALL',
             confidence: 0.8,
             reason: `${rule.fastIndicator} crossed above ${rule.slowIndicator}`
           };
         } else if (fastPrev > slowPrev && fastCurr < slowCurr) {
           return {
-            type: 'SELL',
+            type: 'PUT',
             confidence: 0.8,
             reason: `${rule.fastIndicator} crossed below ${rule.slowIndicator}`
           };
@@ -115,78 +182,66 @@ class StrategyService {
     return null;
   }
 
-  async runBacktest(strategyId, data, config = {}) {
-    const strategy = this.strategies.get(strategyId);
-    if (!strategy) {
-      return { success: false, error: 'Strategy not found' };
+  async runBacktest(strategyId, filePath, config = {}) {
+    if (!this.socket) {
+      this.initializeSocket();
     }
 
-    const {
-      initialCapital = 10000,
-      positionSize = 0.1,
-      commission = 0.001
-    } = config;
+    return new Promise((resolve) => {
+      this.backtestCallbacks.set('current', resolve);
 
-    let capital = initialCapital;
-    let position = null;
-    const trades = [];
+      this.socket.emit('run_backtest', {
+        file_path: filePath,
+        strategy: 'quantum_flux',
+        ...config
+      });
+    });
+  }
 
-    for (let i = 1; i < data.length; i++) {
-      const candles = data.slice(0, i + 1);
-      const signals = await strategy.execute(candles, {});
-
-      for (const signal of signals) {
-        if (signal.type === 'BUY' && !position) {
-          const amount = capital * positionSize;
-          const price = candles[i].close;
-          const shares = amount / price;
-          
-          position = {
-            type: 'LONG',
-            entryPrice: price,
-            shares,
-            entryTime: candles[i].time
-          };
-
-          capital -= amount * (1 + commission);
-          
-        } else if (signal.type === 'SELL' && position) {
-          const exitPrice = candles[i].close;
-          const pnl = (exitPrice - position.entryPrice) * position.shares;
-          
-          capital += (position.shares * exitPrice) * (1 - commission);
-          
-          trades.push({
-            ...position,
-            exitPrice,
-            exitTime: candles[i].time,
-            pnl,
-            pnlPercent: (pnl / (position.entryPrice * position.shares)) * 100
-          });
-
-          position = null;
-        }
-      }
+  async getAvailableDataFiles() {
+    if (!this.socket) {
+      this.initializeSocket();
     }
 
-    const totalPnL = capital - initialCapital;
-    const winningTrades = trades.filter(t => t.pnl > 0);
-    const losingTrades = trades.filter(t => t.pnl <= 0);
+    return new Promise((resolve) => {
+      this.backtestCallbacks.set('data_files', resolve);
+      this.socket.emit('get_available_data');
+    });
+  }
 
-    return {
-      success: true,
-      results: {
-        initialCapital,
-        finalCapital: capital,
-        totalPnL,
-        totalPnLPercent: (totalPnL / initialCapital) * 100,
-        totalTrades: trades.length,
-        winningTrades: winningTrades.length,
-        losingTrades: losingTrades.length,
-        winRate: trades.length > 0 ? (winningTrades.length / trades.length) * 100 : 0,
-        trades
-      }
-    };
+  async generateSignal(candles, strategyType = 'quantum_flux') {
+    if (!this.socket) {
+      this.initializeSocket();
+    }
+
+    return new Promise((resolve) => {
+      this.signalCallbacks.set('current', resolve);
+      
+      this.socket.emit('generate_signal', {
+        candles,
+        strategy: strategyType
+      });
+    });
+  }
+
+  async executeStrategy(candles, strategyType = 'quantum_flux') {
+    if (!this.socket) {
+      this.initializeSocket();
+    }
+
+    return new Promise((resolve) => {
+      const handler = (data) => {
+        resolve({ success: true, signal: data.signal });
+        this.socket.off('strategy_result', handler);
+      };
+
+      this.socket.on('strategy_result', handler);
+      
+      this.socket.emit('execute_strategy', {
+        candles,
+        strategy: strategyType
+      });
+    });
   }
 
   getStrategy(id) {
@@ -199,6 +254,13 @@ class StrategyService {
 
   deleteStrategy(id) {
     return this.strategies.delete(id);
+  }
+
+  disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
   }
 }
 
