@@ -1,0 +1,84 @@
+# -----------------------------
+# .gitignore for QuFLX repository
+# -----------------------------
+
+# Python bytecode
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing / coverage
+.pytest_cache/
+.mypy_cache/
+.cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+
+# Logs and runtime files
+*.log
+logs/
+logs_new/
+
+# Data, artifacts, large/generated files
+data/
+data_output/
+assets_data/
+Historical_Data/
+screenshots/
+test_artifacts/
+tmp_tests/
+
+# Browser/user profile (sensitive)
+Chrome_profile/
+
+# Database files
+*.sqlite
+*.db
+*.db-journal
+
+# Env files (may contain secrets)
+.env
+.env.*
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node / JS (if any)
+node_modules/
+
+# Pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Misc
+.ropeproject/
+
+# Keep important repo files; adjust as needed
+# If you intentionally want to keep small example data, add exceptions like:
+# !data/examples/
