@@ -67,8 +67,16 @@ Chrome_profile/
 Thumbs.db
 desktop.ini
 
-# Node / JS (if any)
+# Node / JS
 node_modules/
+.pnpm-store/
+dist/
+*.local
+.vite/
+.turbo/
+.next/
+.nuxt/
+.cache/
 
 # Pip
 pip-log.txt
