@@ -36,7 +36,6 @@ logs_new/
 
 # Data, artifacts, large/generated files
 archive/
-data/
 data_output/
 assets_data/
 Historical_Data/
