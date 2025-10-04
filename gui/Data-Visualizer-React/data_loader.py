@@ -33,34 +33,46 @@ class DataLoader:
     
     def load_asset_data(self, asset: str, timeframe: str = "1m", 
                         date: Optional[str] = None) -> pd.DataFrame:
-        """Load asset data from standard naming convention.
+        """Load asset data from standard naming convention or direct path.
         
         Args:
-            asset: Asset name (e.g., 'AUDCAD_otc_otc')
-            timeframe: Timeframe ('1m' or '5m')
+            asset: Asset name (e.g., 'AUDCAD_otc_otc') or full file path
+            timeframe: Timeframe ('1m' or '5m') - ignored if asset is a file path
             date: Optional date in format '2025_10_04_18_57_10'
         
         Returns:
             DataFrame with OHLC data
         """
-        # Find matching files
-        pattern = f"{asset}_{timeframe}_*"
-        files = list(self.data_dir.glob(pattern))
+        # Check if asset is actually a file path
+        asset_path = Path(asset)
+        if asset_path.exists() and asset_path.is_file():
+            logger.info(f"Loading data from direct path: {asset}")
+            return self.load_csv(str(asset_path))
         
-        if not files:
+        # Otherwise, search by asset name and timeframe
+        # Get all available files and filter by asset and timeframe
+        all_files = self.get_available_files()
+        
+        # Try exact match first (case-insensitive)
+        exact_matches = [
+            f for f in all_files 
+            if f['asset'].lower() == asset.lower() and f['timeframe'] == timeframe
+        ]
+        
+        # Fallback to partial match if no exact match
+        if not exact_matches:
+            exact_matches = [
+                f for f in all_files 
+                if asset.lower() in f['asset'].lower() and f['timeframe'] == timeframe
+            ]
+        
+        if not exact_matches:
             raise FileNotFoundError(f"No data files found for {asset} {timeframe}")
         
-        # Use most recent file if no date specified
-        file_path = files[-1] if date is None else None
-        
-        if date:
-            for f in files:
-                if date in f.name:
-                    file_path = f
-                    break
-        
-        if not file_path:
-            raise FileNotFoundError(f"No file found matching date {date}")
+        # Sort by filename (most recent timestamp last) and use the last one
+        matching_files = sorted(exact_matches, key=lambda x: x['filename'])
+        file_info = matching_files[-1]
+        file_path = file_info['path']
         
         logger.info(f"Loading data from {file_path}")
         return self.load_csv(file_path)
@@ -82,11 +94,39 @@ class DataLoader:
     def get_available_files(self) -> List[Dict[str, str]]:
         """Get list of available data files."""
         files = []
-        for file_path in self.data_dir.glob("*_[15]m_*"):
-            parts = file_path.stem.split('_')
-            if len(parts) >= 4:
-                asset = '_'.join(parts[:-7])  # Everything before timeframe
-                timeframe = parts[-7]  # e.g., '1m' or '5m'
+        # Search for all CSV files recursively
+        for file_path in self.data_dir.rglob("*.csv"):
+            if file_path.is_file():
+                # Try to extract timeframe from filename first
+                parts = file_path.stem.split('_')
+                timeframe = None
+                asset = None
+                
+                # Method 1: Look for timeframe in filename (e.g., ASSET_1m_date)
+                for i, part in enumerate(parts):
+                    if part in ['1m', '5m', '15m', '1h', '4h', '1d']:
+                        timeframe = part
+                        asset = '_'.join(parts[:i])
+                        break
+                
+                # Method 2: Infer from parent directory name (e.g., data_1m, data_5m)
+                if not timeframe:
+                    parent_dir = file_path.parent.name
+                    if 'data_1m' in parent_dir or '1m' in parent_dir.lower():
+                        timeframe = '1m'
+                    elif 'data_5m' in parent_dir or '5m' in parent_dir.lower():
+                        timeframe = '5m'
+                    elif '15m' in parent_dir.lower():
+                        timeframe = '15m'
+                    
+                    # Extract asset from filename
+                    asset = parts[0] if parts else 'Unknown'
+                
+                # Method 3: Default fallback
+                if not timeframe:
+                    timeframe = 'unknown'
+                if not asset:
+                    asset = file_path.stem
                 
                 files.append({
                     'filename': file_path.name,
@@ -146,11 +186,13 @@ class BacktestEngine:
                     trade_amount = balance * 0.01  # 1% per trade
                     payout = 0.8  # 80% payout
                     
+                    # Calculate profit/loss
                     if won:
                         profit = trade_amount * payout
                         balance += profit
                         win_count += 1
                     else:
+                        profit = -trade_amount
                         balance -= trade_amount
                         loss_count += 1
                     
@@ -160,7 +202,7 @@ class BacktestEngine:
                         'entry_price': entry_price,
                         'exit_price': exit_price,
                         'won': won,
-                        'profit': profit if won else -trade_amount,
+                        'profit': profit,
                         'balance': balance
                     })
                     

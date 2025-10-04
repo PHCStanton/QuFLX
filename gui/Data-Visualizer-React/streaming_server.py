@@ -18,7 +18,11 @@ import threading
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent.parent))
+# Add paths for imports
+script_dir = Path(__file__).parent
+root_dir = script_dir.parent.parent  # Go up two levels to workspace root
+sys.path.insert(0, str(root_dir))
+sys.path.insert(0, str(script_dir))
 
 from strategies.quantum_flux_strategy import QuantumFluxStrategy
 from data_loader import DataLoader, BacktestEngine
