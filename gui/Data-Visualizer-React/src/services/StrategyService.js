@@ -203,6 +203,13 @@ class StrategyService {
       this.initializeSocket();
     }
 
+    // Wait for connection if not connected
+    if (!this.socket.connected) {
+      await new Promise((resolve) => {
+        this.socket.once('connect', resolve);
+      });
+    }
+
     return new Promise((resolve) => {
       this.backtestCallbacks.set('data_files', resolve);
       this.socket.emit('get_available_data');

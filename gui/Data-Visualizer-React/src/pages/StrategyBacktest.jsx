@@ -133,12 +133,17 @@ const StrategyBacktest = () => {
                   onChange={(e) => setSelectedFile(e.target.value)}
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {dataFiles.map(file => (
-                    <option key={file.path} value={file.path}>
-                      {file.filename} ({file.timeframe})
-                    </option>
-                  ))}
+                  {dataFiles.length === 0 ? (
+                    <option>Loading files...</option>
+                  ) : (
+                    dataFiles.map((file, index) => (
+                      <option key={file.path || index} value={file.path}>
+                        {file.asset} - {file.filename} ({file.timeframe})
+                      </option>
+                    ))
+                  )}
                 </select>
+                <div className="text-xs text-slate-400 mt-1">{dataFiles.length} files available</div>
               </div>
             </div>
           </div>

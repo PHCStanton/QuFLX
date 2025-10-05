@@ -15,9 +15,11 @@ class DataLoader:
     
     def __init__(self, data_dir: str = "data_history/pocket_option"):
         self.data_dir = Path(data_dir)
-        # Add additional data directories to search
+        # Add additional data directories to search (relative to project root)
+        script_dir = Path(__file__).parent
+        root_dir = script_dir.parent.parent  # Go up to workspace root
         self.additional_dirs = [
-            Path("data/data_output/assets_data/data_collect")
+            root_dir / "data" / "data_output" / "assets_data" / "data_collect"
         ]
     
     def load_csv(self, file_path: str) -> pd.DataFrame:
@@ -84,12 +86,12 @@ class DataLoader:
         candles = []
         for _, row in df.iterrows():
             candles.append({
-                'timestamp': row['timestamp'].isoformat(),
+                'timestamp': row['timestamp'].isoformat(),  # type: ignore
                 'open': float(row['open']),
                 'high': float(row['high']),
                 'low': float(row['low']),
                 'close': float(row['close']),
-                'volume': float(row.get('volume', 1000.0))
+                'volume': float(row.get('volume', 1000.0))  # type: ignore
             })
         return candles
     
