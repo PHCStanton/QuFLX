@@ -31,7 +31,6 @@ A sophisticated automated trading platform for PocketOption combining real-time 
 
 **Start Backend** (Terminal 1):
 ```bash
-cd gui/Data-Visualizer-React
 uv run python streaming_server.py
 ```
 
@@ -108,6 +107,7 @@ npm run dev
 
 ```
 QuantumFlux/
+├── streaming_server.py              # Flask-SocketIO backend (Port 3001) ✨
 ├── gui/Data-Visualizer-React/       # React GUI
 │   ├── src/                         # Frontend source
 │   │   ├── pages/
@@ -118,7 +118,6 @@ QuantumFlux/
 │   │   │   └── StrategyService.js   # Socket.IO integration ✨
 │   │   └── components/              # UI components
 │   ├── data_loader.py               # CSV loading & backtest engine ✨
-│   ├── streaming_server.py          # Flask-SocketIO backend ✨
 │   └── data_history/pocket_option/  # Historical CSV files (100+)
 ├── strategies/
 │   ├── quantum_flux_strategy.py     # Main strategy ✨
@@ -194,7 +193,6 @@ CSV files in `gui/Data-Visualizer-React/data_history/pocket_option/`:
 uvicorn backend:app --reload --port 8000
 
 # GUI backend (Flask-SocketIO)
-cd gui/Data-Visualizer-React
 uv run python streaming_server.py
 ```
 

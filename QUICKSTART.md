@@ -12,7 +12,6 @@ Perfect for strategy development and testing without live trading.
 
 **Step 1: Start Backend**
 ```bash
-cd gui/Data-Visualizer-React
 uv run python streaming_server.py
 ```
 
@@ -74,7 +73,6 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 
 **Step 3: Start GUI Backend** (New Terminal)
 ```bash
-cd gui/Data-Visualizer-React
 uv run python streaming_server.py
 ```
 
