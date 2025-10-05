@@ -15,6 +15,10 @@ class DataLoader:
     
     def __init__(self, data_dir: str = "data_history/pocket_option"):
         self.data_dir = Path(data_dir)
+        # Add additional data directories to search
+        self.additional_dirs = [
+            Path("data/data_output/assets_data/data_collect")
+        ]
     
     def load_csv(self, file_path: str) -> pd.DataFrame:
         """Load CSV file and return DataFrame."""
@@ -92,46 +96,53 @@ class DataLoader:
     def get_available_files(self) -> List[Dict[str, str]]:
         """Get list of available data files."""
         files = []
-        # Search for all CSV files recursively
-        for file_path in self.data_dir.rglob("*.csv"):
-            if file_path.is_file():
-                # Try to extract timeframe from filename first
-                parts = file_path.stem.split('_')
-                timeframe = None
-                asset = None
-                
-                # Method 1: Look for timeframe in filename (e.g., ASSET_1m_date)
-                for i, part in enumerate(parts):
-                    if part in ['1m', '5m', '15m', '1h', '4h', '1d']:
-                        timeframe = part
-                        asset = '_'.join(parts[:i])
-                        break
-                
-                # Method 2: Infer from parent directory name (e.g., data_1m, data_5m)
-                if not timeframe:
-                    parent_dir = file_path.parent.name
-                    if 'data_1m' in parent_dir or '1m' in parent_dir.lower():
-                        timeframe = '1m'
-                    elif 'data_5m' in parent_dir or '5m' in parent_dir.lower():
-                        timeframe = '5m'
-                    elif '15m' in parent_dir.lower():
-                        timeframe = '15m'
+        
+        # Collect all directories to search
+        search_dirs = [self.data_dir] + self.additional_dirs
+        
+        # Search for all CSV files recursively in all directories
+        for data_dir in search_dirs:
+            if not data_dir.exists():
+                continue
+            for file_path in data_dir.rglob("*.csv"):
+                if file_path.is_file():
+                    # Try to extract timeframe from filename first
+                    parts = file_path.stem.split('_')
+                    timeframe = None
+                    asset = None
                     
-                    # Extract asset from filename
-                    asset = parts[0] if parts else 'Unknown'
-                
-                # Method 3: Default fallback
-                if not timeframe:
-                    timeframe = 'unknown'
-                if not asset:
-                    asset = file_path.stem
-                
-                files.append({
-                    'filename': file_path.name,
-                    'asset': asset,
-                    'timeframe': timeframe,
-                    'path': str(file_path)
-                })
+                    # Method 1: Look for timeframe in filename (e.g., ASSET_1m_date)
+                    for i, part in enumerate(parts):
+                        if part in ['1m', '5m', '15m', '1h', '4h', '1d']:
+                            timeframe = part
+                            asset = '_'.join(parts[:i])
+                            break
+                    
+                    # Method 2: Infer from parent directory name (e.g., data_1m, 1M_candles, 5M_candles)
+                    if not timeframe:
+                        parent_dir = file_path.parent.name
+                        if 'data_1m' in parent_dir or '1m_candles' in parent_dir.lower():
+                            timeframe = '1m'
+                        elif 'data_5m' in parent_dir or '5m_candles' in parent_dir.lower():
+                            timeframe = '5m'
+                        elif '15m' in parent_dir.lower():
+                            timeframe = '15m'
+                        elif '1h_candles' in parent_dir.lower() or '60m' in parent_dir.lower():
+                            timeframe = '1h'
+                        
+                        # Extract asset from filename
+                        asset = parts[0] if parts else 'Unknown'
+                    
+                    # Skip if we still don't have basic info
+                    if not asset or not timeframe or timeframe == 'unknown':
+                        continue
+                    
+                    files.append({
+                        'filename': file_path.name,
+                        'asset': asset,
+                        'timeframe': timeframe,
+                        'path': str(file_path)
+                    })
         
         return files
 
