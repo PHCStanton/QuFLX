@@ -5,23 +5,64 @@ export const parseTradingData = (csvText, symbol) => {
 
   // Skip header and parse data
   for (let i = 1; i < lines.length; i++) {
-    const [index, timestamp, open, close, high, low] = lines[i].split(',');
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    const parts = line.split(',');
+    
+    // Handle different CSV formats
+    let timestamp, open, close, high, low;
+    
+    if (parts.length === 5) {
+      // Format: timestamp,open,close,high,low
+      [timestamp, open, close, high, low] = parts;
+    } else if (parts.length === 6) {
+      // Format: index,timestamp,open,close,high,low
+      [, timestamp, open, close, high, low] = parts;
+    } else {
+      console.warn(`Skipping invalid line ${i}: ${line}`);
+      continue;
+    }
+    
     if (timestamp && open && close && high && low) {
-      const timestampSec = Math.floor(parseFloat(timestamp)); // Keep as seconds for chart compatibility
+      // Parse timestamp - handle both Unix timestamp and ISO format
+      let timestampSec;
+      if (timestamp.includes('-') || timestamp.includes('T')) {
+        // ISO format (e.g., "2025-09-30 09:36:00Z" or "2025-09-30T09:36:00Z")
+        timestampSec = Math.floor(new Date(timestamp).getTime() / 1000);
+      } else {
+        // Unix timestamp
+        timestampSec = Math.floor(parseFloat(timestamp));
+      }
+      
       data.push({
         timestamp: timestampSec,
-        date: new Date(timestampSec * 1000), // Convert to milliseconds for Date object
+        date: new Date(timestampSec * 1000),
         open: parseFloat(open),
         close: parseFloat(close),
         high: parseFloat(high),
         low: parseFloat(low),
-        volume: Math.random() * 1000000, // Mock volume data
+        volume: Math.random() * 1000000,
         symbol: symbol
       });
     }
   }
 
-  return data.sort((a, b) => a.timestamp - b.timestamp);
+  // Sort by timestamp
+  const sorted = data.sort((a, b) => a.timestamp - b.timestamp);
+  
+  // Remove duplicates by keeping the last entry for each timestamp
+  const deduped = [];
+  const seen = new Set();
+  
+  for (const item of sorted) {
+    if (!seen.has(item.timestamp)) {
+      seen.add(item.timestamp);
+      deduped.push(item);
+    }
+  }
+  
+  return deduped;
 };
 
 // Technical indicators calculations

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import LightweightChart from '../components/charts/LightweightChart';
 import { fetchCurrencyPairs } from '../utils/fileUtils';
 import { parseTradingData } from '../utils/tradingData';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 const DataAnalysis = () => {
   const [dataSource, setDataSource] = useState('csv');
@@ -11,6 +12,9 @@ const DataAnalysis = () => {
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isLiveMode, setIsLiveMode] = useState(false);
+  
+  // WebSocket connection for live streaming
+  const { isConnected, lastMessage, socketRef } = useWebSocket('/socket.io');
 
   const dataSources = [
     { id: 'csv', name: 'CSV Files (Historical)' },
@@ -66,8 +70,48 @@ const DataAnalysis = () => {
     }
   }, [selectedAsset, timeframe, isLiveMode, loadHistoricalData]);
 
+  // Handle streaming data updates
+  useEffect(() => {
+    if (isLiveMode && lastMessage) {
+      // Add new tick to chart data
+      const newDataPoint = {
+        timestamp: Math.floor(lastMessage.timestamp / 1000),
+        date: new Date(lastMessage.timestamp),
+        open: lastMessage.price,
+        close: lastMessage.price,
+        high: lastMessage.price,
+        low: lastMessage.price,
+        volume: Math.random() * 1000000,
+        symbol: lastMessage.asset
+      };
+      
+      setChartData(prevData => {
+        const newData = [...prevData, newDataPoint];
+        // Keep last 500 data points for performance
+        return newData.slice(-500);
+      });
+    }
+  }, [isLiveMode, lastMessage]);
+
   const toggleLiveMode = () => {
-    setIsLiveMode(!isLiveMode);
+    const newLiveMode = !isLiveMode;
+    setIsLiveMode(newLiveMode);
+    
+    if (newLiveMode && socketRef.current && isConnected) {
+      // Start streaming when enabling live mode
+      socketRef.current.emit('start_stream', {
+        asset: selectedAsset || 'EURUSD_OTC'
+      });
+      console.log('Started live stream for', selectedAsset);
+    } else if (!newLiveMode && socketRef.current) {
+      // Stop streaming when disabling live mode
+      socketRef.current.emit('stop_stream');
+      console.log('Stopped live stream');
+      // Reload historical data
+      if (selectedAsset) {
+        loadHistoricalData();
+      }
+    }
   };
 
   return (
@@ -140,10 +184,12 @@ const DataAnalysis = () => {
                 type="checkbox"
                 checked={isLiveMode}
                 onChange={toggleLiveMode}
-                disabled={dataSource === 'csv'}
+                disabled={!isConnected}
                 className="rounded"
               />
-              <span className="text-sm text-slate-300">Live Stream Mode</span>
+              <span className="text-sm text-slate-300">
+                Live Stream Mode {!isConnected && '(Connecting...)'}
+              </span>
             </label>
           </div>
 
