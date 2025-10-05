@@ -58,6 +58,10 @@ externalPort = 80
 localPort = 36583
 externalPort = 3000
 
+[[ports]]
+localPort = 42989
+externalPort = 3002
+
 [deployment]
 deploymentTarget = "vm"
 run = ["bash", "-c", "cd gui/Data-Visualizer-React && uv run python streaming_server.py & npx vite preview --host 0.0.0.0 --port 5000"]
