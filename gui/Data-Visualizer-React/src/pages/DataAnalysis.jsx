@@ -17,11 +17,14 @@ const DataAnalysis = () => {
   
   // WebSocket connection for live streaming
   // Vite proxy forwards /socket.io to backend on port 3001
-  const { isConnected, lastMessage, socketRef } = useWebSocket('/socket.io');
+  const { isConnected, lastMessage, chromeStatus, socketRef } = useWebSocket('/socket.io');
 
+  // Platform WebSocket is only enabled when Chrome is connected
+  const chromeConnected = chromeStatus === 'connected';
+  
   const dataSources = [
     { id: 'csv', name: 'CSV Files (Historical)' },
-    { id: 'platform', name: 'Platform WebSocket', disabled: true },
+    { id: 'platform', name: 'Platform WebSocket', disabled: !chromeConnected },
     { id: 'binance', name: 'Binance API', disabled: true },
   ];
 
@@ -215,13 +218,28 @@ const DataAnalysis = () => {
                 type="checkbox"
                 checked={isLiveMode}
                 onChange={toggleLiveMode}
-                disabled={!isConnected}
+                disabled={!isConnected || !chromeConnected}
                 className="rounded"
               />
               <span className="text-sm text-slate-300">
-                Live Stream Mode {!isConnected && '(Connecting...)'}
+                Live Stream Mode {
+                  !isConnected ? '(Connecting to Backend...)' :
+                  !chromeConnected ? '(Chrome Not Connected)' :
+                  isLiveMode ? '(Active)' : ''
+                }
               </span>
             </label>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-xs text-slate-400">Backend: {isConnected ? 'Connected' : 'Disconnected'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${chromeConnected ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+              <span className="text-xs text-slate-400">Chrome: {chromeConnected ? 'Connected' : 'Not Connected'}</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

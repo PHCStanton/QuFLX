@@ -124,6 +124,39 @@ def extract_tick_for_emit(asset: str) -> Optional[Dict]:
     
     return None
 
+def monitor_chrome_status():
+    """
+    Background thread to monitor Chrome connection status and emit updates to clients.
+    """
+    global chrome_driver
+    last_status = None
+    
+    while True:
+        try:
+            current_status = "connected" if chrome_driver else "not connected"
+            
+            # Check if Chrome is still responsive
+            if chrome_driver:
+                try:
+                    _ = chrome_driver.current_url
+                except Exception:
+                    current_status = "not connected"
+                    chrome_driver = None
+            
+            # Emit status update if changed
+            if current_status != last_status:
+                socketio.emit('connection_status', {
+                    'status': 'connected',
+                    'chrome': current_status,
+                    'timestamp': datetime.now().isoformat()
+                })
+                last_status = current_status
+            
+            time.sleep(5)  # Check every 5 seconds
+        except Exception as e:
+            print(f"[Monitor] Error checking Chrome status: {e}")
+            time.sleep(5)
+
 def stream_from_chrome():
     """
     Background thread to capture WebSocket data from Chrome.
@@ -349,10 +382,19 @@ def handle_disconnect():
 @socketio.on('start_stream')
 def handle_start_stream(data):
     """Start streaming real-time data"""
-    global current_asset, streaming_active
+    global current_asset, streaming_active, data_streamer
+    
+    # Check if Chrome is connected
+    if not chrome_driver:
+        emit('stream_error', {
+            'error': 'Chrome not connected',
+            'timestamp': datetime.now().isoformat()
+        })
+        return
     
     if data and 'asset' in data:
         current_asset = data['asset']
+        data_streamer.CURRENT_ASSET = current_asset
     
     streaming_active = True
     
@@ -374,10 +416,12 @@ def handle_stop_stream():
 @socketio.on('change_asset')
 def handle_change_asset(data):
     """Change the streaming asset"""
-    global current_asset
+    global current_asset, data_streamer
     
     if data and 'asset' in data:
         current_asset = data['asset']
+        data_streamer.CURRENT_ASSET = current_asset
+        
         print(f"[Stream] Asset changed to {current_asset}")
         emit('asset_changed', {
             'asset': current_asset,
@@ -432,6 +476,11 @@ if __name__ == '__main__':
     # Try to connect to Chrome on startup
     print("\n[Startup] Attempting to connect to Chrome...")
     chrome_driver = attach_to_chrome(verbose=True)
+    
+    # Start Chrome status monitor thread (always running)
+    monitor_thread = threading.Thread(target=monitor_chrome_status, daemon=True)
+    monitor_thread.start()
+    print("[Startup] ✓ Chrome status monitor started")
     
     if chrome_driver:
         print("[Startup] ✓ Chrome connected successfully")

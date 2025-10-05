@@ -5,6 +5,7 @@ export const useWebSocket = (url) => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [chromeStatus, setChromeStatus] = useState('not connected');
   const socketRef = useRef(null);
 
   useEffect(() => {
@@ -62,6 +63,11 @@ export const useWebSocket = (url) => {
       console.log('Asset changed:', data);
     });
 
+    socket.on('connection_status', (data) => {
+      console.log('Connection status:', data);
+      setChromeStatus(data.chrome || 'not connected');
+    });
+
     return () => {
       console.log('Cleaning up WebSocket connection');
       socket.removeAllListeners();
@@ -92,6 +98,7 @@ export const useWebSocket = (url) => {
     isConnected,
     lastMessage,
     error,
+    chromeStatus,
     startStream,
     stopStream,
     changeAsset
