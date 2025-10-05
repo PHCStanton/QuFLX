@@ -38,13 +38,12 @@ outputType = "webview"
 name = "Backend"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd gui/Data-Visualizer-React && uv run python streaming_server.py"
-waitForPort = 3001
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "uv run python streaming_server.py"
 
 [[ports]]
 localPort = 3001
@@ -53,6 +52,10 @@ externalPort = 3001
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 37109
+externalPort = 3000
 
 [deployment]
 deploymentTarget = "vm"
