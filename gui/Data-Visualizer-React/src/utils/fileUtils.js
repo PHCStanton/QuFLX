@@ -1,7 +1,10 @@
-export const fetchCurrencyPairs = async () => {
+export const fetchCurrencyPairs = async (timeframe = null) => {
   try {
     // Fetch actual CSV files from the backend API (using Vite proxy)
-    const response = await fetch('/api/available-csv-files');
+    const url = timeframe 
+      ? `/api/available-csv-files?timeframe=${timeframe}`
+      : '/api/available-csv-files';
+    const response = await fetch(url);
     const data = await response.json();
     
     if (!data.files || data.files.length === 0) {

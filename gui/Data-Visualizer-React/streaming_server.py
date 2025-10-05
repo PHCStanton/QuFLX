@@ -62,44 +62,88 @@ def get_assets():
 
 @app.route('/api/available-csv-files')
 def get_available_csv_files():
-    """Get list of all available CSV files from root data folder"""
+    """Get list of all available CSV files from root data folder, optionally filtered by timeframe"""
     import glob
     import os
+    
+    # Get optional timeframe filter from query parameters
+    timeframe_filter = request.args.get('timeframe', None)
     
     files = []
     
     # Search in root data folder
     data_dir = root_dir / 'data' / 'data_output' / 'assets_data'
     
-    # Search for CSV files in various subdirectories
-    search_paths = [
-        str(data_dir / 'realtime_stream' / '1M_candle_data' / '*.csv'),
-        str(data_dir / 'realtime_stream' / '1M_tick_data' / '*.csv'),
-        str(data_dir / 'data_collect' / '*_candles' / '*.csv'),
-    ]
+    # Map timeframe to directory names
+    timeframe_dirs = {
+        '1m': ['1M_candles', '1M_candles_utc'],
+        '5m': ['5M_candles', '5M_candles_utc'],
+        '15m': ['15M_candles', '15M_candles_utc'],
+        '1h': ['1H_candles', '1H_candles_utc'],
+        '4h': ['4H_candles', '4H_candles_utc'],
+        'tick': ['0M_candles'],
+    }
+    
+    # Build search paths based on timeframe filter
+    search_paths = []
+    if timeframe_filter and timeframe_filter in timeframe_dirs:
+        # Search in directories matching the selected timeframe
+        for dir_name in timeframe_dirs[timeframe_filter]:
+            search_paths.append(str(data_dir / 'data_collect' / dir_name / '*.csv'))
+        
+        # Also include realtime_stream directories for 1m timeframe
+        if timeframe_filter == '1m':
+            search_paths.extend([
+                str(data_dir / 'realtime_stream' / '1M_candle_data' / '*.csv'),
+                str(data_dir / 'realtime_stream' / '1M_tick_data' / '*.csv'),
+            ])
+    else:
+        # Search all timeframe directories
+        search_paths = [
+            str(data_dir / 'realtime_stream' / '1M_candle_data' / '*.csv'),
+            str(data_dir / 'realtime_stream' / '1M_tick_data' / '*.csv'),
+            str(data_dir / 'data_collect' / '*_candles' / '*.csv'),
+            str(data_dir / 'data_collect' / '*_candles_utc' / '*.csv'),
+        ]
     
     for pattern in search_paths:
         for filepath in glob.glob(pattern):
             filename = os.path.basename(filepath)
             
-            # Parse asset name from filename
+            # Parse asset name from filename - keep more of the name for proper identification
             parts = filename.split('_')
             if len(parts) >= 2:
-                asset = parts[0].upper()
+                # Extract asset by finding where timeframe indicators start
+                asset_parts = []
+                for i, part in enumerate(parts):
+                    # Stop when we hit a timeframe, timestamp, or common separators
+                    if part in ['1m', '5m', '15m', '1h', '4h', '60m', 'otc'] or part.isdigit() or len(part) > 10:
+                        break
+                    asset_parts.append(part)
                 
-                # Determine timeframe
+                # If we didn't get enough parts, use first part + 'otc' if present
+                if len(asset_parts) == 0:
+                    asset_parts = [parts[0]]
+                if len(parts) > 1 and 'otc' in parts[1].lower():
+                    asset_parts.append('otc')
+                
+                asset = '_'.join(asset_parts).upper()
+                
+                # Determine timeframe from parent directory
+                parent_dir = os.path.basename(os.path.dirname(filepath))
                 timeframe = '1m'  # default
-                if '1m' in filename.lower() or '1M' in filename:
+                
+                if '1M' in parent_dir or '1m' in parent_dir:
                     timeframe = '1m'
-                elif '5m' in filename.lower() or '5M' in filename:
+                elif '5M' in parent_dir or '5m' in parent_dir:
                     timeframe = '5m'
-                elif '15m' in filename.lower() or '15M' in filename:
+                elif '15M' in parent_dir or '15m' in parent_dir:
                     timeframe = '15m'
-                elif '1h' in filename.lower() or '1H' in filename:
+                elif '1H' in parent_dir or '1h' in parent_dir or '60m' in parent_dir:
                     timeframe = '1h'
-                elif '4h' in filename.lower() or '4H' in filename:
+                elif '4H' in parent_dir or '4h' in parent_dir or '240m' in parent_dir:
                     timeframe = '4h'
-                elif 'ticks' in filename.lower():
+                elif '0M' in parent_dir or 'tick' in parent_dir.lower():
                     timeframe = 'tick'
                 
                 files.append({
@@ -120,13 +164,24 @@ def serve_csv_file(filename):
     
     # Search for the file in data directories
     data_dir = root_dir / 'data' / 'data_output' / 'assets_data'
-    search_paths = [
+    
+    # Search in all possible timeframe directories
+    search_dirs = [
         data_dir / 'realtime_stream' / '1M_candle_data',
         data_dir / 'realtime_stream' / '1M_tick_data',
+        data_dir / 'data_collect' / '1M_candles',
+        data_dir / 'data_collect' / '5M_candles',
+        data_dir / 'data_collect' / '15M_candles',
+        data_dir / 'data_collect' / '1H_candles',
+        data_dir / 'data_collect' / '4H_candles',
+        data_dir / 'data_collect' / '0M_candles',
+        data_dir / 'data_collect' / '1M_candles_utc',
+        data_dir / 'data_collect' / '5M_candles_utc',
+        data_dir / 'data_collect' / '15M_candles_utc',
     ]
     
-    for search_path in search_paths:
-        filepath = search_path / filename
+    for search_dir in search_dirs:
+        filepath = search_dir / filename
         if filepath.exists():
             return send_file(str(filepath), mimetype='text/csv')
     

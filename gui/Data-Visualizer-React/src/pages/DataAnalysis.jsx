@@ -24,17 +24,17 @@ const DataAnalysis = () => {
     { id: 'binance', name: 'Binance API', disabled: true },
   ];
 
-  const timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d'];
+  const timeframes = ['1m', '5m', '15m', '1h', '4h'];
 
   const loadAvailableAssets = useCallback(async () => {
     if (dataSource === 'csv') {
-      const pairs = await fetchCurrencyPairs();
+      const pairs = await fetchCurrencyPairs(timeframe);
       setAvailableAssets(pairs);
       if (pairs.length > 0) {
         setSelectedAsset(pairs[0].id);
       }
     }
-  }, [dataSource]);
+  }, [dataSource, timeframe]);
 
   const loadHistoricalData = useCallback(async () => {
     setLoading(true);
