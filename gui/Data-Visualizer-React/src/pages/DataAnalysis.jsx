@@ -11,7 +11,9 @@ const DataAnalysis = () => {
   const [availableAssets, setAvailableAssets] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState('');
   const [isLiveMode, setIsLiveMode] = useState(false);
+  const [statistics, setStatistics] = useState(null);
   
   // WebSocket connection for live streaming
   const { isConnected, lastMessage, socketRef } = useWebSocket('/socket.io');
@@ -36,6 +38,9 @@ const DataAnalysis = () => {
 
   const loadHistoricalData = useCallback(async () => {
     setLoading(true);
+    setLoadingStatus('Fetching CSV file...');
+    setStatistics(null);
+    
     try {
       const assetInfo = availableAssets.find(a => a.id === selectedAsset);
       if (assetInfo && dataSource === 'csv') {
@@ -48,16 +53,41 @@ const DataAnalysis = () => {
           throw new Error(`Failed to load data: ${response.statusText}`);
         }
         
+        setLoadingStatus('Parsing CSV data...');
         const csvText = await response.text();
         const data = parseTradingData(csvText, selectedAsset);
+        
+        setLoadingStatus('Rendering chart...');
         setChartData(data);
+        
+        // Calculate statistics
+        if (data.length > 0) {
+          const latest = data[data.length - 1];
+          const first = data[0];
+          const priceChange = latest.close - first.close;
+          const priceChangePercent = ((priceChange / first.close) * 100).toFixed(2);
+          
+          setStatistics({
+            latestPrice: latest.close.toFixed(5),
+            open: latest.open.toFixed(5),
+            high: latest.high.toFixed(5),
+            low: latest.low.toFixed(5),
+            priceChange: priceChange.toFixed(5),
+            priceChangePercent: priceChangePercent,
+            dataPoints: data.length,
+            timeRange: `${first.date.toLocaleString()} - ${latest.date.toLocaleString()}`
+          });
+        }
+        
         console.log(`Loaded ${data.length} data points for ${selectedAsset}`);
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      alert(`Failed to load data: ${error.message}`);
+      alert(`Failed to load data: ${error.message || 'Unknown error'}`);
+      setStatistics(null);
     }
     setLoading(false);
+    setLoadingStatus('');
   }, [availableAssets, selectedAsset, dataSource, timeframe]);
 
   useEffect(() => {
@@ -81,7 +111,7 @@ const DataAnalysis = () => {
         close: lastMessage.price,
         high: lastMessage.price,
         low: lastMessage.price,
-        volume: Math.random() * 1000000,
+        volume: lastMessage.volume || 0,
         symbol: lastMessage.asset
       };
       
@@ -202,11 +232,40 @@ const DataAnalysis = () => {
         </div>
       </div>
 
+      {statistics && (
+        <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6">
+          <h3 className="text-xl font-semibold text-white mb-4">Statistics</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-slate-700/50 rounded-lg p-4">
+              <div className="text-slate-400 text-sm mb-1">Current Price</div>
+              <div className="text-white text-lg font-semibold">{statistics.latestPrice}</div>
+            </div>
+            <div className="bg-slate-700/50 rounded-lg p-4">
+              <div className="text-slate-400 text-sm mb-1">Change</div>
+              <div className={`text-lg font-semibold ${parseFloat(statistics.priceChangePercent) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {statistics.priceChange} ({statistics.priceChangePercent}%)
+              </div>
+            </div>
+            <div className="bg-slate-700/50 rounded-lg p-4">
+              <div className="text-slate-400 text-sm mb-1">High / Low</div>
+              <div className="text-white text-lg font-semibold">{statistics.high} / {statistics.low}</div>
+            </div>
+            <div className="bg-slate-700/50 rounded-lg p-4">
+              <div className="text-slate-400 text-sm mb-1">Data Points</div>
+              <div className="text-white text-lg font-semibold">{statistics.dataPoints}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6">
         <h3 className="text-xl font-semibold text-white mb-4">Chart</h3>
         {loading ? (
           <div className="flex items-center justify-center h-96">
-            <div className="text-slate-300">Loading chart data...</div>
+            <div className="text-center">
+              <div className="text-slate-300 mb-2">{loadingStatus}</div>
+              <div className="w-12 h-12 border-4 border-slate-600 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
+            </div>
           </div>
         ) : (
           <LightweightChart data={chartData} height={500} />

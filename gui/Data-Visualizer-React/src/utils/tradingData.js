@@ -2,6 +2,17 @@
 export const parseTradingData = (csvText, symbol) => {
   const lines = csvText.trim().split('\n');
   const data = [];
+  
+  // Detect CSV format from header
+  let hasIndexColumn = false;
+  
+  if (lines.length > 0) {
+    const headerParts = lines[0].split(',');
+    
+    // Check if first column header is empty or suggests an index
+    const firstHeader = headerParts[0].toLowerCase().trim();
+    hasIndexColumn = firstHeader === '' || firstHeader === 'index' || firstHeader === 'id' || firstHeader === '#';
+  }
 
   // Skip header and parse data
   for (let i = 1; i < lines.length; i++) {
@@ -11,29 +22,44 @@ export const parseTradingData = (csvText, symbol) => {
     const parts = line.split(',');
     
     // Handle different CSV formats
-    let timestamp, open, close, high, low;
+    let timestamp, open, close, high, low, volume = null;
     
     if (parts.length === 5) {
-      // Format: timestamp,open,close,high,low
+      // Format: timestamp,open,close,high,low (OHLC)
       [timestamp, open, close, high, low] = parts;
     } else if (parts.length === 6) {
-      // Format: index,timestamp,open,close,high,low
-      [, timestamp, open, close, high, low] = parts;
+      if (hasIndexColumn) {
+        // Format: index,timestamp,open,high,low,close
+        [, timestamp, open, high, low, close] = parts;
+      } else {
+        // Format: timestamp,open,close,high,low,volume (OHLCV)
+        [timestamp, open, close, high, low, volume] = parts;
+      }
+    } else if (parts.length === 7) {
+      // Format: index,timestamp,open,high,low,close,volume
+      [, timestamp, open, high, low, close, volume] = parts;
+    } else if (parts.length === 3) {
+      // Format: timestamp,asset,price (Tick data)
+      const [ts, asset, price] = parts;
+      timestamp = ts;
+      open = close = high = low = price;
     } else {
-      console.warn(`Skipping invalid line ${i}: ${line}`);
       continue;
     }
     
     if (timestamp && open && close && high && low) {
       // Parse timestamp - handle both Unix timestamp and ISO format
       let timestampSec;
-      if (timestamp.includes('-') || timestamp.includes('T')) {
-        // ISO format (e.g., "2025-09-30 09:36:00Z" or "2025-09-30T09:36:00Z")
+      if (timestamp.includes('-') || timestamp.includes('T') || timestamp.includes(':')) {
+        // ISO format or time string
         timestampSec = Math.floor(new Date(timestamp).getTime() / 1000);
       } else {
         // Unix timestamp
         timestampSec = Math.floor(parseFloat(timestamp));
       }
+      
+      // Skip invalid timestamps
+      if (isNaN(timestampSec)) continue;
       
       data.push({
         timestamp: timestampSec,
@@ -42,7 +68,7 @@ export const parseTradingData = (csvText, symbol) => {
         close: parseFloat(close),
         high: parseFloat(high),
         low: parseFloat(low),
-        volume: Math.random() * 1000000,
+        volume: volume !== null ? parseFloat(volume) || 0 : 0,
         symbol: symbol
       });
     }
