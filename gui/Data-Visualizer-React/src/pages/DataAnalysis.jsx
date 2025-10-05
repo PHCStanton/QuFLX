@@ -15,8 +15,12 @@ const DataAnalysis = () => {
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [statistics, setStatistics] = useState(null);
   
-  // WebSocket connection for live streaming
-  const { isConnected, lastMessage, socketRef } = useWebSocket('/socket.io');
+  // WebSocket connection for live streaming (backend on port 3001)
+  // In Replit, use the current hostname with port 3001
+  const backendUrl = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3001' 
+    : `https://${window.location.hostname.replace(/:\d+$/, '')}:3001`;
+  const { isConnected, lastMessage, socketRef } = useWebSocket(backendUrl);
 
   const dataSources = [
     { id: 'csv', name: 'CSV Files (Historical)' },
