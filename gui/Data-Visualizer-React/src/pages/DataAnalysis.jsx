@@ -35,13 +35,23 @@ const DataAnalysis = () => {
     try {
       const assetInfo = availableAssets.find(a => a.id === selectedAsset);
       if (assetInfo && dataSource === 'csv') {
-        const response = await fetch(`/data/${assetInfo.file}`, { cache: 'no-store' });
+        // Use the new API endpoint to fetch CSV data (using Vite proxy)
+        const response = await fetch(`/api/csv-data/${assetInfo.file}`, { 
+          cache: 'no-store' 
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load data: ${response.statusText}`);
+        }
+        
         const csvText = await response.text();
         const data = parseTradingData(csvText, selectedAsset);
         setChartData(data);
+        console.log(`Loaded ${data.length} data points for ${selectedAsset}`);
       }
     } catch (error) {
       console.error('Error loading data:', error);
+      alert(`Failed to load data: ${error.message}`);
     }
     setLoading(false);
   }, [availableAssets, selectedAsset, dataSource, timeframe]);

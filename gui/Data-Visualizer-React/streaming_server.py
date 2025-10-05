@@ -60,6 +60,78 @@ def get_assets():
     ]
     return jsonify(assets)
 
+@app.route('/api/available-csv-files')
+def get_available_csv_files():
+    """Get list of all available CSV files from root data folder"""
+    import glob
+    import os
+    
+    files = []
+    
+    # Search in root data folder
+    data_dir = root_dir / 'data' / 'data_output' / 'assets_data'
+    
+    # Search for CSV files in various subdirectories
+    search_paths = [
+        str(data_dir / 'realtime_stream' / '1M_candle_data' / '*.csv'),
+        str(data_dir / 'realtime_stream' / '1M_tick_data' / '*.csv'),
+        str(data_dir / 'data_collect' / '*_candles' / '*.csv'),
+    ]
+    
+    for pattern in search_paths:
+        for filepath in glob.glob(pattern):
+            filename = os.path.basename(filepath)
+            
+            # Parse asset name from filename
+            parts = filename.split('_')
+            if len(parts) >= 2:
+                asset = parts[0].upper()
+                
+                # Determine timeframe
+                timeframe = '1m'  # default
+                if '1m' in filename.lower() or '1M' in filename:
+                    timeframe = '1m'
+                elif '5m' in filename.lower() or '5M' in filename:
+                    timeframe = '5m'
+                elif '15m' in filename.lower() or '15M' in filename:
+                    timeframe = '15m'
+                elif '1h' in filename.lower() or '1H' in filename:
+                    timeframe = '1h'
+                elif '4h' in filename.lower() or '4H' in filename:
+                    timeframe = '4h'
+                elif 'ticks' in filename.lower():
+                    timeframe = 'tick'
+                
+                files.append({
+                    'path': filepath,
+                    'filename': filename,
+                    'asset': asset,
+                    'timeframe': timeframe,
+                    'size': os.path.getsize(filepath)
+                })
+    
+    return jsonify({'files': files, 'count': len(files)})
+
+@app.route('/api/csv-data/<path:filename>')
+def serve_csv_file(filename):
+    """Serve CSV file content"""
+    import os
+    from flask import send_file
+    
+    # Search for the file in data directories
+    data_dir = root_dir / 'data' / 'data_output' / 'assets_data'
+    search_paths = [
+        data_dir / 'realtime_stream' / '1M_candle_data',
+        data_dir / 'realtime_stream' / '1M_tick_data',
+    ]
+    
+    for search_path in search_paths:
+        filepath = search_path / filename
+        if filepath.exists():
+            return send_file(str(filepath), mimetype='text/csv')
+    
+    return jsonify({'error': 'File not found'}), 404
+
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection"""

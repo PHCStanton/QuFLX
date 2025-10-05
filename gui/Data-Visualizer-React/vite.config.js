@@ -16,6 +16,18 @@ export default defineConfig({
     },
     headers: {
       'Content-Security-Policy': "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://unpkg.com; object-src 'none'; worker-src 'self' blob:;"
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false
+      },
+      '/socket.io': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        ws: true
+      }
     }
   },
   define: {
