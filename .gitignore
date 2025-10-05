@@ -36,8 +36,6 @@ logs_new/
 
 # Data, artifacts, large/generated files
 archive/
-data_output/
-assets_data/
 Historical_Data/
 screenshots/
 test_artifacts/
