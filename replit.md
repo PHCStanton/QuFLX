@@ -27,7 +27,7 @@ Chrome Session (Port 9222) ←→ Capabilities Framework ←→ Multiple Interfa
 
 1.  **Hybrid Chrome Session Management**: Uses a persistent Chrome session with remote debugging (port 9222) to maintain login state and WebSocket connections, allowing Selenium to attach to an existing instance.
 2.  **WebSocket Data Interception**: Intercepts Chrome DevTools Protocol performance logs to capture and decode WebSocket messages from PocketOption, leveraging the existing authenticated session.
-3.  **Dedicated GUI Backend Server** (`streaming_server.py` in root): Flask-SocketIO server that attaches to Chrome (port 9222), intercepts real WebSocket data from PocketOption, and streams it to the React frontend. Handles CSV serving, backtesting, and real-time tick data streaming. **No simulated data** - all data comes from Chrome/PocketOption WebSocket interception.
+3.  **Dedicated GUI Backend Server** (`streaming_server.py` in root): Flask-SocketIO server that attaches to Chrome (port 9222) and **delegates all WebSocket interception to the RealtimeDataStreaming capability** to avoid code duplication. Intercepts real WebSocket data from PocketOption via `_decode_and_parse_payload`, processes chart settings via `_process_chart_settings`, and handles price updates via `_process_realtime_update`. Streams processed data to the React frontend. Handles CSV serving, backtesting, and real-time tick data streaming. **No simulated data** - all data comes from Chrome/PocketOption WebSocket interception through the capability's vetted logic.
 4.  **Intelligent Timeframe Detection**: Determines candle timeframes by analyzing actual timestamp intervals and chart settings from PocketOption, ensuring reliability regardless of metadata inconsistencies.
 5.  **Modular Capabilities Framework**: Trading operations are implemented as self-contained capabilities with a standardized `run(ctx, inputs) -> CapResult` interface, promoting composability and reusability. Capabilities include data streaming, session scanning, trade execution, and signal generation.
 6.  **Multi-Interface Access Pattern**: Provides access via a FastAPI backend, Flask-SocketIO GUI backend, React GUI, CLI tool, and a Pipeline Orchestrator, all consuming the same core capabilities or Chrome session.
@@ -38,7 +38,7 @@ Chrome Session (Port 9222) ←→ Capabilities Framework ←→ Multiple Interfa
 
 ### Data Flow Architecture
 
-*   **Real-time Data Pipeline**: PocketOption WebSocket → Chrome DevTools Protocol → Performance Log Interception (streaming_server.py) → Base64 Decode → Socket.IO Frame Parse → Tick Data → Candle Formation → Socket.IO Emit to Frontend → Chart Update.
+*   **Real-time Data Pipeline**: PocketOption WebSocket → Chrome DevTools Protocol → Performance Log Interception (streaming_server.py) → **RealtimeDataStreaming Capability** (_decode_and_parse_payload → _process_realtime_update → _process_chart_settings) → Candle State in Capability → Extract for Emit → Socket.IO Emit to Frontend → Chart Update.
 *   **Historical Data Flow**: User Selects Timeframe → Backend Filters CSV Files by Directory → Frontend Displays Matching Assets → User Loads Data → Chart Visualization.
 *   **Trading Execution Flow**: Signal Generation (Indicators) → Confidence Scoring → Strategy Validation → Trade Click Capability → WebDriver Interaction → Execution Verification → Result Logging.
 *   **GUI Backtesting Flow**: User Selects CSV → Frontend (Socket.IO) → Backend Handler → Data Loader → Backtest Engine → Strategy Execution → Results Calculation → Socket.IO Response → Frontend Display.
