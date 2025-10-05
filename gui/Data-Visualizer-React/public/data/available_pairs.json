@@ -1,0 +1,27 @@
+[
+  {
+    "id": "AUD/CAD OTC",
+    "name": "AUD/CAD OTC",
+    "file": "AUDCADOTC_2024_2_5_11.csv"
+  },
+  {
+    "id": "AUD/USD OTC",
+    "name": "AUD/USD OTC",
+    "file": "AUDUSDOTC_2024_2_5_12.csv"
+  },
+  {
+    "id": "EUR/USD OTC",
+    "name": "EUR/USD OTC",
+    "file": "EURUSDOTC_2024_2_5_12.csv"
+  },
+  {
+    "id": "GBP/USD",
+    "name": "GBP/USD",
+    "file": "GBPUSD_2024_2_5_11.csv"
+  },
+  {
+    "id": "EUR/GBP OTC",
+    "name": "EUR/GBP OTC",
+    "file": "EURGBPOTC_2024_2_5_12.csv"
+  }
+]
