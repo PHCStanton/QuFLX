@@ -26,9 +26,15 @@ root_dir = Path(__file__).parent
 sys.path.insert(0, str(root_dir))
 gui_dir = root_dir / 'gui' / 'Data-Visualizer-React'
 sys.path.insert(0, str(gui_dir))
+capabilities_dir = root_dir / 'capabilities'
+sys.path.insert(0, str(capabilities_dir))
 
 from strategies.quantum_flux_strategy import QuantumFluxStrategy
 from data_loader import DataLoader, BacktestEngine
+
+# Import Chrome interception logic from capabilities
+from data_streaming import RealtimeDataStreaming
+from base import Ctx  # Import Ctx for capability context
 
 app = Flask(__name__)
 CORS(app)
@@ -38,10 +44,11 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 chrome_driver = None
 streaming_active = False
 current_asset = "EURUSD_OTC"
-candles_data = {}  # asset -> [[timestamp, open, close, high, low], ...]
+
+# Create data streaming capability instance to reuse its Chrome interception logic
+data_streamer = RealtimeDataStreaming()
+capability_ctx = None  # Will be initialized when Chrome connects
 period = 60  # 1 minute candles by default
-session_authenticated = False
-session_timeframe_detected = False
 
 # ========================================
 # Chrome Connection Functions
@@ -86,124 +93,43 @@ def attach_to_chrome(verbose=True):
         print("[Chrome] Make sure Chrome is running with: chrome --remote-debugging-port=9222 --user-data-dir=/path/to/profile")
         return None
 
-# ========================================
-# WebSocket Frame Decoding Functions
-# ========================================
-
-def decode_websocket_payload(encoded_payload: str) -> Optional[Any]:
-    """Decode base64 WebSocket payload and parse as JSON."""
-    try:
-        decoded = base64.b64decode(encoded_payload).decode('utf-8')
-        
-        # Handle Socket.IO prefixes
-        decoded = handle_socketio_format(decoded)
-        
-        # Parse JSON
-        return json.loads(decoded)
-        
-    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as e:
-        print(f"⚠️ Payload decode error: {e}")
-        return None
-
-def handle_socketio_format(payload: str) -> str:
-    """Handle Socket.IO event arrays like 42["event", data]."""
-    if not payload or not payload[0].isdigit():
-        return payload
-    
-    # Remove numeric prefix
-    match = re.match(r'^\d+', payload)
-    if match:
-        payload = payload[match.end():]
-    
-    # Handle event arrays
-    if payload.startswith('["') and ']' in payload:
-        event_match = re.match(r'\["([^"]+)"(?:,\s*(.+))?\]', payload)
-        if event_match:
-            event_name = event_match.group(1)
-            data_str = event_match.group(2) if event_match.group(2) else '{}'
-            try:
-                data = json.loads(data_str) if data_str else {}
-                return json.dumps({"event": event_name, "data": data})
-            except json.JSONDecodeError:
-                pass
-    
-    return payload
+# Note: WebSocket decoding and data processing reuse capability methods
+# _decode_and_parse_payload, _process_realtime_update, _process_chart_settings
 
 # ========================================
-# Data Processing Functions
+# Data Processing Functions (delegating to capability)
 # ========================================
 
-def process_realtime_tick(data: Any) -> Optional[Dict]:
-    """Process real-time tick update from PocketOption."""
-    global current_asset, candles_data, period
+def extract_tick_for_emit(asset: str) -> Optional[Dict]:
+    """
+    Extract latest price data from capability's candle data for Socket.IO emission.
+    """
+    global data_streamer
     
     try:
-        asset = None
-        price = None
-        timestamp = None
-        
-        # Parse different payload formats
-        if isinstance(data, list) and len(data) > 0:
-            if isinstance(data[0], list) and len(data[0]) >= 3:
-                # Format: [[asset, timestamp, price], ...]
-                asset = data[0][0]
-                timestamp = int(float(data[0][1]))
-                price = data[0][2]
-            else:
-                price = data[-1] if isinstance(data[-1], (int, float)) else None
-                timestamp = int(time.time())
-                asset = current_asset
-        
-        elif isinstance(data, dict):
-            # Format: {"asset": "EURUSD", "price": 1.1234, "timestamp": 1234567890}
-            asset = data.get('asset') or data.get('symbol') or current_asset
-            price = data.get('quote') or data.get('price') or data.get('value')
-            timestamp = data.get('timestamp', int(time.time()))
-            if isinstance(timestamp, str):
-                timestamp = int(float(timestamp))
-        
-        else:
-            # Scalar value
-            price = float(data) if isinstance(data, (int, float, str)) else None
-            timestamp = int(time.time())
-            asset = current_asset
-        
-        if asset and price is not None and timestamp is not None:
-            # Update candles
-            if asset not in candles_data:
-                candles_data[asset] = []
-            
-            candles = candles_data[asset]
-            
-            if not candles:
-                # First candle
-                candles.append([timestamp, price, price, price, price])
-            else:
-                # Update current candle
-                candles[-1][2] = price  # close
-                candles[-1][3] = max(candles[-1][3], price)  # high
-                candles[-1][4] = min(candles[-1][4], price)  # low
-                
-                # Create new candle if period boundary crossed
-                if period and (timestamp - candles[-1][0]) >= period:
-                    candles.append([timestamp, price, price, price, price])
+        if asset in data_streamer.CANDLES and data_streamer.CANDLES[asset]:
+            latest_candle = data_streamer.CANDLES[asset][-1]
+            timestamp, open_price, close_price, high_price, low_price = latest_candle
             
             return {
                 'asset': asset,
-                'price': price,
-                'timestamp': timestamp * 1000,  # Convert to milliseconds for frontend
+                'price': close_price,
+                'timestamp': timestamp * 1000,  # Convert to milliseconds
                 'volume': 0,
                 'time_string': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
             }
     
     except Exception as e:
-        print(f"❌ Error processing tick: {e}")
+        print(f"❌ Error extracting tick: {e}")
     
     return None
 
 def stream_from_chrome():
-    """Background thread to capture WebSocket data from Chrome."""
-    global chrome_driver, streaming_active, session_authenticated, session_timeframe_detected
+    """
+    Background thread to capture WebSocket data from Chrome.
+    Fully delegates to RealtimeDataStreaming capability's logic.
+    """
+    global chrome_driver, streaming_active, data_streamer, capability_ctx, current_asset
     
     if not chrome_driver:
         print("[Stream] Chrome not connected. Attempting to connect...")
@@ -211,6 +137,9 @@ def stream_from_chrome():
         if not chrome_driver:
             print("[Stream] Failed to connect to Chrome. Streaming disabled.")
             return
+    
+    # Initialize capability context
+    capability_ctx = Ctx(driver=chrome_driver, artifacts_root=None, debug=False, dry_run=False, verbose=True)
     
     print("[Stream] Starting WebSocket capture from Chrome...")
     processed_messages = set()
@@ -222,7 +151,6 @@ def stream_from_chrome():
                 logs = chrome_driver.get_log('performance')
                 
                 for log_entry in logs:
-                    # Create unique message ID
                     msg_id = f"{log_entry.get('timestamp', 0)}_{hash(log_entry.get('message', ''))}"
                     if msg_id in processed_messages:
                         continue
@@ -237,26 +165,27 @@ def stream_from_chrome():
                     if response.get('opcode', 0) == 2:
                         payload_data = response.get('payloadData')
                         if payload_data:
-                            # Decode and process
-                            payload = decode_websocket_payload(payload_data)
+                            # Use capability's decode method
+                            payload = data_streamer._decode_and_parse_payload(payload_data)
                             
                             if payload:
-                                # Check for chart settings to detect timeframe
+                                # Delegate chart settings processing to capability
                                 if 'updateCharts' in str(payload) or 'chartPeriod' in str(payload):
-                                    detect_timeframe(payload)
+                                    data_streamer._process_chart_settings(payload, capability_ctx)
                                 
-                                # Process as real-time tick data
-                                tick_data = process_realtime_tick(payload)
+                                # Delegate realtime data processing to capability
+                                data_streamer._process_realtime_update(payload, capability_ctx)
                                 
-                                if tick_data:
-                                    # Emit to frontend
-                                    socketio.emit('tick_update', tick_data)
+                                # Extract processed data and emit to frontend
+                                if data_streamer.CURRENT_ASSET:
+                                    tick_data = extract_tick_for_emit(data_streamer.CURRENT_ASSET)
+                                    if tick_data:
+                                        socketio.emit('tick_update', tick_data)
                 
-                # Keep processed messages set from growing indefinitely
                 if len(processed_messages) > 10000:
                     processed_messages.clear()
                 
-                time.sleep(0.1)  # 10 checks per second
+                time.sleep(0.1)
                 
             except Exception as e:
                 print(f"[Stream] Error: {e}")
@@ -264,31 +193,8 @@ def stream_from_chrome():
         else:
             time.sleep(0.5)
 
-def detect_timeframe(payload: Any):
-    """Detect and set the timeframe from chart settings."""
-    global period, session_timeframe_detected
-    
-    try:
-        if isinstance(payload, dict):
-            # Look for period/timeframe indicators
-            settings = payload.get('settings', {})
-            if isinstance(settings, str):
-                settings = json.loads(settings)
-            
-            period_map = {
-                1: 1, 2: 2, 3: 3, 4: 5, 5: 10, 6: 15, 7: 30, 8: 60, 9: 240, 10: 1440,
-                '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240
-            }
-            
-            chart_period = settings.get('chartPeriod') or settings.get('period')
-            if chart_period:
-                minutes = period_map.get(chart_period, 1)
-                period = minutes * 60
-                session_timeframe_detected = True
-                print(f"⏱️ Timeframe detected: {minutes} minutes")
-    
-    except Exception as e:
-        print(f"Error detecting timeframe: {e}")
+# Note: Timeframe detection is now fully handled by data_streamer._process_chart_settings
+# No separate detect_timeframe function needed - delegated to capability
 
 # ========================================
 # Flask REST API Endpoints (CSV serving, etc.)
