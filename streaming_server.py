@@ -100,9 +100,10 @@ def attach_to_chrome(verbose=True):
 # Data Processing Functions (delegating to capability)
 # ========================================
 
-def extract_tick_for_emit(asset: str) -> Optional[Dict]:
+def extract_candle_for_emit(asset: str) -> Optional[Dict]:
     """
-    Extract latest price data from capability's candle data for Socket.IO emission.
+    Extract latest formed candle from capability's candle data for Socket.IO emission.
+    This emits OHLC candles instead of ticks, eliminating duplicate candle formation.
     """
     global data_streamer
     
@@ -113,14 +114,17 @@ def extract_tick_for_emit(asset: str) -> Optional[Dict]:
             
             return {
                 'asset': asset,
-                'price': close_price,
-                'timestamp': timestamp * 1000,  # Convert to milliseconds
+                'timestamp': timestamp,  # Unix timestamp in seconds
+                'open': open_price,
+                'high': high_price,
+                'low': low_price,
+                'close': close_price,
                 'volume': 0,
-                'time_string': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+                'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
             }
     
     except Exception as e:
-        print(f"❌ Error extracting tick: {e}")
+        print(f"❌ Error extracting candle: {e}")
     
     return None
 
@@ -209,11 +213,11 @@ def stream_from_chrome():
                                 # Delegate realtime data processing to capability
                                 data_streamer._process_realtime_update(payload, capability_ctx)
                                 
-                                # Extract processed data and emit to frontend
+                                # Extract processed candle and emit to frontend
                                 if data_streamer.CURRENT_ASSET:
-                                    tick_data = extract_tick_for_emit(data_streamer.CURRENT_ASSET)
-                                    if tick_data:
-                                        socketio.emit('tick_update', tick_data)
+                                    candle_data = extract_candle_for_emit(data_streamer.CURRENT_ASSET)
+                                    if candle_data:
+                                        socketio.emit('candle_update', candle_data)
                 
                 if len(processed_messages) > 10000:
                     processed_messages.clear()
