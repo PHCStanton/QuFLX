@@ -394,16 +394,9 @@ def handle_start_stream(data):
     
     if data and 'asset' in data:
         current_asset = data['asset']
-        data_streamer.CURRENT_ASSET = current_asset
-        # Enforce asset focus so capability does not auto-switch to another asset
-        try:
-            data_streamer.ASSET_FOCUS_MODE = True
-            # Lock timeframe to 1 minute unless explicitly changed
-            data_streamer.PERIOD = 60
-            data_streamer.PERIOD_LOCKED = True
-            data_streamer.SESSION_TIMEFRAME_DETECTED = True
-        except Exception:
-            pass
+        # Use capability API methods instead of direct state manipulation
+        data_streamer.set_asset_focus(current_asset)
+        data_streamer.set_timeframe(minutes=1, lock=True)
     
     streaming_active = True
     
@@ -421,13 +414,9 @@ def handle_stop_stream():
     streaming_active = False
     print(f"[Stream] Stopped")
     emit('stream_stopped', {'timestamp': datetime.now().isoformat()})
-    # Optionally release asset focus when stream stops
-    try:
-        data_streamer.ASSET_FOCUS_MODE = False
-        # Unlock timeframe to allow auto-detection next session
-        data_streamer.PERIOD_LOCKED = False
-    except Exception:
-        pass
+    # Release asset focus when stream stops using API method
+    data_streamer.release_asset_focus()
+    data_streamer.unlock_timeframe()
 
 @socketio.on('change_asset')
 def handle_change_asset(data):
@@ -436,12 +425,8 @@ def handle_change_asset(data):
 
     if data and 'asset' in data:
         current_asset = data['asset']
-        data_streamer.CURRENT_ASSET = current_asset
-        # Keep asset focus enabled while streaming
-        try:
-            data_streamer.ASSET_FOCUS_MODE = True
-        except Exception:
-            pass
+        # Use API method to change asset focus
+        data_streamer.set_asset_focus(current_asset)
         
         print(f"[Stream] Asset changed to {current_asset}")
         emit('asset_changed', {
