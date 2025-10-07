@@ -1,8 +1,22 @@
 # QuantumFlux Trading Platform - TODO & Status
 
-## 🎉 Recently Completed (October 5, 2025)
+## 🎉 Recently Completed (October 7, 2025)
 
-### ✅ GUI Backend Architecture Refactoring - COMPLETE
+### ✅ Critical Architectural Fixes - COMPLETE
+- [x] Fixed asset filtering bug - filtering now at START of `_process_realtime_update()`
+- [x] Eliminated duplicate candle formation - backend emits candles, frontend displays
+- [x] Added proper API methods to capability:
+  - [x] `set_asset_focus(asset)` / `release_asset_focus()`
+  - [x] `set_timeframe(minutes, lock)` / `unlock_timeframe()`
+  - [x] `get_latest_candle(asset)` / `get_current_asset()`
+- [x] Refactored `streaming_server.py` to use API methods (no direct state access)
+- [x] Simplified data flow - capability → server → frontend (single source of truth)
+- [x] Added backpressure handling - 1000-item buffer limit in frontend
+- [x] Fixed Vite port configuration - now correctly on port 5000
+- [x] Removed 70+ lines of duplicate candle logic from frontend
+- [x] Improved maintainability with clean API boundaries
+
+### ✅ GUI Backend Architecture Refactoring - COMPLETE (October 5, 2025)
 - [x] Moved `streaming_server.py` to root folder as dedicated GUI backend
 - [x] Full integration with `RealtimeDataStreaming` capability - **ZERO code duplication**
 - [x] All WebSocket decoding uses `data_streamer._decode_and_parse_payload`
@@ -192,6 +206,10 @@
 - [x] Simplified redundant code
 - [x] Eliminated code duplication (delegated to capabilities)
 - [x] Architect-approved architecture with zero duplication
+- [x] Fixed asset filtering bug (October 7, 2025)
+- [x] Eliminated duplicate candle formation (October 7, 2025)
+- [x] Added proper API encapsulation (October 7, 2025)
+- [x] Simplified data flow (October 7, 2025)
 - [ ] Add unit tests for data_loader.py
 - [ ] Add integration tests for Socket.IO handlers
 - [ ] Improve error handling in streaming_server.py
@@ -256,4 +274,4 @@ For internal development team:
 - **Strategy**: Quantum Flux provides solid baseline for comparison
 - **GUI**: React + Vite + TailwindCSS stack is productive
 
-**Last Updated**: October 5, 2025
+**Last Updated**: October 7, 2025

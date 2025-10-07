@@ -2,7 +2,7 @@
 
 ## 🎯 Current Status
 
-The platform now has **GUI backtesting fully integrated**! You can test trading strategies on historical data through a modern React interface.
+The platform has **critical architectural improvements complete**! Recent fixes include asset filtering, duplicate candle elimination, and clean API encapsulation. GUI backtesting is fully integrated for testing strategies on historical data through a modern React interface.
 
 ## 🚀 Quick Start Options
 
@@ -31,13 +31,13 @@ npm run dev
 Expected output:
 ```
 VITE v5.4.20  ready in 399 ms
-➜  Local:   http://localhost:5001/
-➜  Network: http://172.31.70.130:5001/
+➜  Local:   http://localhost:5000/
+➜  Network: http://172.31.70.130:5000/
 ```
 
 **Step 3: Open Dashboard**
 
-Navigate to: **http://localhost:5001**
+Navigate to: **http://localhost:5000**
 
 **Step 4: Run a Backtest**
 1. Click **"Strategy Backtest"** in the navigation

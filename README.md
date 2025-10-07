@@ -2,14 +2,15 @@
 
 A sophisticated automated trading platform for PocketOption combining real-time WebSocket data streaming, browser automation, and AI-driven technical analysis with an integrated React GUI for backtesting and strategy execution.
 
-## 🎯 Current Status: GUI Backtesting Integration Complete ✅
+## 🎯 Current Status: Critical Architectural Refactoring Complete ✅
 
-### ✅ **Recently Completed** (October 4, 2025)
-- **GUI Backtesting System**: Full React-based backtesting interface with Socket.IO integration
-- **Historical Data Support**: Smart discovery of 100+ CSV files (OTC & HLOC formats)
-- **Strategy Integration**: Quantum Flux strategy working with both backtesting and live data
-- **Socket.IO Backend**: 4 handlers for backtest execution, data discovery, signal generation
-- **Code Quality**: Cleaned up type hints, removed unused code, simplified architecture
+### ✅ **Recently Completed** (October 7, 2025)
+- **Asset Filtering Bug Fixed**: Asset filtering now at start of processing - prevents unwanted asset switches
+- **Duplicate Candle Formation Eliminated**: Backend emits formed candles, frontend displays only - 70+ lines removed
+- **Encapsulation Fixed**: Added proper API methods to capability, removed direct state access
+- **Data Flow Simplified**: Single source of truth for candle formation - capability → server → frontend
+- **Backpressure Handling**: 1000-item buffer limit prevents memory overflow
+- **Port Configuration Fixed**: Vite now correctly serves on port 5000
 
 ### 🚀 **Core Capabilities**
 - **Real-time WebSocket Data Streaming**: 22,000+ messages from PocketOption
@@ -245,6 +246,14 @@ npm install
 ```
 
 ## Recent Updates
+
+### October 7, 2025
+- ✅ Fixed critical asset filtering bug (filtering at start of processing)
+- ✅ Eliminated duplicate candle formation (single source of truth)
+- ✅ Added proper API methods to capability (clean encapsulation)
+- ✅ Simplified data flow (capability → server → frontend)
+- ✅ Added backpressure handling (1000-item buffer limit)
+- ✅ Fixed Vite port configuration (now on port 5000)
 
 ### October 4, 2025
 - ✅ Integrated backtesting into React GUI

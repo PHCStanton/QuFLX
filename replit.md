@@ -27,21 +27,35 @@ Chrome Session (Port 9222) ←→ Capabilities Framework ←→ Multiple Interfa
 
 1.  **Hybrid Chrome Session Management**: Uses a persistent Chrome session with remote debugging (port 9222) to maintain login state and WebSocket connections, allowing Selenium to attach to an existing instance.
 2.  **WebSocket Data Interception**: Intercepts Chrome DevTools Protocol performance logs to capture and decode WebSocket messages from PocketOption, leveraging the existing authenticated session.
-3.  **Dedicated GUI Backend Server** (`streaming_server.py` in root): Flask-SocketIO server that attaches to Chrome (port 9222) and **delegates all WebSocket interception to the RealtimeDataStreaming capability** to avoid code duplication. Intercepts real WebSocket data from PocketOption via `_decode_and_parse_payload`, processes chart settings via `_process_chart_settings`, and handles price updates via `_process_realtime_update`. Streams processed data to the React frontend. Handles CSV serving, backtesting, and real-time tick data streaming. **No simulated data** - all data comes from Chrome/PocketOption WebSocket interception through the capability's vetted logic.
+3.  **Dedicated GUI Backend Server** (`streaming_server.py` in root): Flask-SocketIO server that attaches to Chrome (port 9222) and **delegates all WebSocket interception to the RealtimeDataStreaming capability** to avoid code duplication. Uses capability's public API methods for clean encapsulation:
+    - `set_asset_focus(asset)` / `release_asset_focus()` for asset control
+    - `set_timeframe(minutes, lock)` / `unlock_timeframe()` for timeframe management
+    - `get_latest_candle(asset)` / `get_current_asset()` for data access
+    - Delegates to `_decode_and_parse_payload`, `_process_chart_settings`, `_process_realtime_update`
+    - Emits fully-formed candles via `candle_update` event (no tick extraction)
+    - Handles CSV serving, backtesting, and real-time candle streaming
+    - **Asset filtering at source**: Capability filters assets at start of processing to prevent unwanted switches
+    - **Single source of truth**: Only capability forms candles, frontend displays them
+    - **No simulated data** - all data comes from Chrome/PocketOption WebSocket interception through the capability's vetted logic
 4.  **Intelligent Timeframe Detection**: Determines candle timeframes by analyzing actual timestamp intervals and chart settings from PocketOption, ensuring reliability regardless of metadata inconsistencies.
 5.  **Modular Capabilities Framework**: Trading operations are implemented as self-contained capabilities with a standardized `run(ctx, inputs) -> CapResult` interface, promoting composability and reusability. Capabilities include data streaming, session scanning, trade execution, and signal generation.
 6.  **Multi-Interface Access Pattern**: Provides access via a FastAPI backend, Flask-SocketIO GUI backend, React GUI, CLI tool, and a Pipeline Orchestrator, all consuming the same core capabilities or Chrome session.
-7.  **GUI Data Analysis with Timeframe Filtering**: React frontend filters available assets by selected timeframe (1m, 5m, 15m, 1h, 4h), showing only assets with matching data in corresponding directories. Complete CSV filenames preserved in dropdowns for clarity.
+7.  **GUI Data Analysis with Timeframe Filtering**: React frontend filters available assets by selected timeframe (1m, 5m, 15m, 1h, 4h), showing only assets with matching data in corresponding directories. Complete CSV filenames preserved in dropdowns for clarity. Frontend implements backpressure handling with 1000-item buffer limit to prevent memory overflow.
 8.  **Chunked CSV Persistence with Timeframe Organization**: Automatically rotates CSV files based on configurable chunk sizes and organizes them by timeframe (e.g., `1M_candles/`, `15M_candles/`) to manage large datasets and facilitate analysis.
 9.  **Selenium UI Control Helpers**: Utility classes (`HighPriorityControls`, `ZoomManager`) centralize robust UI interaction logic for PocketOption, handling specific element interactions and platform quirks.
 10. **Strategy Engine with Confidence Scoring**: A modular strategy system (Quantum Flux, Advanced, Alternative, Basic) generates trading signals from multiple indicators with confidence scoring for risk management, allowing A/B testing of different approaches.
 
 ### Data Flow Architecture
 
-*   **Real-time Data Pipeline**: PocketOption WebSocket → Chrome DevTools Protocol → Performance Log Interception (streaming_server.py) → **RealtimeDataStreaming Capability** (_decode_and_parse_payload → _process_realtime_update → _process_chart_settings) → Candle State in Capability → Extract for Emit → Socket.IO Emit to Frontend → Chart Update.
+*   **Real-time Data Pipeline (SIMPLIFIED)**: PocketOption WebSocket → Chrome DevTools Protocol → Performance Log Interception (streaming_server.py) → **RealtimeDataStreaming Capability** (_decode_and_parse_payload → **Asset Filtering (START)** → _process_realtime_update → _process_chart_settings → **Candle Formation**) → **API Methods** (get_latest_candle) → Socket.IO Emit (`candle_update`) → Frontend Display (with backpressure) → Chart Update.
+    - **Key Improvement**: Asset filtering at START of processing prevents unwanted asset switches
+    - **Single Source of Truth**: Only capability forms candles, frontend displays them directly
+    - **Clean Encapsulation**: Server uses public API methods, no internal state access
+    - **Backpressure Protection**: Frontend limits buffer to 1000 items to prevent memory issues
 *   **Historical Data Flow**: User Selects Timeframe → Backend Filters CSV Files by Directory → Frontend Displays Matching Assets → User Loads Data → Chart Visualization.
 *   **Trading Execution Flow**: Signal Generation (Indicators) → Confidence Scoring → Strategy Validation → Trade Click Capability → WebDriver Interaction → Execution Verification → Result Logging.
 *   **GUI Backtesting Flow**: User Selects CSV → Frontend (Socket.IO) → Backend Handler → Data Loader → Backtest Engine → Strategy Execution → Results Calculation → Socket.IO Response → Frontend Display.
+*   **GUI Real-time Streaming Flow**: User Focuses Asset → Frontend Sets Focus (Socket.IO) → Backend Calls `set_asset_focus(asset)` → Capability Filters at Start → Processes & Forms Candles → Backend Calls `get_latest_candle()` → Emits `candle_update` → Frontend Displays (with backpressure) → Chart Updates.
 
 ## External Dependencies
 

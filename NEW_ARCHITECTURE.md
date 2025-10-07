@@ -2,7 +2,9 @@
 
 ## Architecture Overview
 
-This document outlines the new Clean Architecture structure for the QuantumFlux trading platform, following Domain-Driven Design (DDD) principles.
+This document outlines the Clean Architecture structure for the QuantumFlux trading platform, following Domain-Driven Design (DDD) principles.
+
+**Last Updated**: October 7, 2025 - Reflects recent architectural improvements including asset filtering, encapsulation fixes, and simplified data flow.
 
 ## Core Principles
 
@@ -133,6 +135,45 @@ QuantumFlux/
 4. **Flexibility**: Infrastructure can be swapped without changing business logic
 5. **Team Collaboration**: Different teams can work on different layers/contexts
 6. **Production Ready**: Proper configuration and deployment structure
+
+## Recent Architectural Improvements (October 7, 2025)
+
+### Critical Fixes Implemented
+
+1. **Asset Filtering at Source**
+   - **Problem**: Asset filtering happened too late, causing unwanted asset switches
+   - **Solution**: Moved filtering to START of `_process_realtime_update()` in capability
+   - **Benefit**: Prevents processing of unwanted assets before they enter the system
+
+2. **Eliminated Duplicate Candle Formation**
+   - **Problem**: Both backend and frontend were forming candles independently
+   - **Solution**: Backend emits fully-formed candles via `candle_update`, frontend displays only
+   - **Benefit**: Single source of truth, no granularity mismatch, 70+ lines removed
+
+3. **Fixed Broken Encapsulation**
+   - **Problem**: Server directly manipulated capability internals
+   - **Solution**: Created public API methods:
+     - `set_asset_focus(asset)` / `release_asset_focus()`
+     - `set_timeframe(minutes, lock)` / `unlock_timeframe()`
+     - `get_latest_candle(asset)` / `get_current_asset()`
+   - **Benefit**: Clean separation of concerns, maintainable codebase
+
+4. **Simplified Data Flow**
+   - **Before**: Complex multi-step process with tick extraction
+   - **After**: Capability → Server (emit candles) → Frontend (display)
+   - **Benefit**: Single source of truth, easier to debug and maintain
+
+5. **Backpressure Handling**
+   - **Problem**: Frontend could overflow with too much data
+   - **Solution**: 1000-item buffer limit with auto-truncation
+   - **Benefit**: Prevents memory issues during high-frequency data streams
+
+### Architecture Principles Reinforced
+
+- **Dependency Inversion**: Server depends on capability's public API, not internals
+- **Single Responsibility**: Capability handles candle formation, server handles communication
+- **Don't Repeat Yourself**: Eliminated duplicate candle logic
+- **Separation of Concerns**: Clear boundaries between data processing and presentation
 
 ## Migration Strategy
 
