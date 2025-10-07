@@ -52,7 +52,74 @@ class RealtimeDataStreaming(Capability):
         self.TICK_ONLY_MODE = False
         self.ASSET_FOCUS_MODE = False
 
+    # ========================================
+    # Public API Methods (for external control)
+    # ========================================
+    
+    def set_asset_focus(self, asset: str) -> None:
+        """
+        Enable asset focus mode and lock to a specific asset.
+        This prevents the capability from auto-switching assets based on Pocket Option UI.
+        
+        Args:
+            asset: The asset symbol to focus on (e.g., 'EURUSD_OTC')
+        """
+        self.ASSET_FOCUS_MODE = True
+        self.CURRENT_ASSET = asset
+    
+    def release_asset_focus(self) -> None:
+        """
+        Disable asset focus mode, allowing the capability to auto-sync with Pocket Option UI.
+        """
+        self.ASSET_FOCUS_MODE = False
+    
+    def set_timeframe(self, minutes: int, lock: bool = True) -> None:
+        """
+        Set the timeframe for candle formation.
+        
+        Args:
+            minutes: Timeframe in minutes (1, 5, 15, 60, etc.)
+            lock: If True, prevents auto-detection from overriding this timeframe
+        """
+        self.PERIOD = minutes * 60  # Convert to seconds
+        self.PERIOD_LOCKED = lock
+        self.SESSION_TIMEFRAME_DETECTED = True
+    
+    def unlock_timeframe(self) -> None:
+        """
+        Unlock timeframe to allow auto-detection from chart settings.
+        """
+        self.PERIOD_LOCKED = False
+    
+    def get_latest_candle(self, asset: str) -> Optional[List[Any]]:
+        """
+        Get the latest candle for a specific asset.
+        
+        Args:
+            asset: The asset symbol
+            
+        Returns:
+            Latest candle as [timestamp, open, close, high, low] or None
+        """
+        if asset in self.CANDLES and self.CANDLES[asset]:
+            return self.CANDLES[asset][-1]
+        return None
+    
+    def get_all_candles(self, asset: str) -> List[List[Any]]:
+        """
+        Get all candles for a specific asset.
+        
+        Args:
+            asset: The asset symbol
+            
+        Returns:
+            List of candles, each as [timestamp, open, close, high, low]
+        """
+        return self.CANDLES.get(asset, [])
 
+    # ========================================
+    # Internal Processing Methods
+    # ========================================
 
     def _decode_and_parse_payload(self, encoded_payload: str) -> Optional[Any]:
         """Decodes a base64 payload and parses it as JSON."""
