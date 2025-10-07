@@ -75,7 +75,7 @@ export const useWebSocket = (url) => {
       setIsConnecting(true);
     });
 
-    socket.on('tick_update', (data) => {
+    socket.on('candle_update', (data) => {
       setLastMessage(data);
     });
 

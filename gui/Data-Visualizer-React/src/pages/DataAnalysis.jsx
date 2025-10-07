@@ -17,10 +17,11 @@ const DataAnalysis = () => {
   
   // WebSocket connection for live streaming (dynamic backend URL detection)
   const { isConnected, isConnecting, lastMessage, chromeStatus, streamActive, streamAsset, startStream, stopStream } = useWebSocket();
-  // Buffer for throttled tick processing
-  const tickBufferRef = useRef([]);
+  // Buffer for candle updates with backpressure handling
+  const candleBufferRef = useRef([]);
   const processingRef = useRef(false);
   const processTimerRef = useRef(null);
+  const MAX_BUFFER_SIZE = 1000;
 
   // Platform WebSocket is only enabled when Chrome is connected
   const chromeConnected = chromeStatus === 'connected';
@@ -124,20 +125,24 @@ const DataAnalysis = () => {
     }
   }, [dataSource, isConnected, streamActive, streamAsset, selectedAsset]);
 
-  // Push ticks into buffer with asset gating
+  // Push candles into buffer with asset gating and backpressure handling
   useEffect(() => {
     if (!isLiveMode || !lastMessage) return;
     const gateAsset = dataSource === 'platform' ? (streamAsset || selectedAsset) : selectedAsset;
     if (lastMessage.asset === gateAsset) {
-      tickBufferRef.current.push(lastMessage);
+      // Backpressure: limit buffer size
+      if (candleBufferRef.current.length > MAX_BUFFER_SIZE) {
+        candleBufferRef.current = candleBufferRef.current.slice(-MAX_BUFFER_SIZE / 2);
+      }
+      candleBufferRef.current.push(lastMessage);
     }
   }, [isLiveMode, lastMessage, selectedAsset, dataSource, streamAsset]);
 
-  // Scheduled processing loop (~10 fps)
+  // Simplified candle processing loop (~10 fps)
   useEffect(() => {
     if (!isLiveMode) {
       // Clear buffer and stop processing when not live
-      tickBufferRef.current = [];
+      candleBufferRef.current = [];
       if (processTimerRef.current) {
         clearInterval(processTimerRef.current);
         processTimerRef.current = null;
@@ -150,64 +155,60 @@ const DataAnalysis = () => {
         if (processingRef.current) return;
         processingRef.current = true;
 
-        const buffer = tickBufferRef.current;
+        const buffer = candleBufferRef.current;
         if (buffer.length === 0) {
           processingRef.current = false;
           return;
         }
 
         // Take a snapshot of current buffer and clear it
-        tickBufferRef.current = [];
+        candleBufferRef.current = [];
 
-        // Coalesce ticks into per-second bars and update chart
+        // Update chart with pre-formed candles from backend
         setChartData(prevData => {
           let data = prevData.slice();
-          for (const tick of buffer) {
-            const tsSec = Math.floor(tick.timestamp / 1000);
-            const price = tick.price;
-            const vol = tick.volume || 0;
-
+          
+          for (const candle of buffer) {
+            const timestamp = candle.timestamp;
+            
             if (data.length > 0) {
               const last = data[data.length - 1];
-              if (last.timestamp === tsSec) {
-                // Update current second bar
-                const updatedLast = {
-                  ...last,
-                  high: Math.max(last.high, price),
-                  low: Math.min(last.low, price),
-                  close: price,
-                  volume: (last.volume || 0) + vol
+              
+              // Update existing candle if same timestamp
+              if (last.timestamp === timestamp) {
+                data[data.length - 1] = {
+                  timestamp: timestamp,
+                  date: new Date(candle.date || timestamp * 1000),
+                  open: candle.open,
+                  high: candle.high,
+                  low: candle.low,
+                  close: candle.close,
+                  volume: candle.volume || 0,
+                  symbol: candle.asset
                 };
-                data[data.length - 1] = updatedLast;
                 continue;
               }
-              if (tsSec < last.timestamp) {
-                // Out-of-order tick: treat as update to last bar, do not append
-                const correctedLast = {
-                  ...last,
-                  high: Math.max(last.high, price),
-                  low: Math.min(last.low, price),
-                  close: price,
-                  volume: (last.volume || 0) + vol
-                };
-                data[data.length - 1] = correctedLast;
+              
+              // Skip out-of-order candles
+              if (timestamp < last.timestamp) {
                 continue;
               }
             }
 
-            // Append new bar for new second
+            // Append new candle
             data.push({
-              timestamp: tsSec,
-              date: new Date(tick.timestamp),
-              open: price,
-              high: price,
-              low: price,
-              close: price,
-              volume: vol,
-              symbol: tick.asset
+              timestamp: timestamp,
+              date: new Date(candle.date || timestamp * 1000),
+              open: candle.open,
+              high: candle.high,
+              low: candle.low,
+              close: candle.close,
+              volume: candle.volume || 0,
+              symbol: candle.asset
             });
           }
-          // Cap data length
+          
+          // Cap data length to prevent memory issues
           return data.slice(-500);
         });
 
