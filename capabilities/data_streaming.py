@@ -116,6 +116,15 @@ class RealtimeDataStreaming(Capability):
             List of candles, each as [timestamp, open, close, high, low]
         """
         return self.CANDLES.get(asset, [])
+    
+    def get_current_asset(self) -> Optional[str]:
+        """
+        Get the currently focused or active asset.
+        
+        Returns:
+            The current asset symbol or None
+        """
+        return self.CURRENT_ASSET
 
     # ========================================
     # Internal Processing Methods

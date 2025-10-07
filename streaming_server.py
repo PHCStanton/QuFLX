@@ -104,12 +104,15 @@ def extract_candle_for_emit(asset: str) -> Optional[Dict]:
     """
     Extract latest formed candle from capability's candle data for Socket.IO emission.
     This emits OHLC candles instead of ticks, eliminating duplicate candle formation.
+    Uses capability's public API instead of direct state access.
     """
     global data_streamer
     
     try:
-        if asset in data_streamer.CANDLES and data_streamer.CANDLES[asset]:
-            latest_candle = data_streamer.CANDLES[asset][-1]
+        # Use capability's public API method instead of accessing CANDLES directly
+        latest_candle = data_streamer.get_latest_candle(asset)
+        
+        if latest_candle:
             timestamp, open_price, close_price, high_price, low_price = latest_candle
             
             return {
@@ -214,8 +217,10 @@ def stream_from_chrome():
                                 data_streamer._process_realtime_update(payload, capability_ctx)
                                 
                                 # Extract processed candle and emit to frontend
-                                if data_streamer.CURRENT_ASSET:
-                                    candle_data = extract_candle_for_emit(data_streamer.CURRENT_ASSET)
+                                # Use capability API method to get current asset
+                                current_focused_asset = data_streamer.get_current_asset()
+                                if current_focused_asset:
+                                    candle_data = extract_candle_for_emit(current_focused_asset)
                                     if candle_data:
                                         socketio.emit('candle_update', candle_data)
                 
