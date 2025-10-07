@@ -29,7 +29,13 @@ from data_loader import DataLoader, BacktestEngine
 
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode='eventlet',
+    ping_timeout=30,   # seconds
+    ping_interval=10   # seconds
+)
 
 # Asset base prices
 ASSET_PRICES = {

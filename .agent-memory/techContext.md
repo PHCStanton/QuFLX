@@ -191,3 +191,24 @@ Save locations (realtime stream):
 - **Rate Limiting**: API includes request rate limiting
 - **Input Validation**: All user inputs validated before processing
 - **Error Logging**: Sensitive information excluded from logs
+## Technical Decisions and Considerations (2025-10-06)
+
+Frontend
+- Add asset gating in DataAnalysis/useWebSocket; ignore mismatched tick_update events. [planned]
+- Automatic source sensing mode (auto/historical/streaming) with status badge; default auto. [planned]
+- Throttle chart updates to ~10 fps; coalesce ticks per frame; use series.update for latest/new bars. [planned]
+- Timeframe aggregation (tick/1s/5s/1m) with bar builder; clear cache on timeframe change. [planned]
+
+Backend
+- Stabilize /api/available-csv-files: robust error handling, always valid JSON responses; Windows path-safe handling. [planned]
+- Verify tick payload: { asset, timestamp_ms, price }; enforce per-asset monotonic timestamps; optionally buffer/reorder. [planned]
+- Socket.IO config: prefer transport=["websocket"], tune pingInterval/pingTimeout, reconnection backoff, and CORS origins. [planned]
+
+Security/Scale (future)
+- TLS/WSS for external, tightened CORS/origin, token-based auth, rate limiting.
+- Socket.IO rooms per asset; Redis adapter for multi-node broadcasting and sticky sessions.
+
+References
+- TradingView Advanced Charts (Streaming Implementation/Datafeed API) — cache reset, symbol/resolution matching, time violation rules.
+- Lightweight Charts — real-time series.update semantics; strict ascending time.
+- WebSocket best practices (AlgoCademy) — persistent connections, event handling, reconnection/backoff, performance optimization, scaling, security.

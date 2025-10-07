@@ -34,3 +34,8 @@ QuantumFlux is a sophisticated automated trading platform for PocketOption that 
   - Candles: data/data_output/assets_data/realtime_stream/1M_candle_data
   - Ticks:   data/data_output/assets_data/realtime_stream/1M_tick_data
 - **System Integration**: Clean, working backend without architectural conflicts
+## Product Direction Addendum (2025-10-06)
+
+- Align data visualization with Pocket Option UI: strict per-asset isolation; ensure live stream and historical data sources match the selected asset.
+- Automatic source sensing preferred over manual dropdown: seamlessly use streaming when available; fallback to historical without user friction; display source status.
+- Support timeframe controls consistent with trading platforms; ensure cache resets on resolution change to maintain integrity.

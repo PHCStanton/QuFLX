@@ -5,8 +5,8 @@ Connects to Chrome (port 9222) to intercept PocketOption WebSocket data
 and streams it to the React frontend via Socket.IO
 """
 
-import eventlet
-eventlet.monkey_patch()
+# Note: eventlet WSGI server can be unstable on Windows. Use threading async_mode
+# for compatibility; this will support long-polling and basic Socket.IO features.
 
 from flask import Flask, jsonify, request
 from flask_socketio import SocketIO, emit
@@ -38,7 +38,7 @@ from base import Ctx  # Import Ctx for capability context
 
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Global state for Chrome session and streaming
 chrome_driver = None
@@ -395,6 +395,15 @@ def handle_start_stream(data):
     if data and 'asset' in data:
         current_asset = data['asset']
         data_streamer.CURRENT_ASSET = current_asset
+        # Enforce asset focus so capability does not auto-switch to another asset
+        try:
+            data_streamer.ASSET_FOCUS_MODE = True
+            # Lock timeframe to 1 minute unless explicitly changed
+            data_streamer.PERIOD = 60
+            data_streamer.PERIOD_LOCKED = True
+            data_streamer.SESSION_TIMEFRAME_DETECTED = True
+        except Exception:
+            pass
     
     streaming_active = True
     
@@ -408,19 +417,31 @@ def handle_start_stream(data):
 def handle_stop_stream():
     """Stop streaming data"""
     global streaming_active
-    
+
     streaming_active = False
     print(f"[Stream] Stopped")
     emit('stream_stopped', {'timestamp': datetime.now().isoformat()})
+    # Optionally release asset focus when stream stops
+    try:
+        data_streamer.ASSET_FOCUS_MODE = False
+        # Unlock timeframe to allow auto-detection next session
+        data_streamer.PERIOD_LOCKED = False
+    except Exception:
+        pass
 
 @socketio.on('change_asset')
 def handle_change_asset(data):
     """Change the streaming asset"""
     global current_asset, data_streamer
-    
+
     if data and 'asset' in data:
         current_asset = data['asset']
         data_streamer.CURRENT_ASSET = current_asset
+        # Keep asset focus enabled while streaming
+        try:
+            data_streamer.ASSET_FOCUS_MODE = True
+        except Exception:
+            pass
         
         print(f"[Stream] Asset changed to {current_asset}")
         emit('asset_changed', {
@@ -501,6 +522,5 @@ if __name__ == '__main__':
         port=3001,
         debug=False,
         use_reloader=False,
-        log_output=True,
         allow_unsafe_werkzeug=True
     )

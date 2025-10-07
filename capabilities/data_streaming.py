@@ -34,6 +34,9 @@ class RealtimeDataStreaming(Capability):
         # Global state management following po_bot_v2.py methodology
         self.CANDLES: Dict[str, List[List[Any]]] = {}  # asset -> [[timestamp, open, close, high, low], ...]
         self.PERIOD: int = 60  # Default period in seconds (1 minute)
+        # When locked, PERIOD should not be overridden by incoming chart settings.
+        # This helps force a 1m stream when the platform UI reports an unexpected timeframe.
+        self.PERIOD_LOCKED: bool = False
         self.CURRENT_ASSET: Optional[str] = None
         self.realtime_asset_data: List[Dict[str, Any]] = []
         self.current_asset_prices: Dict[str, Any] = {}  # To store the latest price for each asset
@@ -238,6 +241,12 @@ class RealtimeDataStreaming(Capability):
 
     def _process_chart_period(self, settings: Dict[str, Any], ctx: Ctx) -> None:
         """Process chart period from settings."""
+        # Respect externally locked timeframe
+        if self.PERIOD_LOCKED:
+            self.SESSION_TIMEFRAME_DETECTED = True
+            if ctx.verbose:
+                print(f"⏱️ [{datetime.now(timezone.utc).strftime('%H:%M:%SZ')}] Chart timeframe locked at {int(self.PERIOD/60)} minutes; skipping auto-detection")
+            return
         chart_period_keys = ['chartPeriod', 'period', 'timeframe', 'interval']
         chart_period = None
         for key in chart_period_keys:
@@ -260,6 +269,15 @@ class RealtimeDataStreaming(Capability):
 
     def _process_current_asset(self, settings: Dict[str, Any], payload: Dict[str, Any], ctx: Ctx) -> None:
         """Process current asset from settings."""
+        # When Asset Focus Mode is enabled and a user-selected asset is already set,
+        # do NOT auto-sync CURRENT_ASSET from incoming settings/payload.
+        # This prevents unexpected switches (e.g., to DOGE_OTC) while the user is
+        # focusing a specific asset in the GUI.
+        if self.ASSET_FOCUS_MODE and self.CURRENT_ASSET:
+            if ctx.verbose:
+                print(f"🎯 [Asset Focus] Keeping focused asset: {self.CURRENT_ASSET}; skipping auto asset sync")
+            return
+
         symbol_keys = ['symbol', 'asset', 'pair', 'instrument']
         for key in symbol_keys:
             if key in settings:

@@ -12,7 +12,7 @@ export class WebSocketProvider {
   async connect() {
     return new Promise((resolve) => {
       this.socket = io(this.url, {
-        transports: ['polling', 'websocket'],
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: 1000,
       });

@@ -63,7 +63,9 @@ const LightweightChart = forwardRef(({
             low: item.low,
             close: item.close,
           }))
-          .sort((a, b) => a.time - b.time); // Ensure chronological order
+          .sort((a, b) => a.time - b.time) // Ensure chronological order
+          // Deduplicate any identical timestamps to satisfy LightweightCharts requirement
+          .filter((point, i, arr) => i === 0 || point.time > arr[i - 1].time);
         
         if (processedNewData.length === 0) {
           console.warn('No valid data points to update');
@@ -151,7 +153,9 @@ const LightweightChart = forwardRef(({
           low: item.low,
           close: item.close,
         }))
-        .sort((a, b) => a.time - b.time);
+        .sort((a, b) => a.time - b.time)
+        // Ensure strictly increasing time values by removing duplicates
+        .filter((point, i, arr) => i === 0 || point.time > arr[i - 1].time);
     } catch (error) {
       console.error('Error processing chart data:', error);
       return [];

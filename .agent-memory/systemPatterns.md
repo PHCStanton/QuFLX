@@ -105,3 +105,12 @@ QuantumFlux uses a **capabilities-first architecture** with direct integration p
 - **CLI Testing**: Direct capability testing via command-line interface
 - **API Testing**: REST endpoint verification and health checks
 - **Integration Testing**: End-to-end workflow validation
+## Streaming and Visualization Patterns (2025-10-06)
+
+- Real-time update rule: only update the latest bar (same time) or append a newer bar; never insert older-time bars (TradingView).
+- Cache reset on resolution/timeframe change to avoid time violation conflicts.
+- Subscriber fidelity: updates must match the chart’s current symbol and resolution; mismatches produce time-order violations.
+- Reconnection hygiene: reset caches on reconnect; re-seed from historical before accepting live updates.
+- Asset isolation: gate incoming ticks by asset identity; consider server-side rooms/channels per asset.
+- Throttling/coalescing: batch UI updates (~5–10 fps) to prevent race conditions and reduce render overhead.
+- Transport preference: use WebSocket over polling; configure ping/pong heartbeats and reconnection backoff.

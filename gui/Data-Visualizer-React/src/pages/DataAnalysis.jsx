@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import LightweightChart from '../components/charts/LightweightChart';
 import { fetchCurrencyPairs } from '../utils/fileUtils';
 import { parseTradingData } from '../utils/tradingData';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 const DataAnalysis = () => {
-  const [dataSource, setDataSource] = useState('csv');
+  const [dataSource, setDataSource] = useState('auto');
   const [timeframe, setTimeframe] = useState('1m');
   const [selectedAsset, setSelectedAsset] = useState('');
   const [availableAssets, setAvailableAssets] = useState([]);
@@ -15,23 +15,28 @@ const DataAnalysis = () => {
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [statistics, setStatistics] = useState(null);
   
-  // WebSocket connection for live streaming
-  // Vite proxy forwards /socket.io to backend on port 3001
-  const { isConnected, lastMessage, chromeStatus, socketRef } = useWebSocket('/socket.io');
+  // WebSocket connection for live streaming (dynamic backend URL detection)
+  const { isConnected, isConnecting, lastMessage, chromeStatus, streamActive, streamAsset, startStream, stopStream } = useWebSocket();
+  // Buffer for throttled tick processing
+  const tickBufferRef = useRef([]);
+  const processingRef = useRef(false);
+  const processTimerRef = useRef(null);
 
   // Platform WebSocket is only enabled when Chrome is connected
   const chromeConnected = chromeStatus === 'connected';
   
   const dataSources = [
+    { id: 'auto', name: 'Auto (Streaming when available, else Historical)' },
     { id: 'csv', name: 'CSV Files (Historical)' },
-    { id: 'platform', name: 'Platform WebSocket', disabled: !chromeConnected },
+    // Platform WebSocket should always be selectable; show status separately
+    { id: 'platform', name: 'Platform WebSocket' },
     { id: 'binance', name: 'Binance API', disabled: true },
   ];
 
   const timeframes = ['1m', '5m', '15m', '1h', '4h'];
 
   const loadAvailableAssets = useCallback(async () => {
-    if (dataSource === 'csv') {
+    if (dataSource === 'csv' || dataSource === 'auto') {
       const pairs = await fetchCurrencyPairs(timeframe);
       setAvailableAssets(pairs);
       if (pairs.length > 0) {
@@ -104,42 +109,132 @@ const DataAnalysis = () => {
     }
   }, [selectedAsset, timeframe, isLiveMode, loadHistoricalData]);
 
-  // Handle streaming data updates
+  // Auto source sensing: when dataSource is auto, enable live mode only if backend is connected and stream is active for current asset
   useEffect(() => {
-    if (isLiveMode && lastMessage) {
-      // Add new tick to chart data
-      const newDataPoint = {
-        timestamp: Math.floor(lastMessage.timestamp / 1000),
-        date: new Date(lastMessage.timestamp),
-        open: lastMessage.price,
-        close: lastMessage.price,
-        high: lastMessage.price,
-        low: lastMessage.price,
-        volume: lastMessage.volume || 0,
-        symbol: lastMessage.asset
-      };
-      
-      setChartData(prevData => {
-        const newData = [...prevData, newDataPoint];
-        // Keep last 500 data points for performance
-        return newData.slice(-500);
-      });
+    if (dataSource !== 'auto') return;
+    const shouldLive = isConnected && streamActive && (streamAsset === selectedAsset);
+    if (shouldLive !== isLiveMode) {
+      setIsLiveMode(shouldLive);
+      if (shouldLive) {
+        startStream(selectedAsset || 'EURUSD_OTC');
+      } else {
+        stopStream();
+        if (selectedAsset) loadHistoricalData();
+      }
     }
-  }, [isLiveMode, lastMessage]);
+  }, [dataSource, isConnected, streamActive, streamAsset, selectedAsset]);
+
+  // Push ticks into buffer with asset gating
+  useEffect(() => {
+    if (!isLiveMode || !lastMessage) return;
+    const gateAsset = dataSource === 'platform' ? (streamAsset || selectedAsset) : selectedAsset;
+    if (lastMessage.asset === gateAsset) {
+      tickBufferRef.current.push(lastMessage);
+    }
+  }, [isLiveMode, lastMessage, selectedAsset, dataSource, streamAsset]);
+
+  // Scheduled processing loop (~10 fps)
+  useEffect(() => {
+    if (!isLiveMode) {
+      // Clear buffer and stop processing when not live
+      tickBufferRef.current = [];
+      if (processTimerRef.current) {
+        clearInterval(processTimerRef.current);
+        processTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (!processTimerRef.current) {
+      processTimerRef.current = setInterval(() => {
+        if (processingRef.current) return;
+        processingRef.current = true;
+
+        const buffer = tickBufferRef.current;
+        if (buffer.length === 0) {
+          processingRef.current = false;
+          return;
+        }
+
+        // Take a snapshot of current buffer and clear it
+        tickBufferRef.current = [];
+
+        // Coalesce ticks into per-second bars and update chart
+        setChartData(prevData => {
+          let data = prevData.slice();
+          for (const tick of buffer) {
+            const tsSec = Math.floor(tick.timestamp / 1000);
+            const price = tick.price;
+            const vol = tick.volume || 0;
+
+            if (data.length > 0) {
+              const last = data[data.length - 1];
+              if (last.timestamp === tsSec) {
+                // Update current second bar
+                const updatedLast = {
+                  ...last,
+                  high: Math.max(last.high, price),
+                  low: Math.min(last.low, price),
+                  close: price,
+                  volume: (last.volume || 0) + vol
+                };
+                data[data.length - 1] = updatedLast;
+                continue;
+              }
+              if (tsSec < last.timestamp) {
+                // Out-of-order tick: treat as update to last bar, do not append
+                const correctedLast = {
+                  ...last,
+                  high: Math.max(last.high, price),
+                  low: Math.min(last.low, price),
+                  close: price,
+                  volume: (last.volume || 0) + vol
+                };
+                data[data.length - 1] = correctedLast;
+                continue;
+              }
+            }
+
+            // Append new bar for new second
+            data.push({
+              timestamp: tsSec,
+              date: new Date(tick.timestamp),
+              open: price,
+              high: price,
+              low: price,
+              close: price,
+              volume: vol,
+              symbol: tick.asset
+            });
+          }
+          // Cap data length
+          return data.slice(-500);
+        });
+
+        processingRef.current = false;
+      }, 100); // ~10 fps
+    }
+
+    return () => {
+      if (processTimerRef.current) {
+        clearInterval(processTimerRef.current);
+        processTimerRef.current = null;
+      }
+    };
+  }, [isLiveMode]);
 
   const toggleLiveMode = () => {
     const newLiveMode = !isLiveMode;
     setIsLiveMode(newLiveMode);
     
-    if (newLiveMode && socketRef.current && isConnected) {
+    if (newLiveMode && isConnected) {
       // Start streaming when enabling live mode
-      socketRef.current.emit('start_stream', {
-        asset: selectedAsset || 'EURUSD_OTC'
-      });
+      const desiredAsset = dataSource === 'platform' ? (streamAsset || selectedAsset || '') : (selectedAsset || '');
+      startStream(desiredAsset || 'EURUSD_OTC');
       console.log('Started live stream for', selectedAsset);
-    } else if (!newLiveMode && socketRef.current) {
+    } else if (!newLiveMode) {
       // Stop streaming when disabling live mode
-      socketRef.current.emit('stop_stream');
+      stopStream();
       console.log('Stopped live stream');
       // Reload historical data
       if (selectedAsset) {
@@ -195,6 +290,7 @@ const DataAnalysis = () => {
               value={selectedAsset}
               onChange={(e) => setSelectedAsset(e.target.value)}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={dataSource === 'platform'}
             >
               {availableAssets.map(asset => (
                 <option key={asset.id} value={asset.id}>{asset.name}</option>
@@ -218,14 +314,15 @@ const DataAnalysis = () => {
                 type="checkbox"
                 checked={isLiveMode}
                 onChange={toggleLiveMode}
-                disabled={!isConnected || !chromeConnected}
+                disabled={!isConnected || (dataSource === 'platform' && !chromeConnected) || dataSource === 'csv'}
                 className="rounded"
               />
               <span className="text-sm text-slate-300">
                 Live Stream Mode {
-                  !isConnected ? '(Connecting to Backend...)' :
-                  !chromeConnected ? '(Chrome Not Connected)' :
-                  isLiveMode ? '(Active)' : ''
+                  (dataSource === 'platform' && !chromeConnected) ? '(Disconnected - Chrome not running)' :
+                  isConnecting ? '(Connecting...)' :
+                  isLiveMode && isConnected ? '(Connected)' :
+                  !isConnected ? '(Disconnected)' : ''
                 }
               </span>
             </label>
@@ -233,8 +330,8 @@ const DataAnalysis = () => {
           
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs text-slate-400">Backend: {isConnected ? 'Connected' : 'Disconnected'}</span>
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : isConnecting ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+              <span className="text-xs text-slate-400">Backend: {isConnected ? 'Connected' : isConnecting ? 'Connecting...' : 'Disconnected'}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${chromeConnected ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
@@ -278,8 +375,15 @@ const DataAnalysis = () => {
       )}
 
       <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6">
-        <h3 className="text-xl font-semibold text-white mb-4">Chart</h3>
-        {loading ? (
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-semibold text-white">Chart</h3>
+          <span className={`text-xs px-2 py-1 rounded-full border ${isLiveMode ? 'bg-green-900/30 text-green-300 border-green-700' : 'bg-slate-700/50 text-slate-300 border-slate-600'}`}>
+            {isLiveMode 
+              ? `Streaming • ${dataSource === 'platform' ? (streamAsset || selectedAsset || '') : (selectedAsset || '')}` 
+              : `Historical • ${selectedAsset || ''}`}
+          </span>
+        </div>
+        {loading && !isLiveMode ? (
           <div className="flex items-center justify-center h-96">
             <div className="text-center">
               <div className="text-slate-300 mb-2">{loadingStatus}</div>

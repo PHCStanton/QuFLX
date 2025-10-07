@@ -140,3 +140,21 @@ Ready for local testing with Chrome:
 - CSV files organized by timeframe directories (1M_candles/, 5M_candles/, etc.)
 - Frontend uses Vite proxy for /socket.io and /api endpoints
 - System gracefully handles Chrome unavailable (Replit) vs Chrome available (local)
+## Status Update — 2025-10-06
+
+Current state
+- Streaming server operational after restart; Socket.IO on 0.0.0.0:3001.
+- Frontend LightweightChart stable with guard; indicators rendering; no assertion errors post-initialization.
+- Intermittent REST 500/JSON parse errors observed early; later resolved as backend initialized.
+- WebSocket connection occasionally shows xhr poll errors; stabilizes with reconnection.
+
+Position vs best practices (TradingView/Lightweight Charts)
+- Time ordering: compliant (update latest vs append newer only). [x]
+- Resolution change cache reset: not yet implemented. [ ]
+- Symbol isolation: needs gating on client and server. [ ]
+
+Next milestones
+- Phase 1: transport hardening and client throttling. [ ]
+- Phase 2: auto source sensing and asset isolation. [ ]
+- Phase 3: REST endpoint stability and retry/backoff. [ ]
+- Phase 4: timeframe aggregation and cache reset on change. [ ]

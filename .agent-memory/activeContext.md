@@ -39,3 +39,18 @@ RealtimeDataStreaming Capability → Socket.IO → React GUI (Port 5000)
 
 ## Status
 **PRODUCTION READY**: The QuantumFlux platform now features a clean, maintainable architecture where the GUI backend (streaming_server.py) properly delegates all Chrome WebSocket interception logic to the RealtimeDataStreaming capability. No code duplication, all state managed through capability's vetted methods. System gracefully handles both Replit (Chrome unavailable) and local deployment (Chrome on port 9222) environments.
+## Update 2025-10-06
+
+Context
+- Created SOCKET-IO Visual Data Streaming Development Plan at dev_docs/SOCKET-IO_VISUAL_DEV_PLAN.md with phased, incremental steps and acceptance criteria.
+
+Active tasks (next execution window)
+- Implement client-side asset gating in DataAnalysis/useWebSocket: only apply tick_update when payload.asset matches focused asset. [~]
+- Add Automatic Source Sensing (auto/historical/streaming) with a visible status badge; default to auto. [ ]
+- Introduce client-side throttling (~10 fps) to coalesce tick updates; reduce race conditions. [ ]
+- Harden /api/available-csv-files to always return valid JSON and add meaningful error responses; investigate intermittent 500s on Windows paths/FS. [ ]
+- Prefer Socket.IO transport=["websocket"], tune reconnection/backoff, ensure CORS and ports align to reduce xhr poll errors. [ ]
+
+Notes
+- Time-order guard added in DataAnalysis to update last bar if incoming timestamp < latest; early ordering violations mitigated. [x]
+- Streaming server confirmed listening on 0.0.0.0:3001; frontend shows successful chart initialization for AEDCNY_OTC after stabilization. [x]
