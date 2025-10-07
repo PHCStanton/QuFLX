@@ -488,6 +488,13 @@ class RealtimeDataStreaming(Capability):
                 tstamp = int(time_mod.time())
                 asset = self.CURRENT_ASSET or 'Unknown'
             
+            # CRITICAL FIX: Asset filtering BEFORE processing
+            # Skip this update if asset focus mode is enabled and this isn't the focused asset
+            if self.ASSET_FOCUS_MODE and self.CURRENT_ASSET and asset and asset != self.CURRENT_ASSET:
+                if ctx.verbose:
+                    print(f"🔍 [{datetime.now(timezone.utc).strftime('%H:%M:%SZ')}] Filtering out {asset} (focus on {self.CURRENT_ASSET})")
+                return
+            
             if asset and current_value is not None and tstamp is not None:
                 # Update or create candles
                 if asset not in self.CANDLES:
