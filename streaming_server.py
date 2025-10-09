@@ -19,6 +19,7 @@ import re
 from datetime import datetime, timezone
 import threading
 import sys
+import argparse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -29,6 +30,8 @@ gui_dir = root_dir / 'gui' / 'Data-Visualizer-React'
 sys.path.insert(0, str(gui_dir))
 capabilities_dir = root_dir / 'capabilities'
 sys.path.insert(0, str(capabilities_dir))
+scripts_dir = root_dir / 'scripts' / 'custom_sessions'
+sys.path.insert(0, str(scripts_dir))
 
 from strategies.quantum_flux_strategy import QuantumFluxStrategy
 from data_loader import DataLoader, BacktestEngine  # type: ignore
@@ -36,6 +39,9 @@ from data_loader import DataLoader, BacktestEngine  # type: ignore
 # Import Chrome interception logic from capabilities
 from data_streaming import RealtimeDataStreaming  # type: ignore
 from base import Ctx  # type: ignore
+
+# Import persistence manager
+from stream_persistence import StreamPersistenceManager  # type: ignore
 
 app = Flask(__name__)
 CORS(app)
@@ -56,6 +62,11 @@ current_asset = "EURUSD_OTC"
 data_streamer = RealtimeDataStreaming()
 capability_ctx = None  # Will be initialized when Chrome connects
 period = 60  # 1 minute candles by default
+
+# Data persistence (optional, configured via --collect-stream argument)
+persistence_manager: Optional[StreamPersistenceManager] = None
+collect_stream_mode = "none"  # none, tick, candle, both
+last_closed_candle_index: Dict[str, int] = {}  # Track last written closed candle per asset
 
 # ========================================
 # Chrome Connection Functions
@@ -129,8 +140,9 @@ def extract_candle_for_emit(asset: str) -> Optional[Dict]:
     Extract latest formed candle from capability's candle data for Socket.IO emission.
     This emits OHLC candles instead of ticks, eliminating duplicate candle formation.
     Uses capability's public API instead of direct state access.
+    Also handles candle persistence if enabled.
     """
-    global data_streamer
+    global data_streamer, persistence_manager, collect_stream_mode, last_closed_candle_index
     
     try:
         # Use capability's public API method instead of accessing CANDLES directly
@@ -138,6 +150,39 @@ def extract_candle_for_emit(asset: str) -> Optional[Dict]:
         
         if latest_candle:
             timestamp, open_price, close_price, high_price, low_price = latest_candle
+            
+            # Persist closed candles if enabled
+            if persistence_manager and collect_stream_mode in ['candle', 'both']:
+                try:
+                    # Get all candles for this asset from capability
+                    candles = data_streamer.CANDLES.get(asset, [])
+                    if candles and len(candles) >= 2:
+                        # Index of last closed candle (current forming candle is last)
+                        closed_upto = len(candles) - 2
+                        last_written = last_closed_candle_index.get(asset, -1)
+                        
+                        if closed_upto > last_written:
+                            # Determine timeframe from capability's PERIOD
+                            tfm = int(data_streamer.PERIOD // 60) if hasattr(data_streamer, 'PERIOD') and data_streamer.PERIOD else 1
+                            if tfm < 1:
+                                tfm = 1
+                            
+                            # Write newly closed candles
+                            for i in range(last_written + 1, closed_upto + 1):
+                                c = candles[i]
+                                persistence_manager.add_candle(
+                                    asset=asset,
+                                    timeframe_minutes=tfm,
+                                    candle_ts=c[0],
+                                    open_price=c[1],
+                                    close_price=c[2],
+                                    high_price=c[3],
+                                    low_price=c[4]
+                                )
+                            
+                            last_closed_candle_index[asset] = closed_upto
+                except Exception as e:
+                    print(f"[Persistence] Error saving candle: {e}")
             
             return {
                 'asset': asset,
@@ -508,9 +553,75 @@ def handle_run_backtest(data):
 # ========================================
 
 if __name__ == '__main__':
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='QuantumFlux Trading Platform - GUI Backend Server')
+    parser.add_argument(
+        '--collect-stream',
+        choices=['tick', 'candle', 'both', 'none'],
+        default='none',
+        help='Enable optional data collection: tick=ticks only, candle=candles only, both=both, none=no collection (default: none)'
+    )
+    parser.add_argument(
+        '--candle-chunk-size',
+        type=int,
+        default=100,
+        help='Number of candles per CSV file chunk (default: 100)'
+    )
+    parser.add_argument(
+        '--tick-chunk-size',
+        type=int,
+        default=1000,
+        help='Number of ticks per CSV file chunk (default: 1000)'
+    )
+    
+    args = parser.parse_args()
+    collect_stream_mode = args.collect_stream
+    
     print("=" * 60)
     print("QuantumFlux Trading Platform - GUI Backend Server")
     print("=" * 60)
+    
+    # Initialize persistence manager if collection is enabled
+    if collect_stream_mode != 'none':
+        candle_dir = root_dir / "data" / "data_output" / "assets_data" / "realtime_stream" / "1M_candle_data"
+        tick_dir = root_dir / "data" / "data_output" / "assets_data" / "realtime_stream" / "1M_tick_data"
+        
+        persistence_manager = StreamPersistenceManager(
+            candle_dir=candle_dir,
+            tick_dir=tick_dir,
+            candle_chunk_size=args.candle_chunk_size,
+            tick_chunk_size=args.tick_chunk_size,
+        )
+        print(f"\n[Persistence] ✓ Stream collection enabled: {collect_stream_mode}")
+        print(f"[Persistence]   Candle output: {candle_dir}")
+        print(f"[Persistence]   Tick output: {tick_dir}")
+        print(f"[Persistence]   Chunk sizes: candles={args.candle_chunk_size}, ticks={args.tick_chunk_size}")
+        
+        # Patch data_streamer's output method to capture ticks (if tick collection enabled)
+        if collect_stream_mode in ['tick', 'both']:
+            # Save reference to original bound method
+            original_output = data_streamer._output_streaming_data
+            
+            def patched_output(self, asset, current_value, timestamp_str, change_indicator):
+                # Keep original console behavior
+                try:
+                    original_output(asset, current_value, timestamp_str, change_indicator)
+                except Exception:
+                    pass
+                
+                # Persist tick data
+                try:
+                    if persistence_manager:
+                        persistence_manager.add_tick(asset, timestamp_str, current_value)
+                except Exception as e:
+                    print(f"[Persistence] Error saving tick: {e}")
+            
+            # Bind the patched method
+            import types
+            data_streamer._output_streaming_data = types.MethodType(patched_output, data_streamer)
+            print(f"[Persistence] ✓ Tick persistence hook installed")
+    else:
+        print("\n[Persistence] Stream collection disabled (use --collect-stream to enable)")
     
     # Try to connect to Chrome on startup
     print("\n[Startup] Attempting to connect to Chrome...")
