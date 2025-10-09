@@ -5,8 +5,9 @@ Connects to Chrome (port 9222) to intercept PocketOption WebSocket data
 and streams it to the React frontend via Socket.IO
 """
 
-# Note: eventlet WSGI server can be unstable on Windows. Use threading async_mode
-# for compatibility; this will support long-polling and basic Socket.IO features.
+# Import eventlet and apply monkey patching FIRST (before any other imports)
+import eventlet
+eventlet.monkey_patch()
 
 from flask import Flask, jsonify, request
 from flask_socketio import SocketIO, emit
@@ -30,15 +31,21 @@ capabilities_dir = root_dir / 'capabilities'
 sys.path.insert(0, str(capabilities_dir))
 
 from strategies.quantum_flux_strategy import QuantumFluxStrategy
-from data_loader import DataLoader, BacktestEngine
+from data_loader import DataLoader, BacktestEngine  # type: ignore
 
 # Import Chrome interception logic from capabilities
-from data_streaming import RealtimeDataStreaming
-from base import Ctx  # Import Ctx for capability context
+from data_streaming import RealtimeDataStreaming  # type: ignore
+from base import Ctx  # type: ignore
 
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    async_mode='eventlet',
+    ping_timeout=30,
+    ping_interval=10
+)
 
 # Global state for Chrome session and streaming
 chrome_driver = None
@@ -59,6 +66,23 @@ def attach_to_chrome(verbose=True):
     Attach to existing Chrome instance started with --remote-debugging-port=9222.
     Returns a selenium webdriver.Chrome instance or None on failure.
     """
+    import socket
+    
+    # Quick check if port 9222 is listening
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex(('127.0.0.1', 9222))
+        sock.close()
+        
+        if result != 0:
+            if verbose:
+                print("[Chrome] ✗ Port 9222 not available")
+                print("[Chrome] Start Chrome with: chrome --remote-debugging-port=9222 --user-data-dir=/path/to/profile")
+            return None
+    except Exception:
+        return None
+    
     try:
         if verbose:
             print("[Chrome] Connecting to Chrome at 127.0.0.1:9222...")

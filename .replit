@@ -4,7 +4,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["geckodriver", "glibcLocales", "libxcrypt", "libyaml", "pkg-config", "xsimd"]
+packages = ["geckodriver", "glibcLocales", "libxcrypt", "libyaml", "pkg-config", "xsimd", "chromium", "chromedriver"]
 
 [workflows]
 runButton = "Project"
