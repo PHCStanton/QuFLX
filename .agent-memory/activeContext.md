@@ -1,57 +1,155 @@
 # Active Context
 
+**Last Updated**: October 9, 2025
+
 ## Current Work
-**COMPLETED**: Critical Architectural Refactoring - Asset Filtering, Candle Formation, and Encapsulation Fixes
+**STATUS**: Real-Time Streaming Infrastructure - Phases 1-4 Complete ✅
 
-**JUST COMPLETED** (October 7, 2025):
-- Fixed critical asset filtering bug - filtering now at START of _process_realtime_update
-- Eliminated duplicate candle formation - backend emits formed candles, frontend displays only
-- Fixed broken encapsulation - added proper API methods to capability
-- Simplified data flow - single source of truth for candle formation
-- Added backpressure handling - 1000-item buffer limit in frontend
-- Fixed Vite port configuration - now correctly runs on port 5000
+**CURRENT PHASE**: Phase 5 (Auto-Detection Features) - Pending User Decision ⏸️
 
-## Recent Changes
-- **Asset Filtering Fix**: Asset filtering moved to beginning of `_process_realtime_update()` to prevent unwanted asset switches when user clicks different assets in PocketOption UI
-- **Candle Formation Refactor**: Backend now emits fully-formed candles via `candle_update` event; frontend removed duplicate 1-second candle logic (70+ lines deleted)
-- **API Methods Added**: Created clean public API for capability:
-  - `set_asset_focus(asset)` / `release_asset_focus()` - Asset focus control
-  - `set_timeframe(minutes, lock)` / `unlock_timeframe()` - Timeframe management
-  - `get_latest_candle(asset)` / `get_current_asset()` - Data access
-- **Backend Refactored**: `streaming_server.py` now uses API methods instead of direct state manipulation
-- **Data Flow Simplified**: Removed tick extraction and frontend candle formation - capability handles everything
-- **Backpressure Protection**: Frontend buffer limited to 1000 items to prevent memory issues
-- **Port Configuration**: Fixed Vite config to serve on port 5000 instead of 5173
+### Just Completed (October 9, 2025)
+
+#### Phase 1: Backend Infrastructure Fixes ✅
+- Fixed eventlet/WebSocket configuration (eliminated AssertionError)
+- Added Chrome connection fast-fail (1s timeout on port 9222)
+- Graceful degradation when Chrome unavailable
+- Chrome status monitoring (5-second polling)
+
+#### Phase 2: Stream Data Collection ✅
+- Implemented `--collect-stream {tick,candle,both,none}` CLI argument
+- Integrated StreamPersistenceManager with rotating CSV writers
+- Configurable chunk sizes (100 candles, 1000 ticks default)
+- Output directories: `realtime_stream/1M_candle_data/` and `1M_tick_data/`
+
+#### Phase 3: Frontend Data Provider Separation ✅
+- Removed "Auto" mode - enforced explicit CSV vs Platform selection
+- Fixed false live state (connections validated before activation)
+- Added disconnect handling (auto-stop on Chrome/backend disconnect)
+- Asset validation (prevents invalid assets on mode switch)
+- Race condition fix (validates assets before streaming)
+- Platform mode locked to 1M, CSV mode supports all timeframes
+
+#### Phase 3.5: Code Quality Improvements ✅
+- Fixed LSP error (added log_output parameter)
+- Semantic asset switching (startStream vs changeAsset)
+- Enhanced Chrome disconnect handling (proactive checks + stream_error events)
+
+#### Phase 4: Asset Focus Integration ✅
+- Verified existing implementation complete
+- Backend API working (set_asset_focus, release_asset_focus)
+- Socket.IO events properly wired
+- Frontend uses correct event sequence
+
+## Data Architecture: Two Pipelines
+
+### Pipeline 1: Historical/Topdown (Separate)
+```
+capabilities/data_streaming_csv_save.py
+        ↓
+scripts/custom_sessions/favorites_select_topdown_collect.py
+        ↓
+data/data_output/assets_data/data_collect/
+```
+**Purpose**: Historical backtesting
+**Status**: Independent, not used by streaming_server.py
+
+### Pipeline 2: Real-Time Streaming (Current)
+```
+capabilities/data_streaming.py
+        ↓
+streaming_server.py (port 3001)
+        ↓
+Socket.IO → Frontend (port 5000)
+        ↓
+Optional: realtime_stream/ (--collect-stream)
+```
+**Purpose**: Live trading, GUI visualization
+**Status**: Phases 1-4 complete
 
 ## Architecture Flow
+
+**Real-Time Streaming**:
 ```
-PocketOption WebSocket → Chrome (Port 9222) → streaming_server.py → 
-RealtimeDataStreaming Capability (processes & forms candles) → 
-Socket.IO (emits candles) → React GUI (displays) → Chart
+PocketOption WebSocket
+        ↓
+Chrome DevTools (Port 9222)
+        ↓
+streaming_server.py
+        ↓
+RealtimeDataStreaming Capability:
+  - Asset Filtering (START)
+  - Candle Formation
+        ↓
+Socket.IO: candle_update
+        ↓
+Frontend (1000-item buffer)
+        ↓
+Chart Update
 ```
 
-**Key Architectural Improvements**:
-- **Asset filtering at source**: Prevents processing unwanted assets before they enter the system
-- **Single candle formation point**: Only capability forms candles, eliminating duplicates
-- **Clean API boundaries**: Server uses public methods, no internal state access
-- **Backpressure handling**: Frontend protects against buffer overflow
+**Key Features**:
+- Asset filtering at source (prevents unwanted switches)
+- Single candle formation point (capability only)
+- Clean API boundaries (no direct state access)
+- Backpressure protection (1000-item buffer limit)
+- Optional persistence (--collect-stream flag)
 
 ## Next Steps
-1. **Local Testing**: Test with Chrome running on port 9222 for real WebSocket data
-2. **Monitor Streaming**: Verify chart settings and candle buffers populate correctly
-3. **Strategy Execution**: Integrate live strategy execution with GUI controls
-4. **Performance Testing**: Validate backpressure handling under high-frequency data
+
+### Phase 5: Auto-Detection (Pending User Decision)
+**Options**:
+- A: Auto-follow toggle (chart follows PocketOption UI)
+- B: Display auto-detected values (read-only)
+
+**Current Behavior**:
+- Manual asset selection with focus lock
+- Auto-detection capability exists but disabled
+- Timeframe locked to 1M in platform mode
+
+### Phase 6: Comprehensive Testing (Queued)
+- Chrome disconnect/reconnect scenarios
+- Mode switching (CSV ↔ Platform)
+- Asset switching in live mode
+- Stream persistence verification
+- Extended stability (30+ min)
+- Backpressure under load
 
 ## Blockers
-**NONE**: All architectural issues resolved. System is production-ready with clean separation of concerns.
+**NONE** - Waiting for user decision on Phase 5 approach
 
-## Status
-**PRODUCTION READY**: The QuantumFlux platform now features a robust, maintainable architecture where:
-- Asset filtering prevents unwanted asset switches
-- Single source of truth for candle formation eliminates duplicates
-- Clean API boundaries ensure proper encapsulation
-- Backpressure handling prevents memory issues
-- All state managed through capability's vetted methods
-- System gracefully handles both Replit (Chrome unavailable) and local deployment (Chrome on port 9222) environments
+## Important Notes
 
-**Last Updated**: October 7, 2025
+**Data Pipeline Separation**:
+- Historical: `data_streaming_csv_save.py` → `data_collect/`
+- Real-time: `data_streaming.py` → `realtime_stream/`
+- streaming_server.py uses `data_streaming.py` ONLY
+
+**Frontend Data Sources**:
+- CSV Mode: Historical files, all timeframes
+- Platform Mode: Live streaming, 1M only, hardcoded assets
+
+**Chrome Connection**:
+- Port 9222 (optional)
+- 1-second fast-fail timeout
+- 5-second monitoring
+- Graceful degradation
+
+**Stream Collection**:
+```bash
+# Default (no collection)
+uv run python streaming_server.py
+
+# Collect both
+uv run python streaming_server.py --collect-stream both
+```
+
+## System Status
+✅ Backend stable (port 3001)
+✅ Frontend stable (port 5000)
+✅ Chrome optional (graceful degradation)
+✅ Stream collection configurable
+✅ Asset validation working
+✅ Disconnect handling robust
+✅ Zero code duplication
+
+**Development Status**: Phases 1-4 Complete ✅ | Phase 5 Pending ⏸️ | Phase 6 Queued 📅

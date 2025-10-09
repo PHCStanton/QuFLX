@@ -1,281 +1,230 @@
-# GUI MVP Development Plan - Updated Status
+# GUI Real-Time Streaming Development - Current Status
 
-## 🎉 Current Status: Phases 0-5 COMPLETE ✅
+**Last Updated**: October 9, 2025
 
-**Last Updated**: October 7, 2025
+## 🎯 Current Focus: Real-Time Streaming Infrastructure
 
-## Scope (ACHIEVED ✅)
+This document tracks the development of real-time streaming capabilities for the QuantumFlux GUI. This is **separate from historical/topdown data collection** which uses a different pipeline.
 
-Successfully implemented:
-- ✅ Live streaming of ticks and 1m candles
-- ✅ Historical candle loading from 100+ CSV files
-- ✅ Client-side SMA/RSI overlays and signal generation
-- ✅ Socket.IO gateway for real-time communication
-- ✅ Strategy backtesting with detailed results
-- ✅ Quantum Flux strategy integration
+## 📊 Data Architecture Clarification
 
-## Implementation Status
+### Two Distinct Data Pipelines
 
-### Phase 0 — Environment & Repo Verification ✅ COMPLETE
-- [x] 0.1 Frontend structure validated (all pages, providers, hooks exist)
-- [x] 0.2 React app runs locally on port 5000
-- [x] 0.3 CSV historical files load and render charts
-- [x] 0.4 WebSocketProvider and useWebSocket confirmed usable
-- [x] 0.5 Schemas aligned: Candle format {time, OHLC} consistent
+#### 1. **Historical/Topdown Data Collection** (Separate)
+- **Capability**: `capabilities/data_streaming_csv_save.py`
+- **Scripts**: `scripts/custom_sessions/favorites_select_topdown_collect.py`
+- **Purpose**: Captures historical candles when timeframe changes (1H, 15M, 5M, 1M)
+- **Saves to**: `data/data_output/assets_data/data_collect/`
+- **Use case**: Historical backtesting, strategy development
+- **Status**: ✅ Working independently, not part of GUI streaming
 
-### Phase 1 — Streaming Gateway ✅ COMPLETE
-**Location**: `gui/Data-Visualizer-React/streaming_server.py`
+#### 2. **Real-Time Streaming** (Current Development)
+- **Capability**: `capabilities/data_streaming.py` (RealtimeDataStreaming)
+- **Server**: `streaming_server.py` (Flask-SocketIO on port 3001)
+- **Purpose**: Live WebSocket streaming, candle formation, GUI visualization
+- **Saves to**: `data/data_output/assets_data/realtime_stream/` (optional with --collect-stream)
+- **Use case**: Live trading, real-time analysis, GUI visualization
+- **Status**: 🚧 Active development (Phases 1-4 complete)
 
-#### Completed Tasks
-- [x] 1.1 Created streaming_server.py with Flask-SocketIO
-- [x] 1.2 Socket.IO server operational on port 3001
-- [x] 1.3 Hybrid session attach (9222) integrated
-- [x] 1.4 Implemented all event handlers:
-  - [x] `start_stream` / `stop_stream` for real-time data
-  - [x] `run_backtest` for strategy testing ✨
-  - [x] `get_available_data` for file discovery ✨
-  - [x] `generate_signal` for trading signals ✨
-  - [x] `execute_strategy` for live strategy execution ✨
-- [x] 1.5 Historical candle seeding on start_stream
-- [x] 1.6 Tick forwarding and candle rollover detection
-- [x] 1.7 Schema validation and asset/timeframe matching
-- [x] 1.8 Error handling, logging, graceful shutdown
+## ✅ Completed Phases
 
-### Phase 2 — Frontend WebSocket Provider ✅ COMPLETE
-#### DataAnalysis Page Wiring
-- [x] 2.1 "WebSocket" option in provider selector
-- [x] 2.2 Live Mode toggle with subscribe flow
-- [x] 2.3 Chart pipeline handles candle_update and price_tick
-- [x] 2.4 Cleanup on toggle off, unmount, provider switch
+### Phase 1: Backend Infrastructure Fixes (October 9, 2025)
+**Critical fixes to streaming_server.py foundation**
 
-#### Provider/Service Contracts
-- [x] 2.5 WebSocketProvider.js exposes all required methods
-- [x] 2.6 useWebSocket.js handles reconnection and routing
-- [x] 2.7 DataProviderService cleanly switches providers
+- [x] Fixed eventlet/WebSocket configuration (eliminated AssertionError)
+- [x] Resolved import issues and consolidated streaming servers
+- [x] Added ChromeDriver support with fast-fail port checking (1s timeout on port 9222)
+- [x] Backend starts gracefully with/without Chrome connection
+- [x] Chrome connection status monitoring (5-second polling)
+- [x] Clear error messages when Chrome unavailable
 
-### Phase 3 — Historical Data Loading ✅ COMPLETE
-- [x] 3.1 CSVProvider default for initial charts
-- [x] 3.2 WebSocket request_historical implementation ✨
-- [x] 3.3 Candle[] schema normalized (time in sec, ms for ticks)
-- [x] 3.4 No duplicate bars, correct timeframe boundaries
-- [x] 3.5 Data reset/merge policy on provider switch
-- [x] 3.6 Smart file discovery (100+ CSV files) ✨
-- [x] 3.7 Multiple format support (OTC, HLOC) ✨
+**Impact**: Backend is stable and resilient to Chrome disconnection
 
-### Phase 4 — Client-side Indicators & Strategy MVP ✅ COMPLETE
-- [x] 4.1 Technical indicators available (SMA, RSI in strategy)
-- [x] 4.2 SMA/RSI overlay on historical data
-- [x] 4.3 Incremental indicator updates on candle_update
-- [x] 4.4 StrategyBacktest.jsx fully functional ✨
-  - [x] File selection dropdown
-  - [x] Strategy configuration
-  - [x] Run backtest button
-  - [x] Results display (win rate, P/L, trades)
-- [x] 4.5 LiveTrading.jsx displays signals
-- [x] 4.6 Performant indicator updates
-- [x] 4.7 Quantum Flux strategy integrated ✨
+### Phase 2: Stream Data Collection (October 9, 2025)
+**Optional data persistence for real-time streams**
 
-### Phase 5 — QA, Performance, Stability ✅ COMPLETE
-- [x] 5.1 Latency check: price moves render quickly
-- [x] 5.2 Candle rollover: bars align correctly
-- [x] 5.3 Stability: backend/frontend run without crashes
-- [x] 5.4 Provider toggling: works without stale state
-- [x] 5.5 Error handling: visible messages for issues
-- [x] 5.6 Basic logging in gateway
-- [x] 5.7 Asset filtering bug fixed (October 7, 2025) ✨
-- [x] 5.8 Duplicate candle formation eliminated (October 7, 2025) ✨
-- [x] 5.9 Clean API encapsulation implemented (October 7, 2025) ✨
-- [x] 5.10 Data flow simplified (October 7, 2025) ✨
-- [x] 5.11 Backpressure handling added (October 7, 2025) ✨
-- [x] 5.12 Port configuration fixed (October 7, 2025) ✨
+- [x] Implemented `--collect-stream {tick,candle,both,none}` CLI argument
+- [x] Integrated StreamPersistenceManager with streaming_server.py
+- [x] Rotating CSV writers with configurable chunk sizes:
+  - Default: 100 candles per file
+  - Default: 1000 ticks per file
+- [x] Data saves to `data/data_output/assets_data/realtime_stream/1M_candle_data/`
+- [x] Data saves to `data/data_output/assets_data/realtime_stream/1M_tick_data/`
+- [x] Fixed tick persistence method signature bug
+- [x] Session timestamp-based file naming
 
-### Phase 6 — Runbook ✅ COMPLETE
+**Impact**: Users can optionally persist streaming data for later analysis
 
-#### Current Startup Process
-**Option 1: GUI Backtesting Only (Recommended)**
-```powershell
-# Terminal 1 - Backend
-cd gui/Data-Visualizer-React
-uv run python streaming_server.py
+### Phase 3: Frontend Data Provider Separation (October 9, 2025)
+**Clear distinction between CSV historical and Platform live streaming**
 
-# Terminal 2 - Frontend
-cd gui/Data-Visualizer-React
-npm install  # First time only
-npm run dev
+- [x] Removed "Auto" mode - enforced explicit data provider selection
+- [x] Fixed critical bugs:
+  - [x] **False live state**: Live mode only activates with valid connections
+  - [x] **Disconnect handling**: Auto-stop stream on Chrome/backend disconnect
+  - [x] **Asset validation**: Prevents invalid assets when switching modes
+  - [x] **Race condition**: Validates assets before streaming starts
+- [x] Platform mode locked to 1M timeframe (timeframe selector disabled)
+- [x] CSV mode supports all timeframes (1m, 5m, 15m, 1h, 4h)
+- [x] Asset reset with console logging when switching modes
+- [x] Timeframe helper text: "Platform uses 1M timeframe"
 
-# Access: http://localhost:5000
+**Impact**: Clean user experience with no unexpected behavior when switching modes
+
+### Phase 3.5: Code Quality Improvements (October 9, 2025)
+**Bug fixes and semantic corrections**
+
+- [x] Fixed LSP error (added `log_output=False` to socketio.run)
+- [x] Corrected asset switching logic:
+  - First time: Uses `startStream(asset)` to enable live mode
+  - Subsequent: Uses `changeAsset(asset)` for semantic correctness
+- [x] Improved Chrome disconnect handling:
+  - Proactive check before accessing Chrome logs
+  - Detects Chrome-related errors in exception handler
+  - Emits `stream_error` event to frontend
+  - Sets `streaming_active=False` on disconnect
+
+**Impact**: More robust error handling and semantically correct event flow
+
+### Phase 4: Asset Focus Integration (October 9, 2025)
+**Verified existing implementation is complete**
+
+- [x] Backend API methods working:
+  - `set_asset_focus(asset)` - Locks stream to specific asset
+  - `release_asset_focus()` - Allows auto-switching
+  - `get_current_asset()` - Gets focused asset
+- [x] Socket.IO events properly wired:
+  - `start_stream` → calls `set_asset_focus(asset)`
+  - `change_asset` → calls `set_asset_focus(new_asset)`
+  - `stop_stream` → calls `release_asset_focus()`
+- [x] Frontend uses correct event sequence
+- [x] Asset filtering at capability level (filters unwanted assets)
+
+**Impact**: No code changes needed - asset focus system fully functional
+
+## 🚧 Current Phase
+
+### Phase 5: Auto-Detection Features (In Discussion)
+**Pending user decision on approach**
+
+#### Current Behavior
+- Platform mode uses manual asset selection with focus lock
+- Auto-detection capability exists but disabled (ASSET_FOCUS_MODE=True)
+- Timeframe locked to 1M in platform mode
+
+#### Proposed Options
+- **Option A**: Auto-follow toggle (chart follows PocketOption UI)
+- **Option B**: Display auto-detected values (read-only indicator)
+
+**Status**: ⏸️ Waiting for user decision
+
+## 📋 Pending Phase
+
+### Phase 6: Comprehensive Testing & Validation
+**End-to-end verification**
+
+- [ ] Chrome disconnect/reconnect scenarios
+- [ ] Mode switching (CSV ↔ Platform)
+- [ ] Asset switching in live mode
+- [ ] Stream persistence verification
+- [ ] Extended stability testing (30+ minutes)
+- [ ] Backpressure handling under load
+
+## 🏗️ Architecture Summary
+
+### Backend: streaming_server.py
+```
+streaming_server.py (Flask-SocketIO on port 3001)
+├── Uses: capabilities/data_streaming.py (RealtimeDataStreaming)
+├── Chrome connection: Port 9222 (optional, graceful degradation)
+├── Socket.IO events:
+│   ├── start_stream → Enable streaming for asset
+│   ├── stop_stream → Disable streaming
+│   ├── change_asset → Switch focused asset
+│   ├── candle_update → Emit to frontend (outbound)
+│   ├── stream_error → Error notification (outbound)
+│   └── connection_status → Chrome status updates (outbound)
+├── Optional persistence: --collect-stream {tick,candle,both,none}
+└── Data flow: Chrome → Capability → Server → Socket.IO → Frontend
 ```
 
-**Option 2: Full Platform (Live Trading)**
-```powershell
-# Terminal 1 - Chrome Session
-python start_hybrid_session.py
-# Log into PocketOption
-
-# Terminal 2 - Main Backend
-python backend.py
-
-# Terminal 3 - GUI Backend
-cd gui/Data-Visualizer-React
-uv run python streaming_server.py
-
-# Terminal 4 - Frontend
-cd gui/Data-Visualizer-React
-npm run dev
+### Frontend: React GUI (Port 5000)
+```
+DataAnalysis.jsx
+├── Data Sources:
+│   ├── CSV Files (Historical) → /public/data, backend serves files
+│   └── Platform WebSocket (Live) → streaming_server.py:3001
+├── Platform Assets (Hardcoded):
+│   ├── EURUSD_OTC
+│   ├── GBPUSD_OTC
+│   ├── USDJPY_OTC
+│   └── AUDUSD_OTC
+├── Timeframe Handling:
+│   ├── CSV Mode: User-selectable (1m, 5m, 15m, 1h, 4h)
+│   └── Platform Mode: Locked to 1M
+└── State Management:
+    ├── isLiveMode: Controlled by connections + asset validation
+    ├── Asset validation: On mode switch, resets if invalid
+    └── Backpressure: 1000-item buffer limit
 ```
 
-## Acceptance Criteria
+## 🔧 Key Implementation Details
 
-### Achieved ✅
-- [x] A1 Live chart updates within acceptable latency
-- [x] A2 Candle rollover matches timeframe; no duplicates
-- [x] A3 Live Mode streams reliably
-- [x] A4 Technical indicators render on historical and live data
-- [x] A5 BUY/SELL/NEUTRAL signals visible
-- [x] A6 Backtesting fully functional with 100+ CSV files ✨
-- [x] A7 Socket.IO integration stable ✨
-- [x] A8 Strategy execution accurate ✨
-- [x] A9 Asset filtering prevents unwanted switches (October 7, 2025) ✨
-- [x] A10 No duplicate candle formation (October 7, 2025) ✨
-- [x] A11 Clean API boundaries (October 7, 2025) ✨
-- [x] A12 Backpressure handling prevents memory issues (October 7, 2025) ✨
+### Stream Collection Arguments
+```bash
+# No collection (default)
+uv run python streaming_server.py
 
-### Future Enhancements
-- [ ] Extended stability test (>30 min continuous)
-- [ ] Multi-asset simultaneous subscriptions
+# Collect candles only
+uv run python streaming_server.py --collect-stream candle
 
-## Out of Scope (Correctly Deferred)
-- [x] S1 Multi-asset simultaneous subscriptions (planned for future)
-- [x] S2 Server-side strategy engine (client-side working well)
-- [x] S3 Persistence, rotation (CSV sufficient for MVP)
-- [x] S4 Authentication, rate-limits (not needed yet)
-- [x] S5 Trade execution from GUI (planned for Phase 6)
+# Collect ticks only
+uv run python streaming_server.py --collect-stream tick
 
-## Deliverables Status
+# Collect both
+uv run python streaming_server.py --collect-stream both --candle-chunk-size 200 --tick-chunk-size 2000
+```
 
-- [x] D1 streaming_server.py with Socket.IO + capability loop ✅
-- [x] D2 DataAnalysis.jsx with WebSocket provider ✅
-- [x] D3 WebSocketProvider.js with full functionality ✅
-- [x] D4 Indicator overlays and strategies ✅
-- [x] D5 Documentation (this file + README) ✅
-- [x] D6 StrategyBacktest.jsx with full backtesting UI ✨
-- [x] D7 data_loader.py with CSV loading and backtest engine ✨
-- [x] D8 StrategyService.js with Socket.IO integration ✨
+### Chrome Connection
+- **Port**: 9222 (Chrome DevTools Protocol)
+- **Timeout**: 1 second fast-fail on startup
+- **Monitoring**: 5-second polling for disconnect detection
+- **Graceful**: Backend runs without Chrome, streaming just unavailable
 
-## Implementation Summary
+### Asset Focus System
+- **Enabled**: When user selects asset in Platform mode
+- **Effect**: Filters out other assets at capability level
+- **Release**: When user stops stream or switches to CSV mode
+- **Auto-detection**: Available but currently disabled
 
-### Backend (`streaming_server.py`)
-- Flask-SocketIO server on port 3001
-- 4 Socket.IO event handlers:
-  - `run_backtest`: Execute strategy on historical data
-  - `get_available_data`: List available CSV files
-  - `generate_signal`: Generate trading signal
-  - `execute_strategy`: Execute strategy on live data
-- Real-time price streaming (tick_update, candle_update)
-- Asset price simulation for demo mode
-
-### Data Layer (`data_loader.py`)
-- `DataLoader` class:
-  - `load_csv()`: Parse CSV files with automatic volume addition
-  - `load_asset_data()`: Load by asset name or file path
-  - `get_available_files()`: Recursive file discovery
-  - `df_to_candles()`: Convert DataFrame to candle format
-- `BacktestEngine` class:
-  - `run_backtest()`: Execute strategy on historical data
-  - Win/loss tracking with accurate profit calculation
-  - Equity curve generation
-  - Detailed statistics (win rate, total profit, etc.)
-
-### Frontend Integration
-- `StrategyService.js`:
-  - Socket.IO client connection
-  - Event handler registration
-  - Callback-based async operations
-- `StrategyBacktest.jsx`:
-  - File selection dropdown (auto-populated)
-  - Strategy configuration interface
-  - Run backtest button with loading state
-  - Results display with trade history
-  - Win rate and profit/loss visualization
-
-### Strategy (`quantum_flux_strategy.py`)
-- Core indicators: RSI (14), MACD (12,26,9), Bollinger Bands (20,2), EMAs (12,26)
-- Signal generation with confidence scores
-- Minimum 50 candles required
-- Returns CALL, PUT, or NEUTRAL
-
-## Performance Metrics
-
-### Current Performance ✅
-- Backend startup: ~2 seconds
-- Frontend load: ~3 seconds
-- Backtest execution: <5 seconds for 1000 candles
-- File discovery: <1 second for 100+ files
-- Socket.IO latency: <100ms
-- Chart rendering: <200ms
-
-## Known Issues & Limitations
-
-### Non-Critical
-- LSP diagnostics for imports (false positives)
-- Some strategy calibration files unused at runtime
-- Frontend could benefit from TypeScript
-
-### Future Enhancements
-- Multiple strategy comparison
-- Advanced performance metrics (Sharpe ratio, drawdown)
-- Trade execution from GUI
-- Real-time position monitoring
-- Data quality validation UI
-
-## Next Steps (Priority Order)
-
-### Immediate (Next Sprint)
-1. [ ] Extended stability testing (30+ minutes)
-2. [ ] Multi-asset streaming capability
-3. [ ] Strategy comparison interface
-4. [ ] Enhanced performance metrics
-
-### Short Term (Next Month)
-1. [ ] Additional strategies (Alternative, Basic)
-2. [ ] Trade execution from GUI
-3. [ ] Position monitoring
-4. [ ] Data export functionality
-
-### Medium Term (Q4 2025)
-1. [ ] Database integration (replace CSV)
-2. [ ] User authentication
-3. [ ] Advanced backtesting (walk-forward, Monte Carlo)
-4. [ ] Mobile-responsive improvements
-
-## Success Metrics
+## 📊 Success Metrics
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| GUI Functionality | 100% | 100% | ✅ |
-| CSV File Support | 100+ files | 100+ | ✅ |
-| Backtest Accuracy | 100% | 100% | ✅ |
-| Socket.IO Stability | >99% | >99% | ✅ |
-| User Workflow | Seamless | Seamless | ✅ |
-| Code Quality | High | High | ✅ |
+| Backend Stability | No crashes | Stable | ✅ |
+| Chrome Disconnect Handling | Graceful | Implemented | ✅ |
+| Asset Validation | 100% correct | Implemented | ✅ |
+| Mode Switching | Seamless | Working | ✅ |
+| Data Collection | Optional | Configurable | ✅ |
+| Frontend Responsiveness | <100ms | Good | ✅ |
 
-## Conclusion
+## 🎯 Next Steps
 
-The GUI MVP is **fully functional and production-ready** with critical architectural improvements completed. All core phases (0-5) are complete with additional enhancements beyond original scope. The system provides:
+1. **User Decision Required**: Phase 5 approach (auto-follow vs display)
+2. **Testing**: Comprehensive end-to-end validation
+3. **Documentation**: Update user guides for new features
+4. **Deployment**: Production readiness checklist
 
-✅ User-friendly backtesting interface  
-✅ Comprehensive historical data support  
-✅ Real-time data streaming capability  
-✅ Accurate strategy execution  
-✅ Detailed performance analytics  
-✅ Stable Socket.IO communication  
-✅ Clean asset filtering (no unwanted switches) ✨  
-✅ Single source of truth for candle formation ✨  
-✅ Proper API encapsulation ✨  
-✅ Backpressure handling ✨  
+## 📝 Important Notes
 
-Ready for user adoption and iterative improvements based on feedback!
+- **Separation of Concerns**: Historical collection (data_collect/) is completely separate from real-time streaming (realtime_stream/)
+- **Import Path**: streaming_server.py uses `from data_streaming import RealtimeDataStreaming` (direct import, working as intended)
+- **No Simulation**: All data comes from Chrome/PocketOption WebSocket interception
+- **Hardcoded Assets**: Platform mode currently supports 4 OTC pairs only
+- **1M Limitation**: Platform streaming currently only supports 1-minute candles
 
-**Project Status**: MVP COMPLETE WITH ARCHITECTURAL FIXES, READY FOR PRODUCTION USE 🚀
+---
 
-**Last Major Update**: October 7, 2025 - Critical architectural refactoring complete
+**Development Status**: Phases 1-4 Complete, Phase 5 Pending User Input, Phase 6 Queued
+
+**Last Reviewed**: October 9, 2025

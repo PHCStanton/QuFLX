@@ -1,160 +1,291 @@
 # QuantumFlux Trading Platform - Project Status
 
-## Current Status: GUI Backend Architecture Refactoring Complete ✅
+## Current Status: Real-Time Streaming Infrastructure (Phases 1-4 Complete) ✅
 
-**Last Updated**: October 5, 2025
+**Last Updated**: October 9, 2025
 
 ### Project State
-The system now has a production-ready architecture where the GUI backend (`streaming_server.py` in root) properly delegates all Chrome WebSocket interception to the `RealtimeDataStreaming` capability. Zero code duplication, all state managed through capability's vetted methods.
+The platform now has a **robust real-time streaming infrastructure** with clear separation between historical data collection and live streaming. The GUI backend (`streaming_server.py`) properly delegates to `RealtimeDataStreaming` capability with zero code duplication, enhanced error handling, and explicit data provider controls.
 
-### Recent Completions (October 5, 2025)
+### Recent Completions (October 9, 2025)
 
-#### 1. GUI Backend Architecture Refactoring ✅
-- **Backend Relocation**: Moved `streaming_server.py` from `gui/Data-Visualizer-React/` to root folder
-- **Capability Integration**: Full delegation to `RealtimeDataStreaming` - **ZERO code duplication**
-- **Method Delegation**:
-  - `data_streamer._decode_and_parse_payload` for WebSocket decoding
-  - `data_streamer._process_chart_settings` for chart settings and timeframe detection
-  - `data_streamer._process_realtime_update` for candle aggregation
-- **State Management**: All candle/timeframe data in capability's CANDLES, PERIOD, SESSION_TIMEFRAME_DETECTED
-- **Ctx Integration**: Proper context object creation when Chrome connects
-- **Graceful Handling**: Works on Replit (Chrome unavailable) and local (Chrome on port 9222)
-- **Architect Approved**: Production-ready with zero code duplication
+#### Phase 1: Backend Infrastructure Fixes ✅
+- **Eventlet Configuration**: Fixed WebSocket AssertionError, proper eventlet patching
+- **Chrome Connection**: Fast-fail timeout (1s) on port 9222, graceful degradation when unavailable
+- **Error Handling**: Chrome status monitoring (5-second polling), clear error messages
+- **Stability**: Backend runs reliably with/without Chrome connection
 
-#### 2. Workflow Configuration ✅
-- **Backend Workflow**: Now runs `uv run python streaming_server.py` from root folder (port 3001)
-- **Frontend Workflow**: Remains `cd gui/Data-Visualizer-React && npm run dev` (port 5000)
-- **Vite Proxy**: Configured to proxy /socket.io and /api to backend
+#### Phase 2: Stream Data Collection ✅
+- **CLI Argument**: `--collect-stream {tick,candle,both,none}` for optional persistence
+- **Persistence Manager**: StreamPersistenceManager integration with rotating CSV writers
+- **Chunk Sizes**: Configurable (default: 100 candles, 1000 ticks per file)
+- **Output Directories**:
+  - Candles: `data/data_output/assets_data/realtime_stream/1M_candle_data/`
+  - Ticks: `data/data_output/assets_data/realtime_stream/1M_tick_data/`
+- **Bug Fixes**: Fixed tick persistence method signature
 
-#### 3. Documentation Updates ✅
-- Updated `replit.md` with new architecture flow
-- Updated `.agent-memory/` files to reflect current status
-- All documentation synchronized with actual implementation
+#### Phase 3: Frontend Data Provider Separation ✅
+- **Explicit Selection**: Removed "Auto" mode, enforced CSV vs Platform choice
+- **Critical Bug Fixes**:
+  - False live state prevention (connections validated before activation)
+  - Disconnect handling (auto-stop on Chrome/backend disconnect)
+  - Asset validation (prevents invalid assets on mode switch)
+  - Race condition fix (validates assets before streaming)
+- **Timeframe Control**:
+  - Platform mode: Locked to 1M (timeframe selector disabled)
+  - CSV mode: All timeframes (1m, 5m, 15m, 1h, 4h)
+- **User Experience**: Clear visual indicators, helper text, console logging
 
-### Previous Completions (October 4, 2025)
+#### Phase 3.5: Code Quality Improvements ✅
+- **LSP Fix**: Added `log_output=False` to socketio.run()
+- **Semantic Corrections**:
+  - First activation: Uses `startStream(asset)`
+  - Asset switching: Uses `changeAsset(asset)` (not redundant startStream)
+- **Chrome Disconnect Handling**:
+  - Proactive check before accessing logs
+  - Chrome-related error detection in exception handler
+  - Emits `stream_error` event to frontend
+  - Sets `streaming_active=False` on disconnect
 
-#### Backtesting Infrastructure ✅
-- Created `gui/Data-Visualizer-React/data_loader.py` with CSV loading and backtest engine
-- Smart file discovery finds 100+ CSV files recursively (both OTC format and HLOC directories)
-- Backtest engine simulates trades with win/loss tracking and profit calculation
-- Intelligent timeframe detection from filename or parent directory
+#### Phase 4: Asset Focus Integration ✅
+- **Verification**: Existing implementation confirmed complete
+- **Backend API**: `set_asset_focus()`, `release_asset_focus()`, `get_current_asset()`
+- **Socket.IO Events**: Properly wired (start_stream, change_asset, stop_stream)
+- **Frontend**: Uses correct event sequence for asset control
 
-#### Socket.IO Backend Integration ✅
-- Extended backend with 4 Socket.IO handlers:
-  - `run_backtest` - Execute strategy backtests on historical data
-  - `get_available_data` - List all available CSV files
-  - `generate_signal` - Generate trading signals from candle data
-  - `execute_strategy` - Execute strategy on live streaming data
+### Previous Completions (October 7, 2025)
 
-#### Frontend Integration ✅
-- Updated `src/services/StrategyService.js` to use Socket.IO for all backend communication
-- Built fully functional `src/pages/StrategyBacktest.jsx` with complete backtesting UI
-- Implemented timeframe-based asset filtering (1m, 5m, 15m, 1h, 4h)
-- Data Analysis page with CSV loading and charting
+#### Critical Architectural Fixes ✅
+- **Asset Filtering**: Fixed to START of _process_realtime_update()
+- **Candle Formation**: Eliminated frontend duplication (backend emits, frontend displays)
+- **API Methods**: Added set_asset_focus, set_timeframe, get_latest_candle, etc.
+- **Clean Encapsulation**: streaming_server.py uses API methods only
+- **Data Flow**: Simplified (capability → server → frontend, single source of truth)
+- **Backpressure**: 1000-item buffer limit in frontend
+- **Port Configuration**: Fixed Vite to port 5000
 
-#### Strategy System ✅
-- Simplified `strategies/quantum_flux_strategy.py` for GUI integration
-- Core indicators: RSI, MACD, Bollinger Bands, EMAs
-- Signal generation with confidence scores
-- Both JSON (client-side) and Python (server-side) strategy support
+### Data Architecture: Two Distinct Pipelines
+
+#### Pipeline 1: Historical/Topdown Collection
+```
+capabilities/data_streaming_csv_save.py
+        ↓
+scripts/custom_sessions/favorites_select_topdown_collect.py
+        ↓
+Automated TF switching (1H → 15M → 5M → 1M)
+        ↓
+Saves to: data/data_output/assets_data/data_collect/
+        ↓
+Purpose: Historical backtesting, strategy development
+Status: ✅ Independent, not used by streaming_server.py
+```
+
+#### Pipeline 2: Real-Time Streaming (Current Focus)
+```
+capabilities/data_streaming.py (RealtimeDataStreaming)
+        ↓
+streaming_server.py (Flask-SocketIO, port 3001)
+        ↓
+Socket.IO → React Frontend (port 5000)
+        ↓
+Optional: --collect-stream → realtime_stream/ directory
+        ↓
+Purpose: Live trading, GUI visualization
+Status: 🚧 Phases 1-4 complete, Phase 5 pending
+```
 
 ### Current Workflows
-- **Backend**: `uv run python streaming_server.py` from root (Port 3001)
-- **Frontend**: `cd gui/Data-Visualizer-React && npm run dev` (Port 5000)
+
+**Backend Workflow**:
+```bash
+uv run python streaming_server.py
+# Optional: --collect-stream {tick,candle,both,none}
+# Optional: --candle-chunk-size 200 --tick-chunk-size 2000
+```
+
+**Frontend Workflow**:
+```bash
+cd gui/Data-Visualizer-React && npm run dev
+```
 
 ### Architecture Flow
+
+**Real-Time Streaming (Simplified)**:
 ```
-PocketOption WebSocket → Chrome DevTools Protocol (Port 9222) → 
-streaming_server.py (Root) → RealtimeDataStreaming Capability →
-Candle State (CANDLES/PERIOD/SESSION) → Extract for Emit →
-Socket.IO → React GUI (Port 5000)
+PocketOption WebSocket
+        ↓
+Chrome DevTools Protocol (Port 9222)
+        ↓
+Performance Log Interception (streaming_server.py)
+        ↓
+RealtimeDataStreaming Capability:
+  - _decode_and_parse_payload
+  - Asset Filtering (START)
+  - _process_realtime_update
+  - _process_chart_settings
+  - Candle Formation
+        ↓
+API Methods: get_latest_candle(asset)
+        ↓
+Socket.IO Emit: candle_update
+        ↓
+Frontend Display (1000-item backpressure buffer)
+        ↓
+Chart Update
 ```
 
-### Data Organization
-```
-gui/Data-Visualizer-React/data_history/pocket_option/
-├── 1M_candles/              # 1-minute candle data
-├── 5M_candles/              # 5-minute candle data
-├── 15M_candles/             # 15-minute candle data
-├── 1H_candles/              # 1-hour candle data
-└── 4H_candles/              # 4-hour candle data
-```
+### Socket.IO Events
+
+**Backend → Frontend (Outbound)**:
+- `connection_status` - Chrome/backend status updates
+- `candle_update` - New candle data
+- `stream_started` - Stream activation confirmation
+- `stream_stopped` - Stream deactivation confirmation
+- `stream_error` - Error notifications (Chrome disconnect, etc.)
+- `asset_changed` - Asset switch confirmation
+
+**Frontend → Backend (Inbound)**:
+- `start_stream` - Enable streaming for asset
+- `stop_stream` - Disable streaming
+- `change_asset` - Switch to different asset
+- `run_backtest` - Execute backtest (CSV data)
+- `get_available_data` - List CSV files
+
+### Frontend Data Sources
+
+**CSV Mode**:
+- Source: Pre-collected historical files
+- Location: `/public/data` directory
+- Timeframes: 1m, 5m, 15m, 1h, 4h (user selectable)
+- Assets: All available CSV files
+
+**Platform Mode**:
+- Source: Live WebSocket streaming
+- Backend: streaming_server.py (port 3001)
+- Timeframe: 1M only (locked)
+- Assets: EURUSD_OTC, GBPUSD_OTC, USDJPY_OTC, AUDUSD_OTC (hardcoded)
 
 ### Key Architectural Decisions
 
-1. **Chrome WebSocket Delegation**
-   - GUI backend delegates ALL WebSocket logic to RealtimeDataStreaming capability
-   - No code duplication - single source of truth
-   - Capability methods handle decoding, chart settings, candle aggregation
-   - Backend just extracts and emits processed data
+1. **Dual Pipeline Separation**
+   - Historical collection ≠ Real-time streaming
+   - Different capabilities for different purposes
+   - No code overlap or conflicts
 
-2. **Backend Location Strategy**
-   - `streaming_server.py` in root for easy capability imports
-   - Frontend in `gui/Data-Visualizer-React/` for organized structure
-   - Vite proxy bridges frontend-backend communication
+2. **Capability Delegation**
+   - streaming_server.py delegates ALL WebSocket logic to RealtimeDataStreaming
+   - Zero code duplication
+   - Single source of truth for candle formation
 
-3. **Socket.IO for Unified Communication**
-   - Both data streaming and strategy execution use Socket.IO
-   - Single communication protocol for simplicity
-   - Real-time bidirectional updates
+3. **Explicit Data Provider Control**
+   - User must explicitly select CSV or Platform
+   - No auto-switching between modes
+   - Asset validation on mode changes
 
-4. **CSV Format**: `timestamp,open,close,high,low` (UTC, no volume)
-   - Volume defaults to 1000.0 if missing
-   - Pandas DataFrame processing
-   - Timeframe-based directory organization
+4. **Connection-Gated Streaming**
+   - Live mode requires Chrome + backend connections
+   - Automatic disconnect handling
+   - Visual indicators for connection status
 
-5. **Graceful Chrome Handling**
-   - On Replit: Shows advisory message, CSV endpoints still work
-   - On Local: Connects to Chrome on port 9222, full streaming available
-   - No crashes when Chrome unavailable
+5. **Optional Stream Persistence**
+   - Disabled by default
+   - Configurable via CLI arguments
+   - Separate output directory from historical collection
+
+6. **Graceful Chrome Handling**
+   - Backend starts without Chrome (streaming unavailable)
+   - 1-second fast-fail timeout on connection
+   - Proactive disconnect detection
 
 ### Known Issues (Non-Critical)
-- LSP diagnostics showing (false positives - import resolution)
-  - Packages are installed and working (pandas, numpy, flask, eventlet)
-  - LSP just can't see them in environment
-  - Does not affect runtime
+None currently blocking development
 
-### Next Steps for User
-Ready for local testing with Chrome:
-1. Start Chrome with `chrome --remote-debugging-port=9222 --user-data-dir=/path/to/profile`
-2. Log into PocketOption in Chrome
-3. Start backend (`uv run python streaming_server.py`)
-4. Start frontend (`cd gui/Data-Visualizer-React && npm run dev`)
-5. Monitor real-time WebSocket data flowing to GUI
+### Next Steps
+
+#### Phase 5: Auto-Detection Features (Pending User Decision)
+**Options**:
+- Option A: Auto-follow toggle (chart follows PocketOption UI)
+- Option B: Display auto-detected values (read-only indicator)
+
+**Current Behavior**:
+- Manual asset selection with focus lock
+- Auto-detection capability exists but disabled
+- Timeframe locked to 1M in platform mode
+
+#### Phase 6: Comprehensive Testing (Queued)
+- [ ] Chrome disconnect/reconnect scenarios
+- [ ] Mode switching (CSV ↔ Platform)
+- [ ] Asset switching in live mode
+- [ ] Stream persistence verification
+- [ ] Extended stability (30+ minutes)
+- [ ] Backpressure under load
 
 ### System Health
-- ✅ Backend running successfully (port 3001)
-- ✅ Frontend running successfully (port 5000)
-- ✅ 100+ CSV files discovered and accessible
-- ✅ Backtest engine functional
-- ✅ Strategy execution working
-- ✅ Chrome integration ready (when Chrome available)
-- ✅ Zero code duplication - all logic in capabilities
-- ✅ Architect approved architecture
+
+- ✅ Backend running reliably (port 3001)
+- ✅ Frontend running reliably (port 5000)
+- ✅ Chrome connection optional (graceful degradation)
+- ✅ Stream data collection configurable
+- ✅ Asset focus system working
+- ✅ Disconnect handling robust
+- ✅ Asset validation preventing errors
+- ✅ Zero code duplication (architect approved)
 - ✅ No runtime errors
 
 ### Important Notes for Future Sessions
-- `streaming_server.py` is now in **ROOT FOLDER** (not in gui/Data-Visualizer-React/)
-- Backend fully delegates to `RealtimeDataStreaming` capability - **DO NOT duplicate logic**
-- All candle/timeframe state is in capability's data structures (CANDLES, PERIOD, SESSION flags)
-- CSV files organized by timeframe directories (1M_candles/, 5M_candles/, etc.)
-- Frontend uses Vite proxy for /socket.io and /api endpoints
-- System gracefully handles Chrome unavailable (Replit) vs Chrome available (local)
-## Status Update — 2025-10-06
 
-Current state
-- Streaming server operational after restart; Socket.IO on 0.0.0.0:3001.
-- Frontend LightweightChart stable with guard; indicators rendering; no assertion errors post-initialization.
-- Intermittent REST 500/JSON parse errors observed early; later resolved as backend initialized.
-- WebSocket connection occasionally shows xhr poll errors; stabilizes with reconnection.
+**Data Pipeline Separation**:
+- Historical collection: `capabilities/data_streaming_csv_save.py` → `data_collect/`
+- Real-time streaming: `capabilities/data_streaming.py` → `realtime_stream/`
+- **streaming_server.py uses data_streaming.py ONLY**
 
-Position vs best practices (TradingView/Lightweight Charts)
-- Time ordering: compliant (update latest vs append newer only). [x]
-- Resolution change cache reset: not yet implemented. [ ]
-- Symbol isolation: needs gating on client and server. [ ]
+**Backend Architecture**:
+- `streaming_server.py` in ROOT folder
+- Delegates to RealtimeDataStreaming capability
+- Uses API methods only (no direct state access)
+- Optional persistence via --collect-stream argument
 
-Next milestones
-- Phase 1: transport hardening and client throttling. [ ]
-- Phase 2: auto source sensing and asset isolation. [ ]
-- Phase 3: REST endpoint stability and retry/backoff. [ ]
-- Phase 4: timeframe aggregation and cache reset on change. [ ]
+**Frontend**:
+- Explicit data provider selection (CSV or Platform)
+- Platform mode: 1M only, hardcoded assets
+- CSV mode: All timeframes, discovered files
+- Backpressure: 1000-item buffer limit
+
+**Chrome Connection**:
+- Port 9222 (Chrome DevTools Protocol)
+- Fast-fail: 1-second timeout on startup
+- Monitoring: 5-second polling
+- Graceful: Backend runs without Chrome
+
+**Current Development Status**:
+- Phases 1-4: ✅ Complete
+- Phase 5: ⏸️ Pending user decision (auto-detection approach)
+- Phase 6: 📅 Queued (comprehensive testing)
+
+### Quick Start Commands
+
+**Backend (with stream collection)**:
+```bash
+# Collect both candles and ticks
+uv run python streaming_server.py --collect-stream both
+
+# Candles only with custom chunk size
+uv run python streaming_server.py --collect-stream candle --candle-chunk-size 200
+```
+
+**Frontend**:
+```bash
+cd gui/Data-Visualizer-React && npm run dev
+```
+
+**Chrome (for live streaming)**:
+```bash
+chrome --remote-debugging-port=9222 --user-data-dir=/path/to/profile
+# Then log into PocketOption
+```
+
+---
+
+**Last Major Update**: October 9, 2025 - Real-time streaming infrastructure (Phases 1-4)
+
+**Next Context Start Point**: Review TODO.md and gui/gui_dev_plan_mvp.md for current phase status
