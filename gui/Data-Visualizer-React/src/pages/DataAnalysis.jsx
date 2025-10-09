@@ -5,7 +5,7 @@ import { parseTradingData } from '../utils/tradingData';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 const DataAnalysis = () => {
-  const [dataSource, setDataSource] = useState('auto');
+  const [dataSource, setDataSource] = useState('csv');
   const [timeframe, setTimeframe] = useState('1m');
   const [selectedAsset, setSelectedAsset] = useState('');
   const [availableAssets, setAvailableAssets] = useState([]);
@@ -27,24 +27,45 @@ const DataAnalysis = () => {
   const chromeConnected = chromeStatus === 'connected';
   
   const dataSources = [
-    { id: 'auto', name: 'Auto (Streaming when available, else Historical)' },
-    { id: 'csv', name: 'CSV Files (Historical)' },
-    // Platform WebSocket should always be selectable; show status separately
-    { id: 'platform', name: 'Platform WebSocket' },
+    { id: 'csv', name: 'CSV Files (Historical Data)' },
+    { id: 'platform', name: 'Platform WebSocket (Live Streaming)' },
     { id: 'binance', name: 'Binance API', disabled: true },
   ];
 
   const timeframes = ['1m', '5m', '15m', '1h', '4h'];
 
+  // Platform assets (hardcoded - available via WebSocket streaming)
+  const platformAssets = [
+    { id: 'EURUSD_OTC', name: 'EUR/USD OTC', file: null },
+    { id: 'GBPUSD_OTC', name: 'GBP/USD OTC', file: null },
+    { id: 'USDJPY_OTC', name: 'USD/JPY OTC', file: null },
+    { id: 'AUDUSD_OTC', name: 'AUD/USD OTC', file: null },
+  ];
+
   const loadAvailableAssets = useCallback(async () => {
-    if (dataSource === 'csv' || dataSource === 'auto') {
+    if (dataSource === 'csv') {
+      // Load CSV files from backend (filtered by timeframe)
       const pairs = await fetchCurrencyPairs(timeframe);
       setAvailableAssets(pairs);
-      if (pairs.length > 0) {
+      
+      // Validate current asset is in the new list, reset if not
+      const isValidAsset = pairs.some(p => p.id === selectedAsset);
+      if (!isValidAsset && pairs.length > 0) {
         setSelectedAsset(pairs[0].id);
+        console.log(`Asset reset to ${pairs[0].id} (previous asset not in CSV list)`);
+      }
+    } else if (dataSource === 'platform') {
+      // Use platform assets (WebSocket streaming)
+      setAvailableAssets(platformAssets);
+      
+      // Validate current asset is in the new list, reset if not
+      const isValidAsset = platformAssets.some(p => p.id === selectedAsset);
+      if (!isValidAsset && platformAssets.length > 0) {
+        setSelectedAsset(platformAssets[0].id);
+        console.log(`Asset reset to ${platformAssets[0].id} (previous asset not in platform list)`);
       }
     }
-  }, [dataSource, timeframe]);
+  }, [dataSource, timeframe, selectedAsset]);
 
   const loadHistoricalData = useCallback(async () => {
     setLoading(true);
@@ -105,25 +126,31 @@ const DataAnalysis = () => {
   }, [loadAvailableAssets]);
 
   useEffect(() => {
-    if (selectedAsset && !isLiveMode) {
+    if (selectedAsset && !isLiveMode && dataSource === 'csv') {
       loadHistoricalData();
     }
-  }, [selectedAsset, timeframe, isLiveMode, loadHistoricalData]);
+  }, [selectedAsset, timeframe, isLiveMode, loadHistoricalData, dataSource]);
 
-  // Auto source sensing: when dataSource is auto, enable live mode only if backend is connected and stream is active for current asset
+  // When switching to platform mode, automatically enable live mode if Chrome is connected
   useEffect(() => {
-    if (dataSource !== 'auto') return;
-    const shouldLive = isConnected && streamActive && (streamAsset === selectedAsset);
-    if (shouldLive !== isLiveMode) {
-      setIsLiveMode(shouldLive);
-      if (shouldLive) {
-        startStream(selectedAsset || 'EURUSD_OTC');
+    if (dataSource === 'platform' && isConnected && chromeConnected && selectedAsset) {
+      // Validate asset exists in platform list before streaming (prevent race condition)
+      const isValidPlatformAsset = platformAssets.some(p => p.id === selectedAsset);
+      if (isValidPlatformAsset) {
+        setIsLiveMode(true);
+        startStream(selectedAsset);
       } else {
-        stopStream();
-        if (selectedAsset) loadHistoricalData();
+        console.warn(`Cannot start stream: ${selectedAsset} not in platform asset list`);
       }
+    } else if (dataSource === 'platform' && (!isConnected || !chromeConnected)) {
+      // Chrome/backend disconnected while in platform mode - disable live mode
+      setIsLiveMode(false);
+      stopStream();
+    } else if (dataSource === 'csv') {
+      setIsLiveMode(false);
+      stopStream();
     }
-  }, [dataSource, isConnected, streamActive, streamAsset, selectedAsset]);
+  }, [dataSource, isConnected, chromeConnected, selectedAsset]);
 
   // Push candles into buffer with asset gating and backpressure handling
   useEffect(() => {
@@ -225,22 +252,27 @@ const DataAnalysis = () => {
   }, [isLiveMode]);
 
   const toggleLiveMode = () => {
+    // Only applicable for Platform mode (CSV doesn't support live streaming)
+    if (dataSource !== 'platform') return;
+    
     const newLiveMode = !isLiveMode;
+    
+    // Only allow enabling live mode if both Chrome and backend are connected
+    if (newLiveMode && (!isConnected || !chromeConnected)) {
+      console.warn('Cannot enable live mode: Chrome or backend not connected');
+      return;
+    }
+    
     setIsLiveMode(newLiveMode);
     
-    if (newLiveMode && isConnected) {
-      // Start streaming when enabling live mode
-      const desiredAsset = dataSource === 'platform' ? (streamAsset || selectedAsset || '') : (selectedAsset || '');
-      startStream(desiredAsset || 'EURUSD_OTC');
+    if (newLiveMode) {
+      // Start streaming when enabling live mode (already verified connections above)
+      startStream(selectedAsset || 'EURUSD_OTC');
       console.log('Started live stream for', selectedAsset);
-    } else if (!newLiveMode) {
+    } else {
       // Stop streaming when disabling live mode
       stopStream();
       console.log('Stopped live stream');
-      // Reload historical data
-      if (selectedAsset) {
-        loadHistoricalData();
-      }
     }
   };
 
@@ -275,23 +307,25 @@ const DataAnalysis = () => {
               value={timeframe}
               onChange={(e) => setTimeframe(e.target.value)}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isLiveMode}
+              disabled={dataSource === 'platform' || isLiveMode}
             >
               {timeframes.map(tf => (
                 <option key={tf} value={tf}>{tf}</option>
               ))}
             </select>
+            {dataSource === 'platform' && (
+              <p className="text-xs text-slate-400 mt-1">Platform uses 1M timeframe</p>
+            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              Asset / Pair
+              {dataSource === 'csv' ? 'CSV File' : 'Asset / Pair'}
             </label>
             <select
               value={selectedAsset}
               onChange={(e) => setSelectedAsset(e.target.value)}
               className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={dataSource === 'platform'}
             >
               {availableAssets.map(asset => (
                 <option key={asset.id} value={asset.id}>{asset.name}</option>
@@ -302,31 +336,35 @@ const DataAnalysis = () => {
 
         <div className="mt-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button
-              onClick={loadHistoricalData}
-              disabled={isLiveMode || loading}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-            >
-              {loading ? 'Loading...' : 'Load Data'}
-            </button>
+            {dataSource === 'csv' && (
+              <button
+                onClick={loadHistoricalData}
+                disabled={loading}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+              >
+                {loading ? 'Loading...' : 'Load CSV Data'}
+              </button>
+            )}
             
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isLiveMode}
-                onChange={toggleLiveMode}
-                disabled={!isConnected || (dataSource === 'platform' && !chromeConnected) || dataSource === 'csv'}
-                className="rounded"
-              />
-              <span className="text-sm text-slate-300">
-                Live Stream Mode {
-                  (dataSource === 'platform' && !chromeConnected) ? '(Disconnected - Chrome not running)' :
-                  isConnecting ? '(Connecting...)' :
-                  isLiveMode && isConnected ? '(Connected)' :
-                  !isConnected ? '(Disconnected)' : ''
-                }
-              </span>
-            </label>
+            {dataSource === 'platform' && (
+              <div className="flex items-center gap-2">
+                {chromeConnected ? (
+                  <>
+                    <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                    <span className="text-sm text-green-400 font-medium">
+                      Live Streaming {isLiveMode ? `(${selectedAsset})` : ''}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <span className="text-sm text-yellow-400 font-medium">
+                      Waiting for Chrome connection...
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-3">
