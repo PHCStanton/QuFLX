@@ -16,7 +16,7 @@ const DataAnalysis = () => {
   const [statistics, setStatistics] = useState(null);
   
   // WebSocket connection for live streaming (dynamic backend URL detection)
-  const { isConnected, isConnecting, lastMessage, chromeStatus, streamActive, streamAsset, startStream, stopStream } = useWebSocket();
+  const { isConnected, isConnecting, lastMessage, chromeStatus, streamActive, streamAsset, startStream, stopStream, changeAsset } = useWebSocket();
   // Buffer for candle updates with backpressure handling
   const candleBufferRef = useRef([]);
   const processingRef = useRef(false);
@@ -137,8 +137,14 @@ const DataAnalysis = () => {
       // Validate asset exists in platform list before streaming (prevent race condition)
       const isValidPlatformAsset = platformAssets.some(p => p.id === selectedAsset);
       if (isValidPlatformAsset) {
-        setIsLiveMode(true);
-        startStream(selectedAsset);
+        if (!isLiveMode) {
+          // First time enabling live mode - use startStream
+          setIsLiveMode(true);
+          startStream(selectedAsset);
+        } else {
+          // Already in live mode, just change asset - use changeAsset
+          changeAsset(selectedAsset);
+        }
       } else {
         console.warn(`Cannot start stream: ${selectedAsset} not in platform asset list`);
       }
@@ -150,7 +156,7 @@ const DataAnalysis = () => {
       setIsLiveMode(false);
       stopStream();
     }
-  }, [dataSource, isConnected, chromeConnected, selectedAsset]);
+  }, [dataSource, isConnected, chromeConnected, selectedAsset, isLiveMode, startStream, changeAsset, stopStream]);
 
   // Push candles into buffer with asset gating and backpressure handling
   useEffect(() => {

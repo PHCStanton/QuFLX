@@ -256,6 +256,16 @@ def stream_from_chrome():
     while True:
         if streaming_active:
             try:
+                # Check if Chrome is still connected before accessing logs
+                if not chrome_driver:
+                    print("[Stream] Chrome disconnected during streaming - stopping stream")
+                    streaming_active = False
+                    socketio.emit('stream_error', {
+                        'error': 'Chrome disconnected',
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    continue
+                
                 # Get performance logs (contains WebSocket frames)
                 logs = chrome_driver.get_log('performance')
                 
@@ -300,6 +310,14 @@ def stream_from_chrome():
                 
             except Exception as e:
                 print(f"[Stream] Error: {e}")
+                # Check if error is Chrome-related
+                if "chrome" in str(e).lower() or "driver" in str(e).lower():
+                    print("[Stream] Chrome connection error detected - stopping stream")
+                    streaming_active = False
+                    socketio.emit('stream_error', {
+                        'error': f'Chrome error: {str(e)}',
+                        'timestamp': datetime.now().isoformat()
+                    })
                 time.sleep(1)
         else:
             time.sleep(0.5)
@@ -651,5 +669,6 @@ if __name__ == '__main__':
         port=3001,
         debug=False,
         use_reloader=False,
-        allow_unsafe_werkzeug=True
+        allow_unsafe_werkzeug=True,
+        log_output=False
     )
