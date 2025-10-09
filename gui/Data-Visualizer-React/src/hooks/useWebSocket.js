@@ -23,7 +23,10 @@ export const useWebSocket = (url) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [streamActive, setStreamActive] = useState(false);
   const [streamAsset, setStreamAsset] = useState(null);
+  const [backendReconnected, setBackendReconnected] = useState(false);
+  const [chromeReconnected, setChromeReconnected] = useState(false);
   const socketRef = useRef(null);
+  const reconnectionCallbackRef = useRef(null);
 
   useEffect(() => {
     // Create socket connection with polling first to avoid initial errors
@@ -72,7 +75,19 @@ export const useWebSocket = (url) => {
     });
 
     socket.on('reconnect_attempt', () => {
+      console.log('Attempting to reconnect...');
       setIsConnecting(true);
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+      console.log(`Reconnected successfully after ${attemptNumber} attempt(s)`);
+      setIsConnecting(false);
+      
+      // Trigger reconnection callback if provided
+      if (reconnectionCallbackRef.current) {
+        console.log('[Reconnection] Executing reconnection callback to clear state and reload data');
+        reconnectionCallbackRef.current();
+      }
     });
 
     socket.on('candle_update', (data) => {
@@ -98,6 +113,28 @@ export const useWebSocket = (url) => {
     socket.on('connection_status', (data) => {
       console.log('Connection status:', data);
       setChromeStatus(data.chrome || 'not connected');
+    });
+
+    socket.on('backend_reconnected', (data) => {
+      console.log('[Reconnection] Backend reconnected:', data);
+      setBackendReconnected(true);
+      
+      // Trigger reconnection callback to clear state
+      if (reconnectionCallbackRef.current) {
+        console.log('[Reconnection] Backend reconnected - clearing state and reloading data');
+        reconnectionCallbackRef.current();
+      }
+      
+      // Reset flag after a short delay
+      setTimeout(() => setBackendReconnected(false), 3000);
+    });
+
+    socket.on('chrome_reconnected', (data) => {
+      console.log('[Reconnection] Chrome reconnected:', data);
+      setChromeReconnected(true);
+      
+      // Reset flag after a short delay
+      setTimeout(() => setChromeReconnected(false), 3000);
     });
 
     return () => {
@@ -126,6 +163,10 @@ export const useWebSocket = (url) => {
     }
   }, [isConnected]);
 
+  const setReconnectionCallback = useCallback((callback) => {
+    reconnectionCallbackRef.current = callback;
+  }, []);
+
   return {
     isConnected,
     isConnecting,
@@ -134,10 +175,13 @@ export const useWebSocket = (url) => {
     chromeStatus,
     streamActive,
     streamAsset,
+    backendReconnected,
+    chromeReconnected,
     // Expose the socketRef so pages can access the raw socket when needed
     socketRef,
     startStream,
     stopStream,
-    changeAsset
+    changeAsset,
+    setReconnectionCallback
   };
 };

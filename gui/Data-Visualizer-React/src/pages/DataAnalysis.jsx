@@ -16,7 +16,20 @@ const DataAnalysis = () => {
   const [statistics, setStatistics] = useState(null);
   
   // WebSocket connection for live streaming (dynamic backend URL detection)
-  const { isConnected, isConnecting, lastMessage, chromeStatus, streamActive, streamAsset, startStream, stopStream, changeAsset } = useWebSocket();
+  const { 
+    isConnected, 
+    isConnecting, 
+    lastMessage, 
+    chromeStatus, 
+    streamActive, 
+    streamAsset, 
+    backendReconnected,
+    chromeReconnected,
+    startStream, 
+    stopStream, 
+    changeAsset,
+    setReconnectionCallback 
+  } = useWebSocket();
   // Buffer for candle updates with backpressure handling
   const candleBufferRef = useRef([]);
   const processingRef = useRef(false);
@@ -124,6 +137,38 @@ const DataAnalysis = () => {
   useEffect(() => {
     loadAvailableAssets();
   }, [loadAvailableAssets]);
+
+  // Setup reconnection callback to clear state and reload data
+  useEffect(() => {
+    const handleReconnection = () => {
+      console.log('[Reconnection] Clearing chart data and reloading...');
+      
+      // Clear chart data and buffers
+      setChartData([]);
+      candleBufferRef.current = [];
+      setStatistics(null);
+      
+      // Stop current stream if active
+      if (isLiveMode) {
+        stopStream();
+        setIsLiveMode(false);
+      }
+      
+      // Reload data based on current source
+      if (dataSource === 'csv' && selectedAsset) {
+        setTimeout(() => {
+          loadHistoricalData();
+        }, 500); // Short delay to ensure state is cleared
+      } else if (dataSource === 'platform' && selectedAsset && chromeConnected) {
+        setTimeout(() => {
+          setIsLiveMode(true);
+          startStream(selectedAsset);
+        }, 500);
+      }
+    };
+    
+    setReconnectionCallback(handleReconnection);
+  }, [dataSource, selectedAsset, chromeConnected, isLiveMode, loadHistoricalData, startStream, stopStream, setReconnectionCallback]);
 
   useEffect(() => {
     if (selectedAsset && !isLiveMode && dataSource === 'csv') {
@@ -382,6 +427,23 @@ const DataAnalysis = () => {
               <div className={`w-2 h-2 rounded-full ${chromeConnected ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
               <span className="text-xs text-slate-400">Chrome: {chromeConnected ? 'Connected' : 'Not Connected'}</span>
             </div>
+            {backendReconnected && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 border border-blue-500/50 rounded-md">
+                <svg className="w-3 h-3 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-xs text-blue-400 font-medium">Backend Reconnected</span>
+              </div>
+            )}
+            {chromeReconnected && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-green-500/20 border border-green-500/50 rounded-md">
+                <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                </svg>
+                <span className="text-xs text-green-400 font-medium">Chrome Reconnected</span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

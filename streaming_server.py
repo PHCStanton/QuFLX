@@ -68,6 +68,11 @@ persistence_manager: Optional[StreamPersistenceManager] = None
 collect_stream_mode = "none"  # none, tick, candle, both
 last_closed_candle_index: Dict[str, int] = {}  # Track last written closed candle per asset
 
+# Reconnection tracking
+chrome_reconnection_attempts = 0
+last_reconnection_time = None
+backend_initialized = False  # Track if backend has been initialized with first client
+
 # ========================================
 # Chrome Connection Functions
 # ========================================
@@ -200,11 +205,32 @@ def extract_candle_for_emit(asset: str) -> Optional[Dict]:
     
     return None
 
+def reset_backend_state():
+    """
+    Reset backend streaming state and clear caches.
+    Called on reconnection to ensure clean state.
+    """
+    global data_streamer, streaming_active, last_closed_candle_index
+    
+    print("[Reconnection] Resetting backend state and clearing caches...")
+    
+    # Reset streaming state
+    streaming_active = False
+    
+    # Clear candle tracking for persistence
+    last_closed_candle_index.clear()
+    
+    # Reset capability state (clear candle buffers, asset tracking, etc.)
+    data_streamer._reset_stream_state(inputs={'period': period})
+    
+    print("[Reconnection] ✓ Backend state reset complete")
+
 def monitor_chrome_status():
     """
     Background thread to monitor Chrome connection status and emit updates to clients.
+    Also attempts automatic reconnection when Chrome becomes available.
     """
-    global chrome_driver
+    global chrome_driver, chrome_reconnection_attempts, last_reconnection_time
     last_status = None
     
     while True:
@@ -215,9 +241,41 @@ def monitor_chrome_status():
             if chrome_driver:
                 try:
                     _ = chrome_driver.current_url
+                    chrome_reconnection_attempts = 0  # Reset counter on successful check
                 except Exception:
+                    print("[Monitor] Chrome connection lost - marking as disconnected")
                     current_status = "not connected"
                     chrome_driver = None
+            
+            # Attempt Chrome reconnection if disconnected (max 3 attempts per minute)
+            if not chrome_driver:
+                should_reconnect = False
+                
+                if last_reconnection_time is None:
+                    should_reconnect = True
+                elif (datetime.now() - last_reconnection_time).seconds > 60:
+                    # Reset attempts after 1 minute
+                    chrome_reconnection_attempts = 0
+                    should_reconnect = True
+                elif chrome_reconnection_attempts < 3:
+                    should_reconnect = True
+                
+                if should_reconnect:
+                    chrome_reconnection_attempts += 1
+                    last_reconnection_time = datetime.now()
+                    print(f"[Reconnection] Attempting Chrome reconnection (attempt {chrome_reconnection_attempts}/3)...")
+                    
+                    new_driver = attach_to_chrome(verbose=False)
+                    if new_driver:
+                        chrome_driver = new_driver
+                        current_status = "connected"
+                        print(f"[Reconnection] ✓ Chrome reconnected successfully!")
+                        
+                        # Emit reconnection success event
+                        socketio.emit('chrome_reconnected', {
+                            'timestamp': datetime.now().isoformat(),
+                            'attempt': chrome_reconnection_attempts
+                        })
             
             # Emit status update if changed
             if current_status != last_status:
@@ -461,9 +519,27 @@ def serve_csv_file(filename):
 
 @socketio.on('connect')
 def handle_connect():
-    """Handle client connection"""
+    """Handle client connection and detect reconnections"""
+    global backend_initialized
+    
     chrome_status = "connected" if chrome_driver else "not connected"
-    print(f"[Socket.IO] Client connected. Chrome: {chrome_status}")
+    
+    # Detect if this is a reconnection (backend was previously initialized)
+    is_reconnection = backend_initialized
+    
+    if is_reconnection:
+        print(f"[Socket.IO] Client reconnected. Chrome: {chrome_status}")
+        # Reset backend state on client reconnection
+        reset_backend_state()
+        # Emit reconnection event to client
+        emit('backend_reconnected', {
+            'timestamp': datetime.now().isoformat(),
+            'chrome_status': chrome_status
+        })
+    else:
+        print(f"[Socket.IO] Client connected. Chrome: {chrome_status}")
+        backend_initialized = True
+    
     emit('connection_status', {
         'status': 'connected',
         'chrome': chrome_status,
@@ -473,7 +549,16 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handle client disconnection"""
+    global streaming_active
+    
     print(f"[Socket.IO] Client disconnected")
+    
+    # Stop streaming on client disconnect
+    if streaming_active:
+        streaming_active = False
+        data_streamer.release_asset_focus()
+        data_streamer.unlock_timeframe()
+        print(f"[Socket.IO] Stream stopped due to client disconnect")
 
 @socketio.on('start_stream')
 def handle_start_stream(data):
