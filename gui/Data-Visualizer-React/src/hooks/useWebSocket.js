@@ -25,6 +25,9 @@ export const useWebSocket = (url) => {
   const [streamAsset, setStreamAsset] = useState(null);
   const [backendReconnected, setBackendReconnected] = useState(false);
   const [chromeReconnected, setChromeReconnected] = useState(false);
+  const [detectedAsset, setDetectedAsset] = useState(null);
+  const [detectionError, setDetectionError] = useState(null);
+  const [isDetecting, setIsDetecting] = useState(false);
   const socketRef = useRef(null);
   const reconnectionCallbackRef = useRef(null);
 
@@ -137,6 +140,20 @@ export const useWebSocket = (url) => {
       setTimeout(() => setChromeReconnected(false), 3000);
     });
 
+    socket.on('asset_detected', (data) => {
+      console.log('[AssetDetection] Asset detected:', data);
+      setDetectedAsset(data.asset);
+      setDetectionError(null);
+      setIsDetecting(false);
+    });
+
+    socket.on('asset_detection_failed', (data) => {
+      console.error('[AssetDetection] Detection failed:', data);
+      setDetectionError(data.error);
+      setDetectedAsset(null);
+      setIsDetecting(false);
+    });
+
     return () => {
       console.log('Cleaning up WebSocket connection');
       socket.removeAllListeners();
@@ -163,6 +180,18 @@ export const useWebSocket = (url) => {
     }
   }, [isConnected]);
 
+  const detectAsset = useCallback(() => {
+    if (socketRef.current && isConnected) {
+      console.log('[AssetDetection] Requesting asset detection...');
+      setIsDetecting(true);
+      setDetectionError(null);
+      socketRef.current.emit('detect_asset');
+    } else {
+      setDetectionError('Not connected to backend');
+      setIsDetecting(false);
+    }
+  }, [isConnected]);
+
   const setReconnectionCallback = useCallback((callback) => {
     reconnectionCallbackRef.current = callback;
   }, []);
@@ -177,11 +206,15 @@ export const useWebSocket = (url) => {
     streamAsset,
     backendReconnected,
     chromeReconnected,
+    detectedAsset,
+    detectionError,
+    isDetecting,
     // Expose the socketRef so pages can access the raw socket when needed
     socketRef,
     startStream,
     stopStream,
     changeAsset,
+    detectAsset,
     setReconnectionCallback
   };
 };

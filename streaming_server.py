@@ -615,6 +615,42 @@ def handle_change_asset(data):
             'timestamp': datetime.now().isoformat()
         })
 
+@socketio.on('detect_asset')
+def handle_detect_asset():
+    """Detect current asset from PocketOption via capability"""
+    global chrome_driver, data_streamer
+    
+    if not chrome_driver:
+        print("[DetectAsset] Chrome not connected")
+        emit('asset_detection_failed', {
+            'error': 'Chrome not connected',
+            'timestamp': datetime.now().isoformat()
+        })
+        return
+    
+    try:
+        # Query current asset from capability
+        detected_asset = data_streamer.get_current_asset()
+        
+        if detected_asset:
+            print(f"[DetectAsset] Detected asset: {detected_asset}")
+            emit('asset_detected', {
+                'asset': detected_asset,
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            print("[DetectAsset] No asset currently focused in PocketOption")
+            emit('asset_detection_failed', {
+                'error': 'No asset active in PocketOption',
+                'timestamp': datetime.now().isoformat()
+            })
+    except Exception as e:
+        print(f"[DetectAsset] Error detecting asset: {e}")
+        emit('asset_detection_failed', {
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
+
 # ========================================
 # Backtest Handlers (from original)
 # ========================================

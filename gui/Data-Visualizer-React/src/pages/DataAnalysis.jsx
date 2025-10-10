@@ -4,6 +4,16 @@ import { fetchCurrencyPairs } from '../utils/fileUtils';
 import { parseTradingData } from '../utils/tradingData';
 import { useWebSocket } from '../hooks/useWebSocket';
 
+// Stream lifecycle states for Platform mode
+const STREAM_STATES = {
+  IDLE: 'idle',                    // Chrome not connected
+  READY: 'ready',                  // Chrome connected, ready to detect
+  DETECTING: 'detecting',          // Detecting asset from PocketOption
+  ASSET_DETECTED: 'asset_detected', // Asset detected, ready to stream
+  STREAMING: 'streaming',          // Active stream
+  ERROR: 'error'                   // Detection or streaming error
+};
+
 const DataAnalysis = () => {
   const [dataSource, setDataSource] = useState('csv');
   const [timeframe, setTimeframe] = useState('1m');
@@ -15,6 +25,11 @@ const DataAnalysis = () => {
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [statistics, setStatistics] = useState(null);
   
+  // State machine for Platform streaming lifecycle
+  const [streamState, setStreamState] = useState(STREAM_STATES.IDLE);
+  const [streamError, setStreamError] = useState(null);
+  const [detectedAsset, setDetectedAsset] = useState(null);
+  
   // WebSocket connection for live streaming (dynamic backend URL detection)
   const { 
     isConnected, 
@@ -25,9 +40,13 @@ const DataAnalysis = () => {
     streamAsset, 
     backendReconnected,
     chromeReconnected,
+    detectedAsset: wsDetectedAsset,
+    detectionError: wsDetectionError,
+    isDetecting: wsIsDetecting,
     startStream, 
     stopStream, 
     changeAsset,
+    detectAsset: wsDetectAsset,
     setReconnectionCallback 
   } = useWebSocket();
   // Buffer for candle updates with backpressure handling
@@ -68,15 +87,10 @@ const DataAnalysis = () => {
         console.log(`Asset reset to ${pairs[0].id} (previous asset not in CSV list)`);
       }
     } else if (dataSource === 'platform') {
-      // Use platform assets (WebSocket streaming)
-      setAvailableAssets(platformAssets);
-      
-      // Validate current asset is in the new list, reset if not
-      const isValidAsset = platformAssets.some(p => p.id === selectedAsset);
-      if (!isValidAsset && platformAssets.length > 0) {
-        setSelectedAsset(platformAssets[0].id);
-        console.log(`Asset reset to ${platformAssets[0].id} (previous asset not in platform list)`);
-      }
+      // Platform mode: No asset dropdown, detection-based only
+      // Clear any previous selectedAsset to prevent conflicts
+      setAvailableAssets([]);
+      setSelectedAsset('');
     }
   }, [dataSource, timeframe, selectedAsset]);
 
@@ -134,6 +148,82 @@ const DataAnalysis = () => {
     setLoadingStatus('');
   }, [availableAssets, selectedAsset, dataSource, timeframe]);
 
+  // State machine: Manage Platform mode stream state transitions
+  useEffect(() => {
+    if (dataSource !== 'platform') {
+      // Reset stream state when not in platform mode
+      setStreamState(STREAM_STATES.IDLE);
+      setDetectedAsset(null);
+      setStreamError(null);
+      return;
+    }
+
+    // Platform mode state transitions based on Chrome connection
+    if (!chromeConnected) {
+      setStreamState(STREAM_STATES.IDLE);
+      setDetectedAsset(null);
+    } else if (chromeConnected && streamState === STREAM_STATES.IDLE) {
+      setStreamState(STREAM_STATES.READY);
+      setStreamError(null);
+    }
+  }, [dataSource, chromeConnected, streamState]);
+
+  // Sync WebSocket detection state with local state machine
+  useEffect(() => {
+    if (wsDetectedAsset && streamState === STREAM_STATES.DETECTING) {
+      setDetectedAsset(wsDetectedAsset);
+      setStreamState(STREAM_STATES.ASSET_DETECTED);
+      setStreamError(null);
+    } else if (wsDetectionError && streamState === STREAM_STATES.DETECTING) {
+      setStreamError(wsDetectionError);
+      setStreamState(STREAM_STATES.ERROR);
+      setDetectedAsset(null);
+    }
+  }, [wsDetectedAsset, wsDetectionError, streamState]);
+
+  // Handler: Detect asset from PocketOption
+  const handleDetectAsset = useCallback(() => {
+    if (!isConnected) {
+      setStreamError('Backend not connected');
+      setStreamState(STREAM_STATES.ERROR);
+      return;
+    }
+
+    setStreamState(STREAM_STATES.DETECTING);
+    setStreamError(null);
+    wsDetectAsset(); // Use real WebSocket detection
+  }, [isConnected, wsDetectAsset]);
+
+  // Handler: Start streaming with detected asset
+  const handleStartStream = useCallback(() => {
+    if (!detectedAsset) {
+      setStreamError('No asset detected');
+      setStreamState(STREAM_STATES.ERROR);
+      return;
+    }
+
+    console.log(`[StartStream] Starting stream for ${detectedAsset}...`);
+    
+    // Clear previous chart data
+    setChartData([]);
+    candleBufferRef.current = [];
+    setStatistics(null);
+    
+    // Start streaming
+    setIsLiveMode(true);
+    startStream(detectedAsset);
+    setStreamState(STREAM_STATES.STREAMING);
+  }, [detectedAsset, startStream]);
+
+  // Handler: Stop streaming
+  const handleStopStream = useCallback(() => {
+    console.log('[StopStream] Stopping stream...');
+    setIsLiveMode(false);
+    stopStream();
+    setStreamState(STREAM_STATES.READY);
+    setDetectedAsset(null);
+  }, [stopStream]);
+
   useEffect(() => {
     loadAvailableAssets();
   }, [loadAvailableAssets]);
@@ -154,54 +244,44 @@ const DataAnalysis = () => {
         setIsLiveMode(false);
       }
       
+      // Reset state machine for Platform mode
+      if (dataSource === 'platform') {
+        setStreamState(chromeConnected ? STREAM_STATES.READY : STREAM_STATES.IDLE);
+        setDetectedAsset(null);
+        setStreamError(null);
+      }
+      
       // Reload data based on current source
       if (dataSource === 'csv' && selectedAsset) {
         setTimeout(() => {
           loadHistoricalData();
         }, 500); // Short delay to ensure state is cleared
-      } else if (dataSource === 'platform' && selectedAsset && chromeConnected) {
-        setTimeout(() => {
-          setIsLiveMode(true);
-          startStream(selectedAsset);
-        }, 500);
       }
+      // Platform mode: State machine controls streaming, no auto-start
     };
     
     setReconnectionCallback(handleReconnection);
   }, [dataSource, selectedAsset, chromeConnected, isLiveMode, loadHistoricalData, startStream, stopStream, setReconnectionCallback]);
 
+  // Auto-load CSV data when asset or timeframe changes
   useEffect(() => {
-    if (selectedAsset && !isLiveMode && dataSource === 'csv') {
+    if (selectedAsset && dataSource === 'csv') {
       loadHistoricalData();
     }
-  }, [selectedAsset, timeframe, isLiveMode, loadHistoricalData, dataSource]);
+  }, [selectedAsset, timeframe, loadHistoricalData, dataSource]);
 
-  // When switching to platform mode, automatically enable live mode if Chrome is connected
+  // Clear chart when switching to Platform mode
   useEffect(() => {
-    if (dataSource === 'platform' && isConnected && chromeConnected && selectedAsset) {
-      // Validate asset exists in platform list before streaming (prevent race condition)
-      const isValidPlatformAsset = platformAssets.some(p => p.id === selectedAsset);
-      if (isValidPlatformAsset) {
-        if (!isLiveMode) {
-          // First time enabling live mode - use startStream
-          setIsLiveMode(true);
-          startStream(selectedAsset);
-        } else {
-          // Already in live mode, just change asset - use changeAsset
-          changeAsset(selectedAsset);
-        }
-      } else {
-        console.warn(`Cannot start stream: ${selectedAsset} not in platform asset list`);
-      }
-    } else if (dataSource === 'platform' && (!isConnected || !chromeConnected)) {
-      // Chrome/backend disconnected while in platform mode - disable live mode
+    if (dataSource === 'platform') {
+      // Clear everything when entering platform mode
+      setChartData([]);
+      setStatistics(null);
+      candleBufferRef.current = [];
       setIsLiveMode(false);
       stopStream();
-    } else if (dataSource === 'csv') {
-      setIsLiveMode(false);
-      stopStream();
+      setSelectedAsset(''); // Clear asset - will be detected
     }
-  }, [dataSource, isConnected, chromeConnected, selectedAsset, isLiveMode, startStream, changeAsset, stopStream]);
+  }, [dataSource, stopStream]);
 
   // Push candles into buffer with asset gating and backpressure handling
   useEffect(() => {
@@ -302,30 +382,7 @@ const DataAnalysis = () => {
     };
   }, [isLiveMode]);
 
-  const toggleLiveMode = () => {
-    // Only applicable for Platform mode (CSV doesn't support live streaming)
-    if (dataSource !== 'platform') return;
-    
-    const newLiveMode = !isLiveMode;
-    
-    // Only allow enabling live mode if both Chrome and backend are connected
-    if (newLiveMode && (!isConnected || !chromeConnected)) {
-      console.warn('Cannot enable live mode: Chrome or backend not connected');
-      return;
-    }
-    
-    setIsLiveMode(newLiveMode);
-    
-    if (newLiveMode) {
-      // Start streaming when enabling live mode (already verified connections above)
-      startStream(selectedAsset || 'EURUSD_OTC');
-      console.log('Started live stream for', selectedAsset);
-    } else {
-      // Stop streaming when disabling live mode
-      stopStream();
-      console.log('Stopped live stream');
-    }
-  };
+  // Legacy toggleLiveMode removed - use state machine handlers instead (handleDetectAsset, handleStartStream, handleStopStream)
 
   return (
     <div className="space-y-6">
@@ -369,20 +426,106 @@ const DataAnalysis = () => {
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              {dataSource === 'csv' ? 'CSV File' : 'Asset / Pair'}
-            </label>
-            <select
-              value={selectedAsset}
-              onChange={(e) => setSelectedAsset(e.target.value)}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {availableAssets.map(asset => (
-                <option key={asset.id} value={asset.id}>{asset.name}</option>
-              ))}
-            </select>
-          </div>
+          {/* CSV Mode: Show Asset Dropdown */}
+          {dataSource === 'csv' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                CSV File
+              </label>
+              <select
+                value={selectedAsset}
+                onChange={(e) => setSelectedAsset(e.target.value)}
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {availableAssets.map(asset => (
+                  <option key={asset.id} value={asset.id}>{asset.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Platform Mode: Show Stream Control Panel */}
+          {dataSource === 'platform' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Stream Controls
+              </label>
+              <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-4 space-y-3">
+                {/* Stream State Display */}
+                {streamState === STREAM_STATES.IDLE && (
+                  <div className="flex items-center gap-2 text-yellow-400">
+                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                    <span className="text-sm">Waiting for Chrome connection...</span>
+                  </div>
+                )}
+
+                {streamState === STREAM_STATES.READY && (
+                  <button
+                    onClick={handleDetectAsset}
+                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Detect Asset from PocketOption
+                  </button>
+                )}
+
+                {streamState === STREAM_STATES.DETECTING && (
+                  <div className="flex items-center justify-center gap-2 text-blue-400">
+                    <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm">Detecting asset...</span>
+                  </div>
+                )}
+
+                {streamState === STREAM_STATES.ASSET_DETECTED && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-green-400">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                      </svg>
+                      <span className="text-sm font-medium">Detected: {detectedAsset}</span>
+                    </div>
+                    <button
+                      onClick={handleStartStream}
+                      className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Start Stream
+                    </button>
+                  </div>
+                )}
+
+                {streamState === STREAM_STATES.STREAMING && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-green-400">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                      <span className="text-sm font-medium">Streaming: {detectedAsset}</span>
+                    </div>
+                    <button
+                      onClick={handleStopStream}
+                      className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Stop Stream
+                    </button>
+                  </div>
+                )}
+
+                {streamState === STREAM_STATES.ERROR && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-red-400">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
+                      </svg>
+                      <span className="text-sm">{streamError}</span>
+                    </div>
+                    <button
+                      onClick={handleDetectAsset}
+                      className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Retry Detection
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-6 flex items-center justify-between">
@@ -395,26 +538,6 @@ const DataAnalysis = () => {
               >
                 {loading ? 'Loading...' : 'Load CSV Data'}
               </button>
-            )}
-            
-            {dataSource === 'platform' && (
-              <div className="flex items-center gap-2">
-                {chromeConnected ? (
-                  <>
-                    <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                    <span className="text-sm text-green-400 font-medium">
-                      Live Streaming {isLiveMode ? `(${selectedAsset})` : ''}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <span className="text-sm text-yellow-400 font-medium">
-                      Waiting for Chrome connection...
-                    </span>
-                  </>
-                )}
-              </div>
             )}
           </div>
           
@@ -455,7 +578,8 @@ const DataAnalysis = () => {
         </div>
       </div>
 
-      {statistics && (
+      {/* Statistics Panel - CSV Mode Only */}
+      {statistics && dataSource === 'csv' && (
         <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6">
           <h3 className="text-xl font-semibold text-white mb-4">Statistics</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
