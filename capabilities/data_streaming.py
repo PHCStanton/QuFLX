@@ -1250,9 +1250,6 @@ class RealtimeDataStreaming(Capability):
             new_logs_count = self._process_log_messages(performance_logs, ctx)
             processed_count += new_logs_count
 
-            if ctx.verbose:
-                print(f"[data_streaming] Iteration {wait_iteration + 1}: Processed {new_logs_count} new messages (total: {processed_count})")
-
             # Check if we have sufficient session sync (auth and timeframe)
             if self.SESSION_AUTHENTICATED and self.SESSION_TIMEFRAME_DETECTED:
                 if ctx.verbose:
