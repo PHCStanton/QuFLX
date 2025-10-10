@@ -53,6 +53,31 @@ class RealtimeDataStreaming(Capability):
         self.ASSET_FOCUS_MODE = False
 
     # ========================================
+    # Helper Methods
+    # ========================================
+    
+    @staticmethod
+    def _normalize_asset_name(asset: str) -> str:
+        """
+        Normalize asset names for consistent comparison.
+        Removes underscores, slashes, spaces and converts to uppercase.
+        
+        Examples:
+            'USDJPY_otc' -> 'USDJPYOTC'
+            'EUR/USD_OTC' -> 'EURUSDOTC'
+            'GBPUSD' -> 'GBPUSD'
+        
+        Args:
+            asset: Raw asset name from any source
+            
+        Returns:
+            Normalized asset name (uppercase, no special chars)
+        """
+        if not asset:
+            return ''
+        return asset.replace('_', '').replace('/', '').replace(' ', '').upper()
+    
+    # ========================================
     # Public API Methods (for external control)
     # ========================================
     
@@ -493,7 +518,8 @@ class RealtimeDataStreaming(Capability):
                 
                 
                 # Asset filtering: Skip if asset focus mode is enabled and asset doesn't match current asset
-                if self.ASSET_FOCUS_MODE and self.CURRENT_ASSET and asset != self.CURRENT_ASSET:
+                # Use normalized comparison to handle format differences (USDJPY_otc vs USDJPYOTC)
+                if self.ASSET_FOCUS_MODE and self.CURRENT_ASSET and self._normalize_asset_name(asset) != self._normalize_asset_name(self.CURRENT_ASSET):
                     if ctx.verbose:
                         print(f"🔍 [{datetime.now(timezone.utc).strftime('%H:%M:%SZ')}] Filtering out historical data for {asset} (focus on {self.CURRENT_ASSET})")
                     return
@@ -582,7 +608,8 @@ class RealtimeDataStreaming(Capability):
             
             # CRITICAL FIX: Asset filtering BEFORE processing
             # Skip this update if asset focus mode is enabled and this isn't the focused asset
-            if self.ASSET_FOCUS_MODE and self.CURRENT_ASSET and asset and asset != self.CURRENT_ASSET:
+            # Use normalized comparison to handle format differences (USDJPY_otc vs USDJPYOTC)
+            if self.ASSET_FOCUS_MODE and self.CURRENT_ASSET and asset and self._normalize_asset_name(asset) != self._normalize_asset_name(self.CURRENT_ASSET):
                 if ctx.verbose:
                     print(f"🔍 [{datetime.now(timezone.utc).strftime('%H:%M:%SZ')}] Filtering out {asset} (focus on {self.CURRENT_ASSET})")
                 return
@@ -636,7 +663,8 @@ class RealtimeDataStreaming(Capability):
             timestamp_str = datetime.fromtimestamp(tstamp, tz=timezone.utc).strftime("%H:%M:%SZ")
             
             # Asset filtering: Skip if asset focus mode is enabled and asset doesn't match current asset
-            if self.ASSET_FOCUS_MODE and self.CURRENT_ASSET and asset != self.CURRENT_ASSET:
+            # Use normalized comparison to handle format differences (USDJPY_otc vs USDJPYOTC)
+            if self.ASSET_FOCUS_MODE and self.CURRENT_ASSET and self._normalize_asset_name(asset) != self._normalize_asset_name(self.CURRENT_ASSET):
                 if ctx.verbose:
                     print(f"🔍 [{timestamp_str}] Filtering out {asset} (focus on {self.CURRENT_ASSET})")
                 return
