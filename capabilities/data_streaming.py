@@ -119,28 +119,49 @@ class RealtimeDataStreaming(Capability):
     def get_latest_candle(self, asset: str) -> Optional[List[Any]]:
         """
         Get the latest candle for a specific asset.
+        Uses normalized asset name matching to handle format variations.
         
         Args:
-            asset: The asset symbol
+            asset: The asset symbol (any format: USDJPY_otc, USDJPYOTC, etc.)
             
         Returns:
             Latest candle as [timestamp, open, close, high, low] or None
         """
+        # Try direct lookup first (fast path)
         if asset in self.CANDLES and self.CANDLES[asset]:
             return self.CANDLES[asset][-1]
+        
+        # If not found, try normalized matching (handles format differences)
+        normalized_asset = self._normalize_asset_name(asset)
+        for stored_asset in self.CANDLES:
+            if self._normalize_asset_name(stored_asset) == normalized_asset:
+                if self.CANDLES[stored_asset]:
+                    return self.CANDLES[stored_asset][-1]
+        
         return None
     
     def get_all_candles(self, asset: str) -> List[List[Any]]:
         """
         Get all candles for a specific asset.
+        Uses normalized asset name matching to handle format variations.
         
         Args:
-            asset: The asset symbol
+            asset: The asset symbol (any format: USDJPY_otc, USDJPYOTC, etc.)
             
         Returns:
             List of candles, each as [timestamp, open, close, high, low]
         """
-        return self.CANDLES.get(asset, [])
+        # Try direct lookup first (fast path)
+        if asset in self.CANDLES:
+            return self.CANDLES[asset]
+        
+        # If not found, try normalized matching (handles format differences)
+        normalized_asset = self._normalize_asset_name(asset)
+        for stored_asset in self.CANDLES:
+            if self._normalize_asset_name(stored_asset) == normalized_asset:
+                return self.CANDLES[stored_asset]
+        
+        return []
     
     def get_current_asset(self) -> Optional[str]:
         """
