@@ -4,6 +4,23 @@
 
 ## Recently Completed Features
 
+### Bug Fixes (✅ COMPLETED - October 10, 2025)
+
+**Addressed discrepancies between documentation and implementation**
+
+#### Exponential Backoff Implementation ✅
+- Fixed Chrome reconnection to actually use exponential backoff (5s, 10s, 20s)
+- Previously documented but using fixed 5s delay
+- Reduces log spam when Chrome unavailable
+- Better resource utilization during disconnected periods
+
+#### Frontend Performance Optimization ✅
+- Removed unused `startStream` dependency from reconnection useEffect
+- Prevents unnecessary re-renders
+- Cleaner, more efficient React code
+
+---
+
 ### Phase 12: Platform Mode State Machine (✅ COMPLETED - October 10, 2025)
 
 **Complete architecture overhaul for Platform streaming - PRODUCTION READY**

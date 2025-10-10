@@ -100,7 +100,7 @@ The platform utilizes a **capabilities-first architecture** and **two distinct d
 -   **File System**: For organized directory structure.
 ## Recent Updates
 
-### October 10, 2025 - Platform Mode State Machine & Explicit Detection Flow
+### October 10, 2025 - Platform Mode State Machine & Bug Fixes
 **Complete Architecture Overhaul for Platform Streaming**
 
 - Implemented 6-state machine (idle, ready, detecting, asset_detected, streaming, error)
@@ -112,11 +112,16 @@ The platform utilizes a **capabilities-first architecture** and **two distinct d
 - Statistics panel now only shows in CSV mode
 - Chart data properly clears when switching from CSV to Platform mode
 
+**Bug Fixes**:
+- Implemented exponential backoff (5s, 10s, 20s) for Chrome reconnection attempts (was fixed 5s)
+- Removed unused `startStream` dependency from reconnection useEffect to prevent unnecessary re-renders
+
 **Key Improvements**:
 - Sequential logic: Detect → Start → Stream → Visualize (explicit user control at each step)
 - No more hardcoded asset defaults or auto-restart on reconnection
 - State machine exclusively controls all Platform mode transitions
 - Clean separation between CSV (dropdown) and Platform (detection) UI
+- Reduced log spam and improved resource usage during Chrome unavailability
 
 **Status**: Production-ready, architect-verified. Pending: TradingView pattern for chart updates, component separation, end-to-end testing.
 

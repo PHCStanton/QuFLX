@@ -9,6 +9,22 @@
 
 ### Just Completed (October 10, 2025)
 
+#### Bug Fixes: Exponential Backoff & Performance Optimization ✅
+**Addressed discrepancies between documentation and implementation**
+
+- **Exponential Backoff Implementation**:
+  - Fixed Chrome reconnection to use exponential backoff (5s, 10s, 20s) as documented
+  - Was using fixed 5-second delay for all attempts
+  - Reduces log spam and resource usage when Chrome unavailable
+  - Logs now show: "Waiting 10s before next attempt (exponential backoff)..."
+
+- **Frontend Performance Optimization**:
+  - Removed unused `startStream` from reconnection useEffect dependency array
+  - Prevents unnecessary re-renders when startStream reference changes
+  - No functional change, just cleaner code
+
+**Impact**: Better resource utilization, cleaner logs, improved frontend performance.
+
 #### Phase 6: Platform Mode State Machine & Explicit Detection Flow ✅
 **Complete architecture overhaul for Platform streaming**
 
