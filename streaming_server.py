@@ -637,8 +637,8 @@ def handle_detect_asset():
         return
     
     try:
-        # Query current asset from capability
-        detected_asset = data_streamer.get_current_asset()
+        # Actively detect asset from PocketOption UI
+        detected_asset = data_streamer.detect_asset_from_ui(chrome_driver)
         
         if detected_asset:
             print(f"[DetectAsset] Detected asset: {detected_asset}")
@@ -647,9 +647,9 @@ def handle_detect_asset():
                 'timestamp': datetime.now().isoformat()
             })
         else:
-            print("[DetectAsset] No asset currently focused in PocketOption")
+            print("[DetectAsset] No asset currently selected in PocketOption")
             emit('asset_detection_failed', {
-                'error': 'No asset active in PocketOption',
+                'error': 'No asset selected in PocketOption. Please click on an asset in the trading platform.',
                 'timestamp': datetime.now().isoformat()
             })
     except Exception as e:
