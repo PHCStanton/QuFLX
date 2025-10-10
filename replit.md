@@ -117,6 +117,11 @@ The platform utilizes a **capabilities-first architecture** and **two distinct d
 - Removed unused `startStream` dependency from reconnection useEffect to prevent unnecessary re-renders
 - Fixed asset detection to actively query PocketOption UI instead of returning None (added `detect_asset_from_ui()` method)
 - Removed iteration-based verbose logging that was spamming console output
+- **Fixed asset name mismatch in filtering** (critical chart rendering bug):
+  - Added `_normalize_asset_name()` to handle format variations (USDJPY_otc vs USDJPYOTC)
+  - Applied normalization to all 3 filtering locations (historical, realtime, streaming)
+  - Resolved "Loading chart data..." issue where data was filtered out due to name format differences
+  - CSV persistence unchanged - normalization only affects in-memory comparison
 
 **Key Improvements**:
 - Sequential logic: Detect → Start → Stream → Visualize (explicit user control at each step)
