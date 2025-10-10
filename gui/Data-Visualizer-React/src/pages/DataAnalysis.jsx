@@ -261,7 +261,7 @@ const DataAnalysis = () => {
     };
     
     setReconnectionCallback(handleReconnection);
-  }, [dataSource, selectedAsset, chromeConnected, isLiveMode, loadHistoricalData, startStream, stopStream, setReconnectionCallback]);
+  }, [dataSource, selectedAsset, chromeConnected, isLiveMode, loadHistoricalData, stopStream, setReconnectionCallback]);
 
   // Auto-load CSV data when asset or timeframe changes
   useEffect(() => {

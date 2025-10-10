@@ -248,6 +248,8 @@ def monitor_chrome_status():
                     chrome_driver = None
             
             # Attempt Chrome reconnection if disconnected (max 3 attempts per minute)
+            backoff_delay = 5  # Default monitoring interval
+            
             if not chrome_driver:
                 should_reconnect = False
                 
@@ -276,6 +278,12 @@ def monitor_chrome_status():
                             'timestamp': datetime.now().isoformat(),
                             'attempt': chrome_reconnection_attempts
                         })
+                    else:
+                        # Exponential backoff for failed attempts: 5s, 10s, 20s
+                        backoff_delays = {1: 5, 2: 10, 3: 20}
+                        backoff_delay = backoff_delays.get(chrome_reconnection_attempts, 5)
+                        if backoff_delay > 5:
+                            print(f"[Reconnection] Waiting {backoff_delay}s before next attempt (exponential backoff)...")
             
             # Emit status update if changed
             if current_status != last_status:
@@ -286,7 +294,7 @@ def monitor_chrome_status():
                 })
                 last_status = current_status
             
-            time.sleep(5)  # Check every 5 seconds
+            time.sleep(backoff_delay)  # Exponential backoff or default 5s interval
         except Exception as e:
             print(f"[Monitor] Error checking Chrome status: {e}")
             time.sleep(5)
