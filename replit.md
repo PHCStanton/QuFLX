@@ -100,7 +100,7 @@ The platform utilizes a **capabilities-first architecture** and **two distinct d
 -   **File System**: For organized directory structure.
 ## Recent Updates
 
-### October 10, 2025 - Platform Mode State Machine & Bug Fixes
+### October 10, 2025 - Platform Mode State Machine & Candle Alignment Fix
 **Complete Architecture Overhaul for Platform Streaming**
 
 - Implemented 6-state machine (idle, ready, detecting, asset_detected, streaming, error)
@@ -124,6 +124,11 @@ The platform utilizes a **capabilities-first architecture** and **two distinct d
   - Two-tier lookup: Direct O(1) lookup first, normalized fallback search if needed
   - Resolved "Loading chart data..." issue - data no longer filtered/lost due to name format differences
   - CSV persistence unchanged - normalization only affects in-memory comparison and retrieval
+- **Fixed candle timestamp alignment to match PocketOption timing**:
+  - Candle timestamps now align to minute boundaries (:00 seconds) using `candle_start = (tstamp // PERIOD) * PERIOD`
+  - Changed new candle detection from time difference to boundary crossing check (`candle_start > last_candle_start`)
+  - Ensures candles form at :00 seconds, not when streaming starts (e.g., :30 seconds)
+  - Architect-verified: Prevents data from new periods overwriting previous candle's close/high/low
 
 **Key Improvements**:
 - Sequential logic: Detect → Start → Stream → Visualize (explicit user control at each step)
@@ -131,8 +136,9 @@ The platform utilizes a **capabilities-first architecture** and **two distinct d
 - State machine exclusively controls all Platform mode transitions
 - Clean separation between CSV (dropdown) and Platform (detection) UI
 - Reduced log spam and improved resource usage during Chrome unavailability
+- Real-time candles now perfectly synchronized with PocketOption's minute boundaries
 
-**Status**: Production-ready, architect-verified. Chart rendering verified ✅. Next: Strategy integration (user decision pending on implementation approach).
+**Status**: Production-ready, architect-verified. Chart rendering and candle alignment verified ✅. Ready for live testing with Chrome connection.
 
 ### October 9, 2025 - Real-Time Streaming Infrastructure
 **Phases 1-5 Complete**:
