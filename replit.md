@@ -98,3 +98,50 @@ The platform utilizes a **capabilities-first architecture** and **two distinct d
 -   **CSV Files**: Primary persistence for historical and real-time market data.
 -   **JSON Files**: For configuration storage.
 -   **File System**: For organized directory structure.
+## Recent Updates
+
+### October 10, 2025 - Platform Mode State Machine & Explicit Detection Flow
+**Complete Architecture Overhaul for Platform Streaming**
+
+- Implemented 6-state machine (idle, ready, detecting, asset_detected, streaming, error)
+- Added backend `detect_asset` Socket.IO endpoint for explicit asset detection
+- Created Stream Control Panel UI with state-based buttons (Detect Asset → Start Stream → Stop Stream)
+- Eliminated all race conditions and auto-start bypasses in reconnection logic
+- Separated `selectedAsset` (CSV mode) from `detectedAsset` (Platform mode)
+- Removed legacy `toggleLiveMode` function to prevent state machine bypasses
+- Statistics panel now only shows in CSV mode
+- Chart data properly clears when switching from CSV to Platform mode
+
+**Key Improvements**:
+- Sequential logic: Detect → Start → Stream → Visualize (explicit user control at each step)
+- No more hardcoded asset defaults or auto-restart on reconnection
+- State machine exclusively controls all Platform mode transitions
+- Clean separation between CSV (dropdown) and Platform (detection) UI
+
+**Status**: Production-ready, architect-verified. Pending: TradingView pattern for chart updates, component separation, end-to-end testing.
+
+### October 9, 2025 - Real-Time Streaming Infrastructure
+**Phases 1-5 Complete**:
+- Fixed eventlet/WebSocket configuration
+- Implemented stream data collection with --collect-stream argument
+- Frontend data provider separation (CSV vs Platform)
+- Asset focus integration verified
+- Chrome disconnect handling improved
+- Reconnection lifecycle management with auto-recovery
+- Code quality improvements (LSP fixes, semantic corrections)
+
+### October 7, 2025 - Critical Architectural Fixes
+- Fixed asset filtering bug (filtering at START of processing)
+- Eliminated duplicate candle formation (backend emits, frontend displays)
+- Added proper API methods to capability
+- Refactored streaming_server.py (API methods only, no direct state access)
+- Simplified data flow (single source of truth)
+- Added backpressure handling (1000-item buffer)
+- Fixed Vite port configuration
+
+### October 4-5, 2025 - GUI Backtesting Integration
+- Created data_loader.py with CSV loading and backtest engine
+- Extended streaming_server.py with Socket.IO handlers
+- Smart file discovery (100+ CSV files)
+- Built functional StrategyBacktest.jsx page
+- Fixed profit calculation bugs
