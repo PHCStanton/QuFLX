@@ -125,6 +125,89 @@ class RealtimeDataStreaming(Capability):
             The current asset symbol or None
         """
         return self.CURRENT_ASSET
+    
+    def detect_asset_from_ui(self, driver) -> Optional[str]:
+        """
+        Actively detect the currently selected asset from PocketOption's UI.
+        
+        Args:
+            driver: Selenium WebDriver instance
+            
+        Returns:
+            The detected asset symbol or None
+        """
+        if not driver:
+            return None
+        
+        try:
+            # Strategy 1: Check for active/selected asset in favorites bar
+            # PocketOption highlights the active asset with specific classes
+            selectors = [
+                ".assets-favorites-item__line.active .assets-favorites-item__label",
+                ".assets-favorites-item__line.selected .assets-favorites-item__label",
+                ".assets-favorites-item--active .assets-favorites-item__label",
+                ".assets-favorites-item.active .assets-favorites-item__label",
+                # Fallback: check chart title area
+                ".chart-header .asset-name",
+                ".chart-title .asset",
+                "[class*='chart'][class*='header'] [class*='asset']",
+            ]
+            
+            for selector in selectors:
+                try:
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements and len(elements) > 0:
+                        asset_text = elements[0].text.strip()
+                        if asset_text:
+                            # Clean up asset text (remove spaces, special chars)
+                            asset = asset_text.replace(' ', '').replace('/', '').upper()
+                            if asset:
+                                return asset
+                except Exception:
+                    continue
+            
+            # Strategy 2: Check URL for asset parameter
+            try:
+                current_url = driver.current_url
+                if 'active_symbol=' in current_url or 'symbol=' in current_url:
+                    import urllib.parse
+                    params = urllib.parse.parse_qs(urllib.parse.urlparse(current_url).query)
+                    asset = params.get('active_symbol', params.get('symbol', [None]))[0]
+                    if asset:
+                        return asset.strip().upper()
+            except Exception:
+                pass
+            
+            # Strategy 3: Execute JavaScript to get active asset from page state
+            try:
+                asset = driver.execute_script("""
+                    // Check for active asset in various possible locations
+                    const selectors = [
+                        '.assets-favorites-item.active .assets-favorites-item__label',
+                        '.assets-favorites-item--active .assets-favorites-item__label',
+                        '[data-active="true"] .assets-favorites-item__label',
+                        '.chart-header .asset-name',
+                        '.current-asset'
+                    ];
+                    
+                    for (const sel of selectors) {
+                        const el = document.querySelector(sel);
+                        if (el && el.textContent) {
+                            return el.textContent.trim();
+                        }
+                    }
+                    return null;
+                """)
+                if asset:
+                    return asset.replace(' ', '').replace('/', '').upper()
+            except Exception:
+                pass
+            
+            return None
+            
+        except Exception as e:
+            print(f"[DetectAsset] Error detecting asset from UI: {e}")
+            return None
 
     # ========================================
     # Internal Processing Methods
