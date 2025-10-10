@@ -641,20 +641,27 @@ class RealtimeDataStreaming(Capability):
                     self.CANDLES[asset] = []
                 
                 candles = self.CANDLES[asset]
-                if not candles:
-                    # Initialize with first candle
-                    candles.append([tstamp, current_value, current_value, current_value, current_value])
-                else:
-                    # Update last candle
-                    candles[-1][2] = current_value  # close
-                    candles[-1][3] = max(candles[-1][3], current_value)  # high
-                    candles[-1][4] = min(candles[-1][4], current_value)  # low
                 
-                    # Create new candle if period boundary crossed
-                    if self.PERIOD and (tstamp - candles[-1][0]) >= self.PERIOD:
-                        candles.append([tstamp, current_value, current_value, current_value, current_value])
+                # Align timestamp to period boundary (round down to :00 seconds)
+                candle_start = (tstamp // self.PERIOD) * self.PERIOD if self.PERIOD else tstamp
+                
+                if not candles:
+                    # Initialize with first candle using aligned timestamp
+                    candles.append([candle_start, current_value, current_value, current_value, current_value])
+                else:
+                    # Check if we've crossed into a new candle period
+                    last_candle_start = candles[-1][0]
+                    
+                    if candle_start > last_candle_start:
+                        # New candle period - create new candle with aligned timestamp
+                        candles.append([candle_start, current_value, current_value, current_value, current_value])
                         if ctx.verbose:
-                            print(f"📈 New candle created for {asset}")
+                            print(f"📈 New candle created for {asset} at {datetime.fromtimestamp(candle_start, tz=timezone.utc).strftime('%H:%M:%S')}")
+                    else:
+                        # Same candle period - update last candle
+                        candles[-1][2] = current_value  # close
+                        candles[-1][3] = max(candles[-1][3], current_value)  # high
+                        candles[-1][4] = min(candles[-1][4], current_value)  # low
                 
                 # Store real-time update
                 self.realtime_asset_data.append({
