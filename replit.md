@@ -115,6 +115,8 @@ The platform utilizes a **capabilities-first architecture** and **two distinct d
 **Bug Fixes**:
 - Implemented exponential backoff (5s, 10s, 20s) for Chrome reconnection attempts (was fixed 5s)
 - Removed unused `startStream` dependency from reconnection useEffect to prevent unnecessary re-renders
+- Fixed asset detection to actively query PocketOption UI instead of returning None (added `detect_asset_from_ui()` method)
+- Removed iteration-based verbose logging that was spamming console output
 
 **Key Improvements**:
 - Sequential logic: Detect → Start → Stream → Visualize (explicit user control at each step)
