@@ -189,7 +189,7 @@ This document tracks the development of real-time streaming capabilities for the
 
 **Status**: 📅 Ready to Start (State machine complete)
 
-## 📋 Pending Phase
+## 📋 Pending Phases
 
 ### Phase 8: Comprehensive Testing & Validation
 **End-to-end verification**
@@ -201,6 +201,124 @@ This document tracks the development of real-time streaming capabilities for the
 - [ ] Extended stability testing (30+ minutes)
 - [ ] Backpressure handling under load
 - [ ] State machine transition testing
+
+### Phase 9: Strategy & Indicator Integration (Decision Pending)
+**Live trading strategy implementation - Three implementation approaches available**
+
+#### Available Strategy Engines
+- **Quantum Flux Strategy** (Primary) - Multi-indicator AI-driven with confidence scoring
+- **Neural Beast Quantum Fusion** - 3-phase strategy (Neural Quantum Engine, Beast Hybrid Core, Quantum Momentum Matrix)
+- **Advanced Strategies** (Tier 1) - 5 sophisticated strategies with proven performance
+- **Alternative Strategies** (Tier 2) - 5 unique approaches with different methodologies
+- **Basic Strategies** (Tier 3) - Simple, reliable implementations
+
+#### Available Technical Indicators
+- RSI (Relative Strength Index)
+- EMA/SMA (Exponential/Simple Moving Averages)
+- MACD (Moving Average Convergence Divergence)
+- Bollinger Bands
+- Stochastic Oscillator
+- ATR (Average True Range)
+- SuperTrend
+- Volume Analysis
+
+#### Implementation Options (User Decision Required)
+
+**Option 1: Backend-Only Strategy Testing (Fastest)**
+- ✅ Keep all indicators and strategy logic in backend
+- ✅ Apply strategy engines to live candle data
+- ✅ Emit `strategy_signal` events to frontend (call/put + confidence score)
+- ✅ Display signals as overlays on GUI chart (arrows, badges, recommendation panel)
+- ✅ Validate visually on PocketOption platform (use existing platform indicators)
+
+**Advantages:**
+- Fastest development cycle - strategy engine already exists
+- No chart library limitations or complex rendering
+- Use exact PocketOption platform visualization for validation
+- Focus on signal quality and accuracy, not UI complexity
+- Immediate strategy testing capability
+
+**Best For:** Rapid strategy testing, validation, and iteration
+
+---
+
+**Option 2: Lightweight Charts Indicator Overlays (Visual)**
+- ✅ Calculate indicators in backend
+- ✅ Send indicator data via Socket.IO events
+- ✅ Frontend adds indicator series to Lightweight Charts
+- ✅ Display strategy signals as chart markers
+
+**TradingView Lightweight Charts Supports:**
+- Line overlays (SMA, EMA, Bollinger Bands upper/lower)
+- Histogram overlays (Volume bars)
+- Separate panes (RSI, MACD, Stochastic - below main chart)
+- Price markers and annotations
+
+**Limitations:**
+- Cannot render complex visual patterns (requires custom rendering)
+- Limited to line/histogram/area series types
+- More development effort for multi-pane layouts
+
+**Best For:** Comprehensive UI experience with visual indicator feedback
+
+---
+
+**Option 3: Hybrid Approach (Recommended)**
+- ✅ Backend: Calculate all indicators + generate strategy signals
+- ✅ Frontend Chart: Display basic overlays (EMAs, Bollinger Bands only)
+- ✅ PocketOption Platform: Validate complex visual patterns and execution
+- ✅ GUI Dashboard: Show signal alerts, confidence scores, trade recommendations, performance metrics
+
+**Implementation Flow:**
+1. Backend applies strategy engine to live candles
+2. Emits indicator data for basic overlays (EMA/Bollinger)
+3. Emits strategy signals with confidence scores
+4. Frontend displays:
+   - Basic indicator lines on chart
+   - Signal badges/arrows at entry points
+   - Trade recommendation panel (CALL/PUT, confidence, reasoning)
+   - Performance tracking (win rate, P/L, signal accuracy)
+5. User validates visual patterns on PocketOption for final execution
+
+**Advantages:**
+- Best of both worlds - speed + visualization
+- Focus on what matters: signal quality
+- Enhanced UX without over-engineering
+- Leverages existing PocketOption platform for complex indicators
+
+**Best For:** Production-ready implementation with balanced approach
+
+---
+
+#### Recommended Implementation Sequence (Pending User Decision)
+
+**Phase 9.1: Strategy Signal Integration (Quick Win)**
+- [ ] Integrate strategy engine into streaming pipeline (`capabilities/data_streaming.py`)
+- [ ] Add strategy configuration selection (Quantum Flux, Neural Beast, Advanced, etc.)
+- [ ] Emit `strategy_signal` events with: direction, confidence, reasoning, indicators
+- [ ] Create signal display components (badges, arrows, recommendation panel)
+- [ ] Add real-time signal monitoring dashboard
+
+**Phase 9.2: Basic Indicator Overlays (If Option 2 or 3 chosen)**
+- [ ] Add EMA/SMA line series to Lightweight Charts
+- [ ] Implement Bollinger Bands visualization (upper/lower/middle bands)
+- [ ] Create RSI separate pane below main chart
+- [ ] Create MACD separate pane with histogram
+- [ ] Add indicator configuration panel (periods, colors, visibility toggles)
+
+**Phase 9.3: Strategy Testing & Validation**
+- [ ] Live signal monitoring and tracking
+- [ ] Signal accuracy metrics (win rate, profit factor)
+- [ ] Performance comparison dashboard (strategy A vs B)
+- [ ] Backtesting integration (test strategies on historical CSV data)
+- [ ] Signal history and replay functionality
+
+**Phase 9.4: Advanced Features (Future)**
+- [ ] Multi-strategy ensemble (combine signals from multiple engines)
+- [ ] Custom strategy builder UI
+- [ ] Machine learning model integration for confidence optimization
+- [ ] Trade execution automation (with user confirmation)
+- [ ] Risk management controls (position sizing, stop-loss automation)
 
 ## 🏗️ Architecture Summary
 
