@@ -145,9 +145,9 @@ def extract_candle_for_emit(asset: str) -> Optional[Dict]:
     Extract latest formed candle from capability's candle data for Socket.IO emission.
     This emits OHLC candles instead of ticks, eliminating duplicate candle formation.
     Uses capability's public API instead of direct state access.
-    Also handles candle persistence if enabled.
+    NOTE: Candle persistence is now handled in stream_from_chrome() directly.
     """
-    global data_streamer, persistence_manager, collect_stream_mode, last_closed_candle_index
+    global data_streamer
     
     try:
         # Use capability's public API method instead of accessing CANDLES directly
@@ -155,39 +155,6 @@ def extract_candle_for_emit(asset: str) -> Optional[Dict]:
         
         if latest_candle:
             timestamp, open_price, close_price, high_price, low_price = latest_candle
-            
-            # Persist closed candles if enabled
-            if persistence_manager and collect_stream_mode in ['candle', 'both']:
-                try:
-                    # Get all candles for this asset from capability
-                    candles = data_streamer.CANDLES.get(asset, [])
-                    if candles and len(candles) >= 2:
-                        # Index of last closed candle (current forming candle is last)
-                        closed_upto = len(candles) - 2
-                        last_written = last_closed_candle_index.get(asset, -1)
-                        
-                        if closed_upto > last_written:
-                            # Determine timeframe from capability's PERIOD
-                            tfm = int(data_streamer.PERIOD // 60) if hasattr(data_streamer, 'PERIOD') and data_streamer.PERIOD else 1
-                            if tfm < 1:
-                                tfm = 1
-                            
-                            # Write newly closed candles
-                            for i in range(last_written + 1, closed_upto + 1):
-                                c = candles[i]
-                                persistence_manager.add_candle(
-                                    asset=asset,
-                                    timeframe_minutes=tfm,
-                                    candle_ts=c[0],
-                                    open_price=c[1],
-                                    close_price=c[2],
-                                    high_price=c[3],
-                                    low_price=c[4]
-                                )
-                            
-                            last_closed_candle_index[asset] = closed_upto
-                except Exception as e:
-                    print(f"[Persistence] Error saving candle: {e}")
             
             return {
                 'asset': asset,
@@ -360,6 +327,75 @@ def stream_from_chrome():
                                 
                                 # Delegate realtime data processing to capability
                                 data_streamer._process_realtime_update(payload, capability_ctx)
+                                
+                                # CSV Persistence: Save tick and candle data if enabled
+                                # This must happen AFTER _process_realtime_update() processes the data
+                                if persistence_manager and collect_stream_mode != 'none':
+                                    current_focused_asset = data_streamer.get_current_asset()
+                                    if current_focused_asset:
+                                        # Extract tick data from payload for persistence
+                                        try:
+                                            tick_asset = None
+                                            tick_value = None
+                                            tick_timestamp = None
+                                            
+                                            # Parse tick data from payload (same logic as _process_realtime_update)
+                                            if isinstance(payload, list) and len(payload) > 0:
+                                                if isinstance(payload[0], list) and len(payload[0]) >= 3:
+                                                    tick_asset = payload[0][0]
+                                                    tick_timestamp = int(float(payload[0][1]))
+                                                    tick_value = payload[0][2]
+                                                else:
+                                                    tick_value = payload[-1] if isinstance(payload[-1], (int, float)) else None
+                                                    tick_timestamp = int(time.time())
+                                                    tick_asset = current_focused_asset
+                                            elif isinstance(payload, dict):
+                                                tick_asset = payload.get('asset') or payload.get('symbol') or current_focused_asset
+                                                tick_value = payload.get('quote') or payload.get('price') or payload.get('value')
+                                                tick_timestamp = payload.get('timestamp', int(time.time()))
+                                                if isinstance(tick_timestamp, str):
+                                                    tick_timestamp = int(float(tick_timestamp))
+                                            else:
+                                                tick_value = float(payload) if isinstance(payload, (int, float, str)) else None
+                                                tick_timestamp = int(time.time())
+                                                tick_asset = current_focused_asset
+                                            
+                                            # Persist tick data if enabled and we have valid data
+                                            if tick_asset and tick_value is not None and tick_timestamp and collect_stream_mode in ['tick', 'both']:
+                                                timestamp_str = datetime.fromtimestamp(tick_timestamp, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                                                persistence_manager.add_tick(tick_asset, timestamp_str, tick_value)
+                                            
+                                            # Persist candle data if enabled
+                                            if tick_asset and collect_stream_mode in ['candle', 'both']:
+                                                candles = data_streamer.CANDLES.get(tick_asset, [])
+                                                # Save all closed candles (all except the last forming one)
+                                                if candles and len(candles) >= 2:
+                                                    closed_upto = len(candles) - 2
+                                                    last_written = last_closed_candle_index.get(tick_asset, -1)
+                                                    
+                                                    if closed_upto > last_written:
+                                                        # Determine timeframe from capability's PERIOD
+                                                        tfm = int(data_streamer.PERIOD // 60) if hasattr(data_streamer, 'PERIOD') and data_streamer.PERIOD else 1
+                                                        if tfm < 1:
+                                                            tfm = 1
+                                                        
+                                                        # Write newly closed candles
+                                                        for i in range(last_written + 1, closed_upto + 1):
+                                                            c = candles[i]
+                                                            persistence_manager.add_candle(
+                                                                asset=tick_asset,
+                                                                timeframe_minutes=tfm,
+                                                                candle_ts=c[0],
+                                                                open_price=c[1],
+                                                                close_price=c[2],
+                                                                high_price=c[3],
+                                                                low_price=c[4]
+                                                            )
+                                                        
+                                                        last_closed_candle_index[tick_asset] = closed_upto
+                                        
+                                        except Exception as e:
+                                            print(f"[Persistence] Error saving data: {e}")
                                 
                                 # Extract processed candle and emit to frontend
                                 # Use capability API method to get current asset
@@ -744,7 +780,9 @@ if __name__ == '__main__':
         print(f"[Persistence]   Tick output: {tick_dir}")
         print(f"[Persistence]   Chunk sizes: candles={args.candle_chunk_size}, ticks={args.tick_chunk_size}")
         
-        # Patch data_streamer's output method to capture ticks (if tick collection enabled)
+        # NOTE: CSV persistence is now handled directly in stream_from_chrome() 
+        # This patch is kept as a fallback for any code paths that use _output_streaming_data
+        # (e.g., if data_streamer is used via stream_continuous() instead of stream_from_chrome())
         if collect_stream_mode in ['tick', 'both']:
             # Save reference to original bound method
             original_output = data_streamer._output_streaming_data
@@ -756,7 +794,7 @@ if __name__ == '__main__':
                 except Exception:
                     pass
                 
-                # Persist tick data
+                # Persist tick data (fallback path)
                 try:
                     if persistence_manager:
                         persistence_manager.add_tick(asset, timestamp_str, current_value)
@@ -766,7 +804,7 @@ if __name__ == '__main__':
             # Bind the patched method
             import types
             data_streamer._output_streaming_data = types.MethodType(patched_output, data_streamer)
-            print(f"[Persistence] ✓ Tick persistence hook installed")
+            print(f"[Persistence] ✓ Tick persistence fallback hook installed")
     else:
         print("\n[Persistence] Stream collection disabled (use --collect-stream to enable)")
     
