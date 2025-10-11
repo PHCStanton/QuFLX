@@ -88,3 +88,7 @@ pip-delete-this-directory.txt
 # Keep important repo files; adjust as needed
 # If you intentionally want to keep small example data, add exceptions like:
 # !data/examples/
+
+# Ignore local helper scripts and docs in utils created by the developer
+utils/git-fetch-status.ps1
+utils/README.md
