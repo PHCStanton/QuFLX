@@ -1,11 +1,11 @@
 import asyncio
 import base64
+import binascii
 import json
 import os
 import re
 from datetime import datetime, timezone
 import time as time_mod
-import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from selenium.common.exceptions import WebDriverException
@@ -45,12 +45,12 @@ class RealtimeDataStreaming(Capability):
         self.FAVORITES = []
         self.SESSION_AUTHENTICATED = False
         self.SESSION_TIMEFRAME_DETECTED = False
-        self.TICK_DATA_MODE = False
+        self.TICK_DATA_MODE: bool = False
         
         # New streaming mode attributes
-        self.CANDLE_ONLY_MODE = False
-        self.TICK_ONLY_MODE = False
-        self.ASSET_FOCUS_MODE = False
+        self.CANDLE_ONLY_MODE: bool = False
+        self.TICK_ONLY_MODE: bool = False
+        self.ASSET_FOCUS_MODE: bool = False
 
     # ========================================
     # Helper Methods
@@ -354,7 +354,7 @@ class RealtimeDataStreaming(Capability):
             
         if 'sid' in payload:
             self.SESSION_ID = payload.get('sid')
-            if ctx.verbose:
+            if ctx.verbose and self.SESSION_ID:
                 print(f"🔗 [{datetime.now(timezone.utc).strftime('%H:%M:%SZ')}] Session connected: {self.SESSION_ID[:8]}...")
         elif 'id' in payload or 'user_id' in payload:
             self.USER_ID = payload.get('id') or payload.get('user_id')
@@ -954,7 +954,7 @@ class RealtimeDataStreaming(Capability):
                                 print(f"📈 [{datetime.now(timezone.utc).strftime('%H:%M:%SZ')}] Loaded {candle_count} historical candles for {asset}")
                                 if self.SESSION_TIMEFRAME_DETECTED:
                                     print(f"⏱️ [{datetime.now(timezone.utc).strftime('%H:%M:%SZ')}] Session timeframe synced: {self.PERIOD // 60}m")
-                            else:
+                            elif isinstance(payload, list):
                                 self._stream_realtime_update(payload, ctx)
                     
                     # Small delay to prevent excessive CPU usage
@@ -983,10 +983,10 @@ class RealtimeDataStreaming(Capability):
         
         # Export session data
         export_data = self.expo_data(ctx)
-        if ctx.debug:
+        if ctx.debug and ctx.artifacts_root:
             # Save export data as artifact
             export_filename = f"session_export_{timestamp()}.json"
-            save_json(export_filename, export_data, ctx.artifacts_root)
+            save_json(ctx, export_filename, export_data)
             print(f"💾 Session data exported to: {export_filename}")
         
         print(f"⏰ {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%SZ')} - Stream ended")
@@ -1010,8 +1010,9 @@ class RealtimeDataStreaming(Capability):
         # Try to decode as text first for session messages
         try:
             decoded_text = base64.b64decode(raw_payload).decode('utf-8')
-            self._process_session_message(decoded_text, ctx)
-        except (base64.binascii.Error, UnicodeDecodeError):
+            # Convert string to dict format for _process_session_message
+            self._process_session_message({'raw': decoded_text}, ctx)
+        except (binascii.Error, UnicodeDecodeError):
             # If text decoding fails, continue with JSON parsing
             pass
         
@@ -1035,8 +1036,6 @@ class RealtimeDataStreaming(Capability):
         # Process historical data
         if isinstance(payload, dict) and ('history' in payload or 'candles' in payload):
             self._process_historical_data(payload, ctx)
-            # Extract timeframe from historical data
-            self._extract_timeframe_from_data(payload, ctx)
         # Process real-time updates (enhanced)
         elif isinstance(payload, (list, dict)) or isinstance(payload, (int, float)):
             self._process_realtime_update(payload, ctx)
