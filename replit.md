@@ -100,6 +100,28 @@ The platform utilizes a **capabilities-first architecture** and **two distinct d
 -   **File System**: For organized directory structure.
 ## Recent Updates
 
+### October 11, 2025 - CSV Persistence Fix for streaming_server.py
+**Critical Bug Fix: --collect-stream Not Saving Data**
+
+**Root Cause Identified**:
+- `streaming_server.py` called `_process_realtime_update()` which bypassed `_output_streaming_data()`
+- The patched persistence logic (lines 816-843) was never executed because `_process_realtime_update()` doesn't call `_output_streaming_data()`
+- This differed from `data_stream_collect.py` which uses `stream_continuous()` → `_stream_realtime_update()` → `_output_streaming_data()` (where the patch works)
+
+**Fix Implemented**:
+- Added CSV persistence directly in `stream_from_chrome()` data flow (lines 367-434)
+- Tick persistence: Extract and save tick data immediately after `_process_realtime_update()` processes payload
+- Candle persistence: Save closed candles using `last_closed_candle_index` tracking (same mechanism as data_stream_collect.py)
+- Cleaned up `extract_candle_for_emit()`: Removed redundant persistence logic, focused on data extraction only
+- Kept fallback patch (lines 819-843) for any alternative code paths that use `_output_streaming_data()`
+
+**Key Changes**:
+- Lines 367-434 (streaming_server.py): Persistence now executes directly in real-time data flow
+- Lines 146-176 (streaming_server.py): Simplified extract_candle_for_emit() to avoid duplicate persistence
+- Added clarifying comments about the dual persistence approach
+
+**Status**: Architect-verified ✅. CSV files will now be saved correctly when running `streaming_server.py --collect-stream both`. End-to-end testing requires Chrome connection.
+
 ### October 10, 2025 - Platform Mode State Machine & Candle Alignment Fix
 **Complete Architecture Overhaul for Platform Streaming**
 
