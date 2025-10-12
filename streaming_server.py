@@ -724,6 +724,48 @@ def handle_detect_asset():
             'timestamp': datetime.now().isoformat()
         })
 
+@socketio.on('calculate_indicators')
+def handle_calculate_indicators(data):
+    """
+    Stage 2: Calculate technical indicators for given asset and configuration.
+    Exposes the existing apply_technical_indicators() method from data_streaming capability.
+    """
+    global data_streamer
+    
+    try:
+        asset = data.get('asset')
+        indicators_config = data.get('indicators', {
+            'sma': {'period': 20},
+            'rsi': {'period': 14},
+            'bollinger': {'period': 20, 'std_dev': 2}
+        })
+        
+        if not asset:
+            emit('indicators_error', {
+                'error': 'No asset specified',
+                'timestamp': datetime.now().isoformat()
+            })
+            return
+        
+        print(f"[Indicators] Calculating indicators for {asset} with config: {indicators_config}")
+        
+        # Call existing capability method
+        indicators_result = data_streamer.apply_technical_indicators(asset, indicators_config)
+        
+        if 'error' in indicators_result:
+            print(f"[Indicators] Error: {indicators_result['error']}")
+            emit('indicators_error', indicators_result)
+        else:
+            print(f"[Indicators] Calculated {len(indicators_result.get('indicators', {}))} indicators for {asset}")
+            emit('indicators_calculated', indicators_result)
+            
+    except Exception as e:
+        print(f"[Indicators] Exception: {e}")
+        emit('indicators_error', {
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
+
 # ========================================
 # Backtest Handlers (from original)
 # ========================================
