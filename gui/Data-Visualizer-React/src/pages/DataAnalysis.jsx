@@ -386,18 +386,32 @@ const DataAnalysis = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6">
-        <h2 className="text-2xl font-bold text-white mb-6">Data Source Configuration</h2>
+      <div
+        className="glass rounded-xl p-6"
+        style={{ borderColor: 'var(--card-border)' }}
+      >
+        <h2
+          className="text-2xl font-bold mb-6"
+          style={{ color: 'var(--text-primary)' }}
+        >Data Source Configuration</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label
+              className="block text-sm font-medium mb-2"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               Data Provider
             </label>
             <select
               value={dataSource}
               onChange={(e) => setDataSource(e.target.value)}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full glass border rounded-lg px-4 py-2 focus:outline-none focus:ring-2"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                borderColor: 'var(--card-border)',
+                color: 'var(--text-primary)'
+              }}
             >
               {dataSources.map(source => (
                 <option key={source.id} value={source.id} disabled={source.disabled}>
@@ -408,13 +422,21 @@ const DataAnalysis = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label
+              className="block text-sm font-medium mb-2"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               Timeframe
             </label>
             <select
               value={timeframe}
               onChange={(e) => setTimeframe(e.target.value)}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full glass border rounded-lg px-4 py-2 focus:outline-none focus:ring-2"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                borderColor: 'var(--card-border)',
+                color: 'var(--text-primary)'
+              }}
               disabled={dataSource === 'platform' || isLiveMode}
             >
               {timeframes.map(tf => (
@@ -429,13 +451,21 @@ const DataAnalysis = () => {
           {/* CSV Mode: Show Asset Dropdown */}
           {dataSource === 'csv' && (
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: 'var(--text-secondary)' }}
+              >
                 CSV File
               </label>
               <select
                 value={selectedAsset}
                 onChange={(e) => setSelectedAsset(e.target.value)}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full glass border rounded-lg px-4 py-2 focus:outline-none focus:ring-2"
+                style={{
+                  backgroundColor: 'var(--card-bg)',
+                  borderColor: 'var(--card-border)',
+                  color: 'var(--text-primary)'
+                }}
               >
                 {availableAssets.map(asset => (
                   <option key={asset.id} value={asset.id}>{asset.name}</option>
@@ -447,10 +477,16 @@ const DataAnalysis = () => {
           {/* Platform Mode: Show Stream Control Panel */}
           {dataSource === 'platform' && (
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: 'var(--text-secondary)' }}
+              >
                 Stream Controls
               </label>
-              <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-4 space-y-3">
+              <div
+                className="glass border rounded-lg p-4 space-y-3"
+                style={{ borderColor: 'var(--card-border)' }}
+              >
                 {/* Stream State Display */}
                 {streamState === STREAM_STATES.IDLE && (
                   <div className="flex items-center gap-2 text-yellow-400">
@@ -462,7 +498,13 @@ const DataAnalysis = () => {
                 {streamState === STREAM_STATES.READY && (
                   <button
                     onClick={handleDetectAsset}
-                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                    className="w-full px-4 py-2 rounded-lg font-medium transition-colors"
+                    style={{
+                      backgroundColor: 'var(--accent-purple)',
+                      color: 'var(--text-primary)'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-blue)'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--accent-purple)'}
                   >
                     Detect Asset from PocketOption
                   </button>
@@ -485,7 +527,13 @@ const DataAnalysis = () => {
                     </div>
                     <button
                       onClick={handleStartStream}
-                      className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                      className="w-full px-4 py-2 rounded-lg font-medium transition-colors"
+                      style={{
+                        backgroundColor: 'var(--accent-green)',
+                        color: 'var(--text-primary)'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-blue)'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--accent-green)'}
                     >
                       Start Stream
                     </button>
@@ -500,7 +548,13 @@ const DataAnalysis = () => {
                     </div>
                     <button
                       onClick={handleStopStream}
-                      className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                      className="w-full px-4 py-2 rounded-lg font-medium transition-colors"
+                      style={{
+                        backgroundColor: 'var(--accent-red)',
+                        color: 'var(--text-primary)'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-purple)'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--accent-red)'}
                     >
                       Stop Stream
                     </button>
@@ -517,7 +571,13 @@ const DataAnalysis = () => {
                     </div>
                     <button
                       onClick={handleDetectAsset}
-                      className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                      className="w-full px-4 py-2 rounded-lg font-medium transition-colors"
+                      style={{
+                        backgroundColor: 'var(--accent-purple)',
+                        color: 'var(--text-primary)'
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-blue)'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--accent-purple)'}
                     >
                       Retry Detection
                     </button>
@@ -534,7 +594,13 @@ const DataAnalysis = () => {
               <button
                 onClick={loadHistoricalData}
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                className="px-6 py-2 rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: loading ? 'var(--card-border)' : 'var(--accent-blue)',
+                  color: 'var(--text-primary)'
+                }}
+                onMouseEnter={(e) => !loading && (e.target.style.backgroundColor = 'var(--accent-purple)')}
+                onMouseLeave={(e) => !loading && (e.target.style.backgroundColor = 'var(--accent-blue)')}
               >
                 {loading ? 'Loading...' : 'Load CSV Data'}
               </button>
@@ -543,12 +609,28 @@ const DataAnalysis = () => {
           
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : isConnecting ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs text-slate-400">Backend: {isConnected ? 'Connected' : isConnecting ? 'Connecting...' : 'Disconnected'}</span>
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{
+                  backgroundColor: isConnected ? 'var(--accent-green)' : isConnecting ? 'var(--accent-orange)' : 'var(--accent-red)'
+                }}
+              ></div>
+              <span
+                className="text-xs"
+                style={{ color: 'var(--text-muted)' }}
+              >Backend: {isConnected ? 'Connected' : isConnecting ? 'Connecting...' : 'Disconnected'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${chromeConnected ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-              <span className="text-xs text-slate-400">Chrome: {chromeConnected ? 'Connected' : 'Not Connected'}</span>
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{
+                  backgroundColor: chromeConnected ? 'var(--accent-green)' : 'var(--accent-orange)'
+                }}
+              ></div>
+              <span
+                className="text-xs"
+                style={{ color: 'var(--text-muted)' }}
+              >Chrome: {chromeConnected ? 'Connected' : 'Not Connected'}</span>
             </div>
             {backendReconnected && (
               <div className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 border border-blue-500/50 rounded-md">
@@ -570,8 +652,16 @@ const DataAnalysis = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${isLiveMode ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`} />
-            <span className="text-sm text-slate-300">
+            <div
+              className={`w-3 h-3 rounded-full ${isLiveMode ? 'animate-pulse' : ''}`}
+              style={{
+                backgroundColor: isLiveMode ? 'var(--accent-green)' : 'var(--card-border)'
+              }}
+            />
+            <span
+              className="text-sm"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               {isLiveMode ? 'Live' : 'Historical'}
             </span>
           </div>
@@ -580,45 +670,111 @@ const DataAnalysis = () => {
 
       {/* Statistics Panel - CSV Mode Only */}
       {statistics && dataSource === 'csv' && (
-        <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6">
-          <h3 className="text-xl font-semibold text-white mb-4">Statistics</h3>
+        <div
+          className="glass rounded-xl p-6"
+          style={{ borderColor: 'var(--card-border)' }}
+        >
+          <h3
+            className="text-xl font-semibold mb-4"
+            style={{ color: 'var(--text-primary)' }}
+          >Statistics</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-slate-700/50 rounded-lg p-4">
-              <div className="text-slate-400 text-sm mb-1">Current Price</div>
-              <div className="text-white text-lg font-semibold">{statistics.latestPrice}</div>
+            <div
+              className="glass rounded-lg p-4"
+              style={{ borderColor: 'var(--card-border)' }}
+            >
+              <div
+                className="text-sm mb-1"
+                style={{ color: 'var(--text-muted)' }}
+              >Current Price</div>
+              <div
+                className="text-lg font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >{statistics.latestPrice}</div>
             </div>
-            <div className="bg-slate-700/50 rounded-lg p-4">
-              <div className="text-slate-400 text-sm mb-1">Change</div>
-              <div className={`text-lg font-semibold ${parseFloat(statistics.priceChangePercent) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div
+              className="glass rounded-lg p-4"
+              style={{ borderColor: 'var(--card-border)' }}
+            >
+              <div
+                className="text-sm mb-1"
+                style={{ color: 'var(--text-muted)' }}
+              >Change</div>
+              <div
+                className="text-lg font-semibold"
+                style={{
+                  color: parseFloat(statistics.priceChangePercent) >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'
+                }}
+              >
                 {statistics.priceChange} ({statistics.priceChangePercent}%)
               </div>
             </div>
-            <div className="bg-slate-700/50 rounded-lg p-4">
-              <div className="text-slate-400 text-sm mb-1">High / Low</div>
-              <div className="text-white text-lg font-semibold">{statistics.high} / {statistics.low}</div>
+            <div
+              className="glass rounded-lg p-4"
+              style={{ borderColor: 'var(--card-border)' }}
+            >
+              <div
+                className="text-sm mb-1"
+                style={{ color: 'var(--text-muted)' }}
+              >High / Low</div>
+              <div
+                className="text-lg font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >{statistics.high} / {statistics.low}</div>
             </div>
-            <div className="bg-slate-700/50 rounded-lg p-4">
-              <div className="text-slate-400 text-sm mb-1">Data Points</div>
-              <div className="text-white text-lg font-semibold">{statistics.dataPoints}</div>
+            <div
+              className="glass rounded-lg p-4"
+              style={{ borderColor: 'var(--card-border)' }}
+            >
+              <div
+                className="text-sm mb-1"
+                style={{ color: 'var(--text-muted)' }}
+              >Data Points</div>
+              <div
+                className="text-lg font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >{statistics.dataPoints}</div>
             </div>
           </div>
         </div>
       )}
 
-      <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-6">
+      <div
+        className="glass rounded-xl p-6"
+        style={{ borderColor: 'var(--card-border)' }}
+      >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold text-white">Chart</h3>
-          <span className={`text-xs px-2 py-1 rounded-full border ${isLiveMode ? 'bg-green-900/30 text-green-300 border-green-700' : 'bg-slate-700/50 text-slate-300 border-slate-600'}`}>
-            {isLiveMode 
-              ? `Streaming • ${dataSource === 'platform' ? (streamAsset || selectedAsset || '') : (selectedAsset || '')}` 
+          <h3
+            className="text-xl font-semibold"
+            style={{ color: 'var(--text-primary)' }}
+          >Chart</h3>
+          <span
+            className="text-xs px-2 py-1 rounded-full border"
+            style={{
+              backgroundColor: isLiveMode ? 'var(--accent-green)' : 'var(--card-bg)',
+              color: isLiveMode ? 'var(--text-primary)' : 'var(--text-secondary)',
+              borderColor: isLiveMode ? 'var(--accent-green)' : 'var(--card-border)'
+            }}
+          >
+            {isLiveMode
+              ? `Streaming • ${dataSource === 'platform' ? (streamAsset || selectedAsset || '') : (selectedAsset || '')}`
               : `Historical • ${selectedAsset || ''}`}
           </span>
         </div>
         {loading && !isLiveMode ? (
           <div className="flex items-center justify-center h-96">
             <div className="text-center">
-              <div className="text-slate-300 mb-2">{loadingStatus}</div>
-              <div className="w-12 h-12 border-4 border-slate-600 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
+              <div
+                className="mb-2"
+                style={{ color: 'var(--text-secondary)' }}
+              >{loadingStatus}</div>
+              <div
+                className="w-12 h-12 border-4 rounded-full animate-spin mx-auto"
+                style={{
+                  borderColor: 'var(--card-border)',
+                  borderTopColor: 'var(--accent-blue)'
+                }}
+              ></div>
             </div>
           </div>
         ) : (

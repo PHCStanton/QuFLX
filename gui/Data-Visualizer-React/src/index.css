@@ -154,10 +154,65 @@ select {
   }
 }
 
-/* Dark theme optimizations */
+/* Theme System with CSS Custom Properties */
+:root {
+  /* Original Theme (Default) */
+  --bg-primary: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 100%);
+  --card-bg: rgba(51, 65, 85, 0.6);
+  --card-border: rgba(71, 85, 105, 0.7);
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+  --accent-orange: #f59e0b;
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: rgba(31, 38, 135, 0.37);
+}
+
+/* New Theme: Cosmic Fire */
+[data-theme="cosmic-fire"] {
+  --bg-primary: linear-gradient(135deg, #11082f 0%, #301a40 50%, #932d47 100%);
+  --card-bg: rgba(189, 22, 46, 0.15);
+  --card-border: rgba(222, 118, 25, 0.3);
+  --text-primary: #f8fafc;
+  --text-secondary: #e2e8f0;
+  --text-muted: #cbd5e1;
+  --accent-blue: #de7619;
+  --accent-purple: #bd162e;
+  --accent-green: #de7619;
+  --accent-red: #932d47;
+  --accent-orange: #de7619;
+  --glass-bg: rgba(222, 118, 25, 0.08);
+  --glass-border: rgba(222, 118, 25, 0.2);
+  --glass-shadow: rgba(189, 22, 46, 0.25);
+}
+
+/* Apply theme variables to body */
 body {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 100%);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   min-height: 100vh;
+  transition: all 0.3s ease;
+}
+
+/* Update glass morphism to use theme variables */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px 0 var(--glass-shadow);
+}
+
+.glass-hover:hover {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px 0 var(--glass-shadow);
 }
 
 /* Card hover effects */
