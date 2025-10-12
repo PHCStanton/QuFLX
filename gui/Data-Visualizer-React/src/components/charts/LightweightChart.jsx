@@ -20,6 +20,7 @@ const LightweightChart = forwardRef(({
   theme = 'dark',
   className = '',
   enabledIndicators = {},
+  backendIndicators = null,
   onChartReady = null,
   enableRealTime = false,
   ...chartOptions
@@ -494,6 +495,120 @@ const LightweightChart = forwardRef(({
       console.error('[LightweightChart] Failed to update indicators:', error);
     }
   }, [enabledIndicators, processedData]);
+
+  // Stage 2: Render backend-calculated indicators as chart overlays
+  useEffect(() => {
+    if (!chartRef.current || !processedData.length || !backendIndicators) return;
+
+    try {
+      // Clear previous backend indicator series
+      ['backend_sma', 'backend_rsi', 'backend_bb_upper', 'backend_bb_middle', 'backend_bb_lower'].forEach(key => {
+        if (seriesRef.current[key]) {
+          chartRef.current.removeSeries(seriesRef.current[key]);
+          delete seriesRef.current[key];
+        }
+      });
+
+      const latestTime = processedData[processedData.length - 1]?.time;
+      if (!latestTime) return;
+
+      // Render SMA overlay
+      if (backendIndicators.indicators?.sma) {
+        const smaValue = backendIndicators.indicators.sma.value;
+        if (!seriesRef.current.backend_sma) {
+          seriesRef.current.backend_sma = chartRef.current.addLineSeries({
+            color: '#8b5cf6',
+            lineWidth: 2,
+            title: `SMA(${backendIndicators.indicators.sma.period})`,
+            priceLineVisible: false,
+          });
+        }
+        // Draw SMA as a horizontal line at the calculated value
+        seriesRef.current.backend_sma.setData([
+          { time: processedData[Math.max(0, processedData.length - 50)].time, value: smaValue },
+          { time: latestTime, value: smaValue }
+        ]);
+      }
+
+      // Render RSI overlay (scaled to price range for visibility)
+      if (backendIndicators.indicators?.rsi) {
+        const rsiValue = backendIndicators.indicators.rsi.value;
+        // Get price range for scaling
+        const prices = processedData.map(d => d.close || d.value);
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        const priceRange = maxPrice - minPrice;
+        
+        // Scale RSI (0-100) to fit price chart
+        const scaledRSI = minPrice + (rsiValue / 100) * priceRange;
+        
+        if (!seriesRef.current.backend_rsi) {
+          seriesRef.current.backend_rsi = chartRef.current.addLineSeries({
+            color: '#ff6b6b',
+            lineWidth: 2,
+            title: `RSI(${backendIndicators.indicators.rsi.period})=${rsiValue.toFixed(1)}`,
+            priceLineVisible: false,
+          });
+        }
+        seriesRef.current.backend_rsi.setData([
+          { time: processedData[Math.max(0, processedData.length - 50)].time, value: scaledRSI },
+          { time: latestTime, value: scaledRSI }
+        ]);
+      }
+
+      // Render Bollinger Bands overlays
+      if (backendIndicators.indicators?.bollinger) {
+        const { upper_band, middle_band, lower_band } = backendIndicators.indicators.bollinger;
+        
+        // Upper band
+        if (!seriesRef.current.backend_bb_upper) {
+          seriesRef.current.backend_bb_upper = chartRef.current.addLineSeries({
+            color: 'rgba(239, 83, 80, 0.6)',
+            lineWidth: 1,
+            title: 'BB Upper',
+            priceLineVisible: false,
+          });
+        }
+        seriesRef.current.backend_bb_upper.setData([
+          { time: processedData[Math.max(0, processedData.length - 50)].time, value: upper_band },
+          { time: latestTime, value: upper_band }
+        ]);
+
+        // Middle band (same as SMA for BB)
+        if (!seriesRef.current.backend_bb_middle) {
+          seriesRef.current.backend_bb_middle = chartRef.current.addLineSeries({
+            color: 'rgba(255, 193, 7, 0.6)',
+            lineWidth: 1,
+            lineStyle: 2, // Dashed
+            title: 'BB Middle',
+            priceLineVisible: false,
+          });
+        }
+        seriesRef.current.backend_bb_middle.setData([
+          { time: processedData[Math.max(0, processedData.length - 50)].time, value: middle_band },
+          { time: latestTime, value: middle_band }
+        ]);
+
+        // Lower band
+        if (!seriesRef.current.backend_bb_lower) {
+          seriesRef.current.backend_bb_lower = chartRef.current.addLineSeries({
+            color: 'rgba(76, 175, 80, 0.6)',
+            lineWidth: 1,
+            title: 'BB Lower',
+            priceLineVisible: false,
+          });
+        }
+        seriesRef.current.backend_bb_lower.setData([
+          { time: processedData[Math.max(0, processedData.length - 50)].time, value: lower_band },
+          { time: latestTime, value: lower_band }
+        ]);
+      }
+
+      console.log('[LightweightChart] Backend indicators rendered as overlays (SMA, RSI, Bollinger)');
+    } catch (error) {
+      console.error('[LightweightChart] Failed to render backend indicators:', error);
+    }
+  }, [backendIndicators, processedData]);
 
   // Render loading state
   if (processedData.length === 0) {

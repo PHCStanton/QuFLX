@@ -29,6 +29,9 @@ export const useWebSocket = (url) => {
   const [detectionError, setDetectionError] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [historicalCandles, setHistoricalCandles] = useState(null);
+  const [indicatorData, setIndicatorData] = useState(null);
+  const [indicatorError, setIndicatorError] = useState(null);
+  const [isCalculatingIndicators, setIsCalculatingIndicators] = useState(false);
   const socketRef = useRef(null);
   const reconnectionCallbackRef = useRef(null);
 
@@ -161,6 +164,21 @@ export const useWebSocket = (url) => {
       setHistoricalCandles(data);
     });
 
+    // Stage 2: Listen for indicator calculation results
+    socket.on('indicators_calculated', (data) => {
+      console.log(`[Indicators] Received indicators for ${data.asset}:`, data.indicators);
+      setIndicatorData(data);
+      setIndicatorError(null);
+      setIsCalculatingIndicators(false);
+    });
+
+    socket.on('indicators_error', (data) => {
+      console.error('[Indicators] Calculation error:', data.error);
+      setIndicatorError(data.error);
+      setIndicatorData(null);
+      setIsCalculatingIndicators(false);
+    });
+
     return () => {
       console.log('Cleaning up WebSocket connection');
       socket.removeAllListeners();
@@ -203,6 +221,28 @@ export const useWebSocket = (url) => {
     reconnectionCallbackRef.current = callback;
   }, []);
 
+  const calculateIndicators = useCallback((asset, indicatorsConfig = null) => {
+    if (socketRef.current && isConnected) {
+      console.log('[Indicators] Requesting indicator calculation for:', asset);
+      setIsCalculatingIndicators(true);
+      setIndicatorError(null);
+      
+      const defaultConfig = {
+        sma: { period: 20 },
+        rsi: { period: 14 },
+        bollinger: { period: 20, std_dev: 2 }
+      };
+      
+      socketRef.current.emit('calculate_indicators', {
+        asset,
+        indicators: indicatorsConfig || defaultConfig
+      });
+    } else {
+      setIndicatorError('Not connected to backend');
+      setIsCalculatingIndicators(false);
+    }
+  }, [isConnected]);
+
   return {
     isConnected,
     isConnecting,
@@ -217,12 +257,16 @@ export const useWebSocket = (url) => {
     detectionError,
     isDetecting,
     historicalCandles,
+    indicatorData,
+    indicatorError,
+    isCalculatingIndicators,
     // Expose the socketRef so pages can access the raw socket when needed
     socketRef,
     startStream,
     stopStream,
     changeAsset,
     detectAsset,
+    calculateIndicators,
     setReconnectionCallback
   };
 };
