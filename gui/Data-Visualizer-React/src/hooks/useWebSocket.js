@@ -28,6 +28,7 @@ export const useWebSocket = (url) => {
   const [detectedAsset, setDetectedAsset] = useState(null);
   const [detectionError, setDetectionError] = useState(null);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [historicalCandles, setHistoricalCandles] = useState(null);
   const socketRef = useRef(null);
   const reconnectionCallbackRef = useRef(null);
 
@@ -154,6 +155,12 @@ export const useWebSocket = (url) => {
       setIsDetecting(false);
     });
 
+    // Stage 1: Listen for historical candles loaded event
+    socket.on('historical_candles_loaded', (data) => {
+      console.log(`[HistoricalData] Received ${data.count} historical candles for ${data.asset}`);
+      setHistoricalCandles(data);
+    });
+
     return () => {
       console.log('Cleaning up WebSocket connection');
       socket.removeAllListeners();
@@ -209,6 +216,7 @@ export const useWebSocket = (url) => {
     detectedAsset,
     detectionError,
     isDetecting,
+    historicalCandles,
     // Expose the socketRef so pages can access the raw socket when needed
     socketRef,
     startStream,

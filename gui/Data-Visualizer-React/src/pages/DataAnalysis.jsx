@@ -43,6 +43,7 @@ const DataAnalysis = () => {
     detectedAsset: wsDetectedAsset,
     detectionError: wsDetectionError,
     isDetecting: wsIsDetecting,
+    historicalCandles,
     startStream, 
     stopStream, 
     changeAsset,
@@ -282,6 +283,47 @@ const DataAnalysis = () => {
       setSelectedAsset(''); // Clear asset - will be detected
     }
   }, [dataSource, stopStream]);
+
+  // Stage 1: Handle historical candles loaded event - seed chart with context
+  useEffect(() => {
+    if (historicalCandles && historicalCandles.candles && historicalCandles.candles.length > 0) {
+      console.log(`[HistoricalData] Seeding chart with ${historicalCandles.count} historical candles`);
+      
+      // Convert historical candles to chart format
+      const formattedCandles = historicalCandles.candles.map(candle => ({
+        timestamp: candle.timestamp,
+        date: new Date(candle.date || candle.timestamp * 1000),
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        volume: candle.volume || 0,
+        symbol: candle.asset
+      }));
+      
+      // Seed chart with historical data
+      setChartData(formattedCandles);
+      
+      // Update statistics with latest historical candle
+      if (formattedCandles.length > 0) {
+        const latest = formattedCandles[formattedCandles.length - 1];
+        const first = formattedCandles[0];
+        const priceChange = latest.close - first.close;
+        const priceChangePercent = ((priceChange / first.close) * 100).toFixed(2);
+        
+        setStatistics({
+          latestPrice: latest.close.toFixed(5),
+          open: latest.open.toFixed(5),
+          high: latest.high.toFixed(5),
+          low: latest.low.toFixed(5),
+          priceChange: priceChange.toFixed(5),
+          priceChangePercent: priceChangePercent,
+          dataPoints: formattedCandles.length,
+          timeRange: `${first.date.toLocaleString()} - ${latest.date.toLocaleString()}`
+        });
+      }
+    }
+  }, [historicalCandles]);
 
   // Push candles into buffer with asset gating and backpressure handling
   useEffect(() => {
