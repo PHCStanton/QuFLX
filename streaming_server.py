@@ -630,6 +630,35 @@ def handle_start_stream(data):
         'asset': current_asset,
         'timestamp': datetime.now().isoformat()
     })
+    
+    # Stage 1: Emit historical candles if available (from PocketOption WebSocket)
+    # This seeds the frontend chart with context for indicator calculation
+    historical_candles = data_streamer.get_all_candles(current_asset)
+    if historical_candles and len(historical_candles) > 0:
+        # Convert candle format to frontend-compatible format
+        formatted_candles = []
+        for candle in historical_candles:
+            timestamp, open_price, close_price, high_price, low_price = candle
+            formatted_candles.append({
+                'asset': current_asset,
+                'timestamp': timestamp,
+                'open': open_price,
+                'high': high_price,
+                'low': low_price,
+                'close': close_price,
+                'volume': 0,
+                'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+            })
+        
+        print(f"[Stream] Emitting {len(formatted_candles)} historical candles for {current_asset}")
+        emit('historical_candles_loaded', {
+            'asset': current_asset,
+            'candles': formatted_candles,
+            'count': len(formatted_candles),
+            'timestamp': datetime.now().isoformat()
+        })
+    else:
+        print(f"[Stream] No historical candles available for {current_asset} yet")
 
 @socketio.on('stop_stream')
 def handle_stop_stream():
