@@ -1,8 +1,34 @@
 # Development Progress
 
-**Last Updated**: October 10, 2025
+**Last Updated**: October 11, 2025
 
 ## Recently Completed Features
+
+### CSV Persistence Fix for streaming_server.py (✅ COMPLETED - October 11, 2025)
+
+**Critical bug fix: --collect-stream not saving data**
+
+#### Root Cause Identified ✅
+- `streaming_server.py` called `_process_realtime_update()` which bypassed `_output_streaming_data()`
+- Patched persistence logic (lines 816-843) never executed because `_process_realtime_update()` doesn't call `_output_streaming_data()`
+- Different from `data_stream_collect.py` which uses `stream_continuous()` → `_stream_realtime_update()` → `_output_streaming_data()` (where patch works)
+
+#### Fix Implementation ✅
+- **Direct Persistence**: Added CSV persistence directly in `stream_from_chrome()` data flow (lines 367-434)
+- **Tick Persistence**: Extract and save tick data immediately after `_process_realtime_update()` processes payload
+- **Candle Persistence**: Save closed candles using `last_closed_candle_index` tracking (same mechanism as data_stream_collect.py)
+- **Code Cleanup**: Removed redundant persistence logic from `extract_candle_for_emit()` (lines 146-176)
+- **Fallback Safety**: Kept patch (lines 819-843) for alternative code paths using `_output_streaming_data()`
+
+#### Key Changes ✅
+- Lines 367-434: Persistence executes directly in real-time data flow
+- Lines 146-176: Simplified extract_candle_for_emit() to avoid duplicate persistence
+- Added clarifying comments about dual persistence approach
+- Architect-verified implementation
+
+**Impact**: CSV files now save correctly when running `streaming_server.py --collect-stream both`
+
+---
 
 ### Bug Fixes (✅ COMPLETED - October 10, 2025)
 
@@ -302,7 +328,7 @@ Optional: realtime_stream/ (--collect-stream)
 ## Next Development Priorities
 
 1. **Phase 13**: TradingView chart pattern implementation
-2. **Phase 14**: Comprehensive end-to-end testing
+2. **Phase 14**: Comprehensive end-to-end testing with Chrome connection
 3. **Live Trading GUI**: Connect to real-time Chrome data
 4. **Strategy Controls**: Live execution from GUI
 5. **Performance**: Further optimization
@@ -311,6 +337,6 @@ Optional: realtime_stream/ (--collect-stream)
 
 **OVERALL STATUS**: ✅ **PRODUCTION READY**
 
-All core functionality implemented, tested, and architect-approved. Real-time streaming infrastructure complete (Phases 1-6). Platform mode state machine with zero race conditions fully implemented and verified. Ready for chart pattern improvements and comprehensive testing.
+All core functionality implemented, tested, and architect-approved. Real-time streaming infrastructure complete (Phases 1-6). Platform mode state machine with zero race conditions fully implemented. CSV persistence bug fixed - data collection fully operational. Ready for chart pattern improvements and comprehensive testing.
 
-**Last Major Update**: October 10, 2025 - Phase 6: Platform Mode State Machine & Explicit Detection Flow
+**Last Major Update**: October 11, 2025 - CSV Persistence Fix for streaming_server.py

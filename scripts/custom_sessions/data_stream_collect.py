@@ -13,7 +13,7 @@ capabilities_dir = Path(__file__).parent.parent.parent / "capabilities"
 if str(capabilities_dir) not in sys.path:
     sys.path.insert(0, str(capabilities_dir))
 
-from data_streaming import RealtimeDataStreaming
+from data_streaming import RealtimeDataStreaming  # type: ignore
 from stream_persistence import StreamPersistenceManager
 from qf import attach_chrome_session
 import qf
