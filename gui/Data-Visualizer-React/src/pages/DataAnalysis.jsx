@@ -128,6 +128,12 @@ const DataAnalysis = () => {
         setLoadingStatus('Rendering chart...');
         setChartData(data);
         
+        // Auto-calculate indicators after data loads (with small delay for backend to store)
+        setTimeout(() => {
+          console.log('[DataAnalysis] Auto-calculating indicators after CSV load...');
+          calculateIndicators(selectedAsset);
+        }, 300);
+        
         // Calculate statistics
         if (data.length > 0) {
           const latest = data[data.length - 1];
@@ -323,6 +329,15 @@ const DataAnalysis = () => {
       
       // Seed chart with historical data
       setChartData(formattedCandles);
+      
+      // Auto-calculate indicators for Platform mode historical data
+      const asset = historicalCandles.asset;
+      if (asset && formattedCandles.length >= 20) {
+        setTimeout(() => {
+          console.log('[DataAnalysis] Auto-calculating indicators after historical load...');
+          calculateIndicators(asset);
+        }, 300);
+      }
       
       // Update statistics with latest historical candle
       if (formattedCandles.length > 0) {

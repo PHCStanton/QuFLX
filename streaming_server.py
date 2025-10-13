@@ -666,16 +666,16 @@ def handle_start_stream(data):
                 
                 for _, row in df.iterrows():
                     # Safely convert row values with defaults
-                    timestamp = int(row['timestamp']) if row['timestamp'] else 0
+                    timestamp = int(row['timestamp'])
                     historical_candles_csv.append({
                         'asset': current_asset,
                         'timestamp': timestamp,
-                        'open': float(row['open']) if row['open'] else 0.0,
-                        'high': float(row['high']) if row['high'] else 0.0,
-                        'low': float(row['low']) if row['low'] else 0.0,
-                        'close': float(row['close']) if row['close'] else 0.0,
-                        'volume': int(row.get('volume', 0)) if row.get('volume') else 0,
-                        'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat() if timestamp else ''
+                        'open': float(row['open']),
+                        'high': float(row['high']),
+                        'low': float(row['low']),
+                        'close': float(row['close']),
+                        'volume': int(row.get('volume', 0)),
+                        'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
                     })
                 
                 print(f"[Stream] Loaded {len(historical_candles_csv)} historical candles from CSV")
