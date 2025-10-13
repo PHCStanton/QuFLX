@@ -367,7 +367,7 @@ def stream_from_chrome():
                                             
                                             # Persist candle data if enabled
                                             if tick_asset and collect_stream_mode in ['candle', 'both']:
-                                                candles = data_streamer.CANDLES.get(tick_asset, [])
+                                                candles = data_streamer.get_all_candles(tick_asset)
                                                 # Save all closed candles (all except the last forming one)
                                                 if candles and len(candles) >= 2:
                                                     closed_upto = len(candles) - 2
