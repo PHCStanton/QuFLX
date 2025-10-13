@@ -2,9 +2,7 @@
 
 ## Overview
 
-QuantumFlux is an automated trading platform designed for PocketOption, integrating real-time WebSocket data streaming, browser automation, and AI-driven technical analysis. It features a React-based GUI for backtesting and live streaming visualization. The platform captures live market data, converts it into OHLC candles, generates trading signals using technical indicators, executes automated trades, and provides a user-friendly interface for strategy development and testing.
-
-The project aims to provide algorithmic traders, quantitative researchers, and developers with reliable real-time data, automated execution, and comprehensive market analysis capabilities.
+QuantumFlux is an automated trading platform for PocketOption, integrating real-time WebSocket data, browser automation, and AI-driven technical analysis. It features a React GUI for backtesting and live streaming visualization, capturing market data, forming OHLC candles, generating AI-driven trading signals, and executing automated trades. The platform aims to provide algorithmic traders, quantitative researchers, and developers with reliable real-time data, automated execution, and comprehensive market analysis.
 
 ## User Preferences
 
@@ -16,7 +14,7 @@ The project aims to provide algorithmic traders, quantitative researchers, and d
 
 ### Core Architecture Pattern: Capabilities-First Design + Dual Data Pipelines
 
-The platform utilizes a **capabilities-first architecture** and **two distinct data pipelines** to handle both historical data collection for backtesting and real-time streaming for live trading and visualization.
+The platform uses a **capabilities-first architecture** and **two distinct data pipelines** for historical data collection (backtesting) and real-time streaming (live trading and visualization).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -50,159 +48,54 @@ The platform utilizes a **capabilities-first architecture** and **two distinct d
 
 ### Key Architectural Decisions
 
-1.  **Hybrid Chrome Session Management**: A persistent Chrome session with remote debugging (port 9222) maintains login and WebSocket connections, allowing Selenium to attach to an existing instance.
-2.  **WebSocket Data Interception**: Captures and decodes WebSocket messages from PocketOption via Chrome DevTools Protocol performance logs.
-3.  **Dual Data Pipeline Separation**: Dedicated pipelines for historical data collection (for backtesting) and real-time streaming (for live operations and GUI visualization), ensuring no overlap and clear separation of concerns.
-4.  **Dedicated GUI Backend Server** (`streaming_server.py`): A Flask-SocketIO server on port 3001 handles real-time data streaming to the React frontend. It delegates all core logic to the `RealtimeDataStreaming` capability, ensuring a single source of truth for candle formation and processing.
-5.  **Intelligent Timeframe Detection**: Analyzes PocketOption's timestamp intervals and chart settings to reliably determine candle timeframes.
-6.  **Modular Capabilities Framework**: Trading operations are structured as self-contained capabilities with a standardized interface.
-7.  **Multi-Interface Access Pattern**: Capabilities are accessible via a FastAPI backend, Flask-SocketIO GUI backend, React GUI, and a CLI tool.
-8.  **Frontend Data Provider Separation**: The React GUI explicitly distinguishes between "CSV Mode" for historical data and "Platform Mode" for live WebSocket streaming, preventing automatic switching and ensuring data integrity.
-9.  **Chunked CSV Persistence**: Data is saved into rotating CSV files with configurable chunk sizes, organized by timeframe for efficient storage and retrieval.
-10. **Strategy Engine with Confidence Scoring**: Features a modular strategy system (e.g., Quantum Flux, Advanced) that generates multi-indicator signals with associated confidence scores.
+1.  **Hybrid Chrome Session Management**: Persistent Chrome session with remote debugging (port 9222) for login and WebSocket connections, allowing Selenium to attach.
+2.  **WebSocket Data Interception**: Captures and decodes WebSocket messages from PocketOption via Chrome DevTools Protocol.
+3.  **Dual Data Pipeline Separation**: Dedicated pipelines for historical data collection and real-time streaming, ensuring no overlap.
+4.  **Dedicated GUI Backend Server** (`streaming_server.py`): A Flask-SocketIO server on port 3001 for real-time data streaming to React frontend, delegating core logic to `RealtimeDataStreaming`.
+5.  **Intelligent Timeframe Detection**: Analyzes PocketOption's timestamp intervals and chart settings for reliable candle timeframe determination.
+6.  **Modular Capabilities Framework**: Trading operations are structured as self-contained capabilities.
+7.  **Multi-Interface Access Pattern**: Capabilities are accessible via FastAPI, Flask-SocketIO GUI backend, React GUI, and a CLI tool.
+8.  **Frontend Data Provider Separation**: React GUI explicitly distinguishes "CSV Mode" for historical data and "Platform Mode" for live WebSocket streaming.
+9.  **Chunked CSV Persistence**: Data saved into rotating CSV files by timeframe.
+10. **Strategy Engine with Confidence Scoring**: Modular strategy system generates multi-indicator signals with confidence scores.
+11. **Platform Mode State Machine**: Implemented a 6-state machine for robust streaming control (idle, ready, detecting, asset_detected, streaming, error) with explicit asset detection.
+12. **Normalized Asset Naming**: Handles asset name variations (e.g., USDJPY_otc vs USDJPYOTC) for consistent data filtering and retrieval.
+13. **Candle Timestamp Alignment**: Candles align to minute boundaries (e.g., :00 seconds) to match PocketOption timing.
 
 ## External Dependencies
 
 ### Browser Automation & Session Management
--   **Chrome Browser**: For interacting with PocketOption.
--   **Selenium WebDriver**: For browser automation.
--   **Chrome Remote Debugging Protocol (Port 9222)**: For WebSocket interception and session attachment.
+-   **Chrome Browser**
+-   **Selenium WebDriver**
+-   **Chrome Remote Debugging Protocol (Port 9222)**
 
 ### Data Processing & Analysis
--   **Pandas**: For DataFrame operations.
--   **NumPy**: For numerical operations and technical indicators.
+-   **Pandas**
+-   **NumPy**
 
 ### Web Framework & API
--   **FastAPI**: For REST API endpoints (Port 8000).
--   **Flask / Flask-SocketIO**: For the GUI backend and real-time Socket.IO server (Port 3001).
--   **Uvicorn**: ASGI server.
--   **WebSocket Support**: For real-time communication.
--   **CORS Support**: For frontend-backend communication.
+-   **FastAPI** (Port 8000)
+-   **Flask / Flask-SocketIO** (Port 3001)
+-   **Uvicorn**
+-   **WebSocket Support**
+-   **CORS Support**
 
 ### Frontend Stack
--   **React 18**: UI library.
--   **Vite**: Build tool (Port 5000).
--   **Socket.IO Client**: For real-time communication.
--   **Lightweight Charts**: For financial charting.
--   **TailwindCSS**: CSS framework.
--   **React Router**: For client-side routing.
+-   **React 18**
+-   **Vite** (Port 5000)
+-   **Socket.IO Client**
+-   **Lightweight Charts**
+-   **TailwindCSS**
+-   **React Router**
 
 ### CLI & Automation
--   **Typer**: Command-line interface framework.
--   **asyncio**: For asynchronous operations.
+-   **Typer**
+-   **asyncio**
 
 ### Platform Integration
--   **PocketOption**: The trading platform being integrated with, leveraging its WebSocket API for market data and web UI elements for interaction.
+-   **PocketOption**
 
 ### Data Storage
--   **CSV Files**: Primary persistence for historical and real-time market data.
--   **JSON Files**: For configuration storage.
--   **File System**: For organized directory structure.
-## Recent Updates
-
-### October 11, 2025 - LSP Type Safety Cleanup
-**All 12 LSP Diagnostics Resolved**
-
-**Issues Fixed**:
-- Null safety: Added SESSION_ID None check before string slicing (line 358)
-- Type checking: Added `isinstance(payload, list)` guard for `_stream_realtime_update` (line 958)
-- Function signatures: Corrected `save_json` argument order to `(ctx, filename, data)` (line 989)
-- Import organization: Added `import binascii` separately for proper exception handling (line 1014)
-- Type wrapping: Wrapped string payloads in dict for `_process_session_message` compatibility (line 1013)
-- Dead code removal: Removed non-existent `_extract_timeframe_from_data` call (line 1039)
-- Type annotations: Added explicit `bool` types for mode flags (TICK_DATA_MODE, CANDLE_ONLY_MODE, TICK_ONLY_MODE)
-- Import suppression: Added `# type: ignore` for runtime-valid import in data_stream_collect.py
-
-**Files Updated**:
-- `capabilities/data_streaming.py`: 11 diagnostics resolved
-- `scripts/custom_sessions/data_stream_collect.py`: 1 diagnostic resolved
-
-**Status**: Architect-verified ✅. All type safety issues resolved, no functional regressions introduced.
-
-### October 11, 2025 - CSV Persistence Fix for streaming_server.py
-**Critical Bug Fix: --collect-stream Not Saving Data**
-
-**Root Cause Identified**:
-- `streaming_server.py` called `_process_realtime_update()` which bypassed `_output_streaming_data()`
-- The patched persistence logic (lines 816-843) was never executed because `_process_realtime_update()` doesn't call `_output_streaming_data()`
-- This differed from `data_stream_collect.py` which uses `stream_continuous()` → `_stream_realtime_update()` → `_output_streaming_data()` (where the patch works)
-
-**Fix Implemented**:
-- Added CSV persistence directly in `stream_from_chrome()` data flow (lines 367-434)
-- Tick persistence: Extract and save tick data immediately after `_process_realtime_update()` processes payload
-- Candle persistence: Save closed candles using `last_closed_candle_index` tracking (same mechanism as data_stream_collect.py)
-- Cleaned up `extract_candle_for_emit()`: Removed redundant persistence logic, focused on data extraction only
-- Kept fallback patch (lines 819-843) for any alternative code paths that use `_output_streaming_data()`
-
-**Key Changes**:
-- Lines 367-434 (streaming_server.py): Persistence now executes directly in real-time data flow
-- Lines 146-176 (streaming_server.py): Simplified extract_candle_for_emit() to avoid duplicate persistence
-- Added clarifying comments about the dual persistence approach
-
-**Status**: Architect-verified ✅. CSV files will now be saved correctly when running `streaming_server.py --collect-stream both`. End-to-end testing requires Chrome connection.
-
-### October 10, 2025 - Platform Mode State Machine & Candle Alignment Fix
-**Complete Architecture Overhaul for Platform Streaming**
-
-- Implemented 6-state machine (idle, ready, detecting, asset_detected, streaming, error)
-- Added backend `detect_asset` Socket.IO endpoint for explicit asset detection
-- Created Stream Control Panel UI with state-based buttons (Detect Asset → Start Stream → Stop Stream)
-- Eliminated all race conditions and auto-start bypasses in reconnection logic
-- Separated `selectedAsset` (CSV mode) from `detectedAsset` (Platform mode)
-- Removed legacy `toggleLiveMode` function to prevent state machine bypasses
-- Statistics panel now only shows in CSV mode
-- Chart data properly clears when switching from CSV to Platform mode
-
-**Bug Fixes**:
-- Implemented exponential backoff (5s, 10s, 20s) for Chrome reconnection attempts (was fixed 5s)
-- Removed unused `startStream` dependency from reconnection useEffect to prevent unnecessary re-renders
-- Fixed asset detection to actively query PocketOption UI instead of returning None (added `detect_asset_from_ui()` method)
-- Removed iteration-based verbose logging that was spamming console output
-- **Fixed asset name mismatch in filtering and candle retrieval** (critical chart rendering bug):
-  - Added `_normalize_asset_name()` to handle format variations (USDJPY_otc vs USDJPYOTC)
-  - Applied normalization to all 3 filtering locations (historical, realtime, streaming)
-  - Extended normalization to candle retrieval methods (`get_latest_candle`, `get_all_candles`)
-  - Two-tier lookup: Direct O(1) lookup first, normalized fallback search if needed
-  - Resolved "Loading chart data..." issue - data no longer filtered/lost due to name format differences
-  - CSV persistence unchanged - normalization only affects in-memory comparison and retrieval
-- **Fixed candle timestamp alignment to match PocketOption timing**:
-  - Candle timestamps now align to minute boundaries (:00 seconds) using `candle_start = (tstamp // PERIOD) * PERIOD`
-  - Changed new candle detection from time difference to boundary crossing check (`candle_start > last_candle_start`)
-  - Ensures candles form at :00 seconds, not when streaming starts (e.g., :30 seconds)
-  - Architect-verified: Prevents data from new periods overwriting previous candle's close/high/low
-
-**Key Improvements**:
-- Sequential logic: Detect → Start → Stream → Visualize (explicit user control at each step)
-- No more hardcoded asset defaults or auto-restart on reconnection
-- State machine exclusively controls all Platform mode transitions
-- Clean separation between CSV (dropdown) and Platform (detection) UI
-- Reduced log spam and improved resource usage during Chrome unavailability
-- Real-time candles now perfectly synchronized with PocketOption's minute boundaries
-
-**Status**: Production-ready, architect-verified. Chart rendering and candle alignment verified ✅. Ready for live testing with Chrome connection.
-
-### October 9, 2025 - Real-Time Streaming Infrastructure
-**Phases 1-5 Complete**:
-- Fixed eventlet/WebSocket configuration
-- Implemented stream data collection with --collect-stream argument
-- Frontend data provider separation (CSV vs Platform)
-- Asset focus integration verified
-- Chrome disconnect handling improved
-- Reconnection lifecycle management with auto-recovery
-- Code quality improvements (LSP fixes, semantic corrections)
-
-### October 7, 2025 - Critical Architectural Fixes
-- Fixed asset filtering bug (filtering at START of processing)
-- Eliminated duplicate candle formation (backend emits, frontend displays)
-- Added proper API methods to capability
-- Refactored streaming_server.py (API methods only, no direct state access)
-- Simplified data flow (single source of truth)
-- Added backpressure handling (1000-item buffer)
-- Fixed Vite port configuration
-
-### October 4-5, 2025 - GUI Backtesting Integration
-- Created data_loader.py with CSV loading and backtest engine
-- Extended streaming_server.py with Socket.IO handlers
-- Smart file discovery (100+ CSV files)
-- Built functional StrategyBacktest.jsx page
-- Fixed profit calculation bugs
+-   **CSV Files**
+-   **JSON Files**
+-   **File System**

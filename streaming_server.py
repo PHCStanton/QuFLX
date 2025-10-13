@@ -222,7 +222,7 @@ def monitor_chrome_status():
                 
                 if last_reconnection_time is None:
                     should_reconnect = True
-                elif (datetime.now() - last_reconnection_time).seconds > 60:
+                elif (datetime.now() - last_reconnection_time).total_seconds() > 60:
                     # Reset attempts after 1 minute
                     chrome_reconnection_attempts = 0
                     should_reconnect = True
@@ -367,16 +367,19 @@ def stream_from_chrome():
                                             
                                             # Persist candle data if enabled
                                             if tick_asset and collect_stream_mode in ['candle', 'both']:
-                                                candles = data_streamer.CANDLES.get(tick_asset, [])
+                                                candles = data_streamer.get_all_candles(tick_asset)
                                                 # Save all closed candles (all except the last forming one)
                                                 if candles and len(candles) >= 2:
                                                     closed_upto = len(candles) - 2
                                                     last_written = last_closed_candle_index.get(tick_asset, -1)
                                                     
                                                     if closed_upto > last_written:
-                                                        # Determine timeframe from capability's PERIOD
-                                                        tfm = int(data_streamer.PERIOD // 60) if hasattr(data_streamer, 'PERIOD') and data_streamer.PERIOD else 1
-                                                        if tfm < 1:
+                                                        # Determine timeframe from capability's PERIOD with safe fallback
+                                                        try:
+                                                            period = getattr(data_streamer, 'PERIOD', 60)  # Default 60 seconds (1 minute)
+                                                            tfm = max(1, int(period // 60))  # Ensure minimum 1 minute
+                                                        except (TypeError, ValueError, AttributeError) as e:
+                                                            print(f"[Persistence] Invalid PERIOD value, using 1m default: {e}")
                                                             tfm = 1
                                                         
                                                         # Write newly closed candles
@@ -720,6 +723,56 @@ def handle_detect_asset():
     except Exception as e:
         print(f"[DetectAsset] Error detecting asset: {e}")
         emit('asset_detection_failed', {
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
+
+@socketio.on('store_csv_candles')
+def handle_store_csv_candles(data):
+    """
+    Store CSV candle data in backend for indicator calculation.
+    Converts frontend candle format to backend storage format.
+    """
+    global data_streamer
+    
+    try:
+        asset = data.get('asset')
+        candles_data = data.get('candles', [])
+        
+        if not asset:
+            emit('csv_storage_error', {'error': 'No asset specified'})
+            return
+        
+        if not candles_data:
+            emit('csv_storage_error', {'error': 'No candle data provided'})
+            return
+        
+        # Convert frontend format to backend format
+        # Frontend: {timestamp, date, open, close, high, low, volume, symbol}
+        # Backend: [timestamp, open, close, high, low]
+        backend_candles = []
+        for candle in candles_data:
+            backend_candles.append([
+                candle['timestamp'],
+                candle['open'],
+                candle['close'],
+                candle['high'],
+                candle['low']
+            ])
+        
+        # Store in backend (same structure as live streaming)
+        data_streamer.CANDLES[asset] = backend_candles
+        
+        print(f"[CSV Storage] Stored {len(backend_candles)} candles for {asset}")
+        emit('csv_storage_success', {
+            'asset': asset,
+            'candle_count': len(backend_candles),
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        print(f"[CSV Storage] Exception: {e}")
+        emit('csv_storage_error', {
             'error': str(e),
             'timestamp': datetime.now().isoformat()
         })

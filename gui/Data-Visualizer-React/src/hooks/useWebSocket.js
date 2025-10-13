@@ -179,6 +179,14 @@ export const useWebSocket = (url) => {
       setIsCalculatingIndicators(false);
     });
 
+    socket.on('csv_storage_success', (data) => {
+      console.log(`[CSV Storage] Successfully stored ${data.candle_count} candles for ${data.asset}`);
+    });
+
+    socket.on('csv_storage_error', (data) => {
+      console.error('[CSV Storage] Storage error:', data.error);
+    });
+
     return () => {
       console.log('Cleaning up WebSocket connection');
       socket.removeAllListeners();
@@ -243,6 +251,18 @@ export const useWebSocket = (url) => {
     }
   }, [isConnected]);
 
+  const storeCsvCandles = useCallback((asset, candles) => {
+    if (socketRef.current && isConnected) {
+      console.log(`[CSV Storage] Storing ${candles.length} candles for ${asset}`);
+      socketRef.current.emit('store_csv_candles', {
+        asset,
+        candles
+      });
+    } else {
+      console.error('[CSV Storage] Not connected to backend');
+    }
+  }, [isConnected]);
+
   return {
     isConnected,
     isConnecting,
@@ -267,6 +287,7 @@ export const useWebSocket = (url) => {
     changeAsset,
     detectAsset,
     calculateIndicators,
+    storeCsvCandles,
     setReconnectionCallback
   };
 };

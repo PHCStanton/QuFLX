@@ -278,18 +278,46 @@ const LightweightChart = forwardRef(({
     }
   }, [chartConfig]);
 
-  // Update main series data
+  // Track previous data length to detect initial load vs incremental update
+  const prevDataLengthRef = useRef(0);
+
+  // Update main series data - OPTIMIZED: Use setData() for initial load, update() for incremental changes
   useEffect(() => {
     if (!chartRef.current || !seriesRef.current.main) return;
 
     try {
-      if (processedData.length > 0) {
+      if (processedData.length === 0) {
+        seriesRef.current.main.setData([]);
+        prevDataLengthRef.current = 0;
+        return;
+      }
+
+      const prevLength = prevDataLengthRef.current;
+      
+      // Initial load or complete data replacement (e.g., switching assets)
+      if (prevLength === 0 || processedData.length < prevLength) {
         seriesRef.current.main.setData(processedData);
         chartRef.current.timeScale().fitContent();
-        console.log(`[LightweightChart] Updated main series with ${processedData.length} data points`);
-      } else {
-        seriesRef.current.main.setData([]);
+        console.log(`[LightweightChart] Initial load: ${processedData.length} data points`);
+        prevDataLengthRef.current = processedData.length;
+        return;
       }
+
+      // Incremental update - use update() for performance (TradingView best practice)
+      if (processedData.length > prevLength) {
+        // New candle(s) added - update only the new ones
+        for (let i = prevLength; i < processedData.length; i++) {
+          seriesRef.current.main.update(processedData[i]);
+        }
+        console.log(`[LightweightChart] Added ${processedData.length - prevLength} new candle(s) via update()`);
+      } else if (processedData.length === prevLength && processedData.length > 0) {
+        // Same length - likely updating the last forming candle
+        const lastCandle = processedData[processedData.length - 1];
+        seriesRef.current.main.update(lastCandle);
+        console.log(`[LightweightChart] Updated last candle via update()`);
+      }
+      
+      prevDataLengthRef.current = processedData.length;
     } catch (error) {
       console.error('[LightweightChart] Failed to update main series:', error);
     }
