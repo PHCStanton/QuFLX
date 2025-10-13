@@ -4,14 +4,21 @@ import io from 'socket.io-client';
 // Helper to detect the backend Socket.IO server URL
 const detectSocketUrl = () => {
   try {
+    // In Replit/production, use the current origin (Vite proxy handles routing to backend)
+    // In local dev with separate ports, use explicit backend URL
     const protocol = window?.location?.protocol || 'http:';
     const hostname = window?.location?.hostname || 'localhost';
-    const defaultUrl = `${protocol}//${hostname}:3001`;
+    
     // Allow override via env variable if provided
     const envUrl = import.meta?.env?.VITE_SOCKET_URL;
-    return envUrl || defaultUrl;
+    if (envUrl) return envUrl;
+    
+    // Use current origin (Vite proxies /socket.io to backend:3001)
+    // This works in Replit where frontend and backend share the same domain
+    return `${protocol}//${hostname}${window?.location?.port ? ':' + window?.location?.port : ''}`;
   } catch {
-    return 'http://localhost:3001';
+    // Fallback to current origin
+    return '';
   }
 };
 
