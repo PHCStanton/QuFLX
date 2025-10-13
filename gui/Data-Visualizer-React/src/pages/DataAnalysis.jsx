@@ -52,6 +52,7 @@ const DataAnalysis = () => {
     changeAsset,
     detectAsset: wsDetectAsset,
     calculateIndicators,
+    storeCsvCandles,
     setReconnectionCallback 
   } = useWebSocket();
   // Buffer for candle updates with backpressure handling
@@ -119,6 +120,10 @@ const DataAnalysis = () => {
         setLoadingStatus('Parsing CSV data...');
         const csvText = await response.text();
         const data = parseTradingData(csvText, selectedAsset);
+        
+        setLoadingStatus('Storing in backend...');
+        // Store CSV candles in backend for indicator calculation
+        storeCsvCandles(selectedAsset, data);
         
         setLoadingStatus('Rendering chart...');
         setChartData(data);

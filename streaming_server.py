@@ -724,6 +724,56 @@ def handle_detect_asset():
             'timestamp': datetime.now().isoformat()
         })
 
+@socketio.on('store_csv_candles')
+def handle_store_csv_candles(data):
+    """
+    Store CSV candle data in backend for indicator calculation.
+    Converts frontend candle format to backend storage format.
+    """
+    global data_streamer
+    
+    try:
+        asset = data.get('asset')
+        candles_data = data.get('candles', [])
+        
+        if not asset:
+            emit('csv_storage_error', {'error': 'No asset specified'})
+            return
+        
+        if not candles_data:
+            emit('csv_storage_error', {'error': 'No candle data provided'})
+            return
+        
+        # Convert frontend format to backend format
+        # Frontend: {timestamp, date, open, close, high, low, volume, symbol}
+        # Backend: [timestamp, open, close, high, low]
+        backend_candles = []
+        for candle in candles_data:
+            backend_candles.append([
+                candle['timestamp'],
+                candle['open'],
+                candle['close'],
+                candle['high'],
+                candle['low']
+            ])
+        
+        # Store in backend (same structure as live streaming)
+        data_streamer.CANDLES[asset] = backend_candles
+        
+        print(f"[CSV Storage] Stored {len(backend_candles)} candles for {asset}")
+        emit('csv_storage_success', {
+            'asset': asset,
+            'candle_count': len(backend_candles),
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        print(f"[CSV Storage] Exception: {e}")
+        emit('csv_storage_error', {
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
+
 @socketio.on('calculate_indicators')
 def handle_calculate_indicators(data):
     """

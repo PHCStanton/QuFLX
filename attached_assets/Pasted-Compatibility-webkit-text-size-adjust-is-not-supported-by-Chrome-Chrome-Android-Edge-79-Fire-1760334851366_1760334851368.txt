@@ -1,0 +1,111 @@
+Compatibility
+'-webkit-text-size-adjust' is not supported by Chrome, Chrome Android, Edge 79+, Firefox, Safari. Add 'text-size-adjust' to support Chrome 54+, Chrome Android 54+, Edge 79+.
+html,
+:host {
+    -webkit-text-size-adjust: 100%;
+}
+Request
+http://localhost:5000/
+Further Reading
+Learn more about this CSS feature on MDN
+Learn why this is important and how to fix it on webhint.io
+'backdrop-filter' is not supported by Safari. Add '-webkit-backdrop-filter' to support Safari 9+.
+.backdrop-blur-md {
+    backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);
+}
+Request
+http://localhost:5000/
+Further Reading
+Learn more about this CSS feature on MDN
+Learn why this is important and how to fix it on webhint.io
+Performance
+'background-position' changes to this property will trigger: 'Paint', which can impact performance when used inside @keyframes.
+@keyframes gradient-shift {
+    0% {
+        background-position: 0% 50%;
+    }
+}
+Request
+http://localhost:5000/
+Further Reading
+Learn why this is important and how to fix it on webhint.io
+'transform' changes to this property will trigger: 'Paint', which can impact performance when used inside @keyframes.
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+Request
+http://localhost:5000/
+Further Reading
+Learn why this is important and how to fix it on webhint.io
+Security
+Content Security Policy of your site blocks the use of 'eval' in JavaScript`
+The Content Security Policy (CSP) prevents the evaluation of arbitrary strings as JavaScript to make it more difficult for an attacker to inject unathorized code on your site.
+
+To solve this issue, avoid using eval(), new Function(), setTimeout([string], ...) and setInterval([string], ...) for evaluating strings.
+
+If you absolutely must: you can enable string evaluation by adding unsafe-eval as an allowed source in a script-src directive.
+
+⚠️ Allowing string evaluation comes at the risk of inline script injection.
+
+1 directive
+Source location	Directive	Status
+script-src	blocked
+Other
+'backdrop-filter' should be listed after '-webkit-backdrop-filter'.
+.glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+Request
+http://localhost:5000/
+Further Reading
+Learn why this is important and how to fix it on webhint.io
+'background-clip' should be listed after '-webkit-background-clip'.
+.gradient-text {
+    background: linear-gradient(45deg, #3b82f6, #8b5cf6, #06d6a0);
+    background-size: 200% 200%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradient-shift 3s ease infinite;
+}
+Request
+http://localhost:5000/
+Further Reading
+Learn why this is important and how to fix it on webhint.io
+Button type attribute has not been set.
+<button class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)] focus:ring-offset-2 focus:ring-offset-[var(--card-bg)]" style="background-color: var(--accent-blue);">
+Open in Elements
+Request
+http://localhost:5000/
+Further Reading
+Learn why this is important and how to fix it on webhint.io
+<button class="p-2 rounded-full glass-hover" style="--hover-bg: var(--glass-bg); --hover-border: var(--glass-border);">
+Open in Elements
+Request
+http://localhost:5000/
+Further Reading
+Learn why this is important and how to fix it on webhint.io
+<button class="flex items-center focus:outline-none glass-hover rounded-full p-1">
+Open in Elements
+Request
+http://localhost:5000/
+Further Reading
+Learn why this is important and how to fix it on webhint.io
+<button class="w-full px-4 py-2 rounded-lg font-medium transition-colors" _msttexthash="156364" _msthash="28" style="background-color: var(--accent-red); color: var(--text-primary);">
+Open in Elements
+Request
+http://localhost:5000/
+Further Reading
+Learn why this is important and how to fix it on webhint.io
+<button class="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" _msttexthash="412828" _msthash="33" style="background-color: var(--accent-purple); color: var(--text-primary);">
+Open in Elements
+Request
+http://localhost:5000/
+Further Reading
+Learn why this is important and how to fix it on webhint.io
