@@ -374,9 +374,12 @@ def stream_from_chrome():
                                                     last_written = last_closed_candle_index.get(tick_asset, -1)
                                                     
                                                     if closed_upto > last_written:
-                                                        # Determine timeframe from capability's PERIOD
-                                                        tfm = int(data_streamer.PERIOD // 60) if hasattr(data_streamer, 'PERIOD') and data_streamer.PERIOD else 1
-                                                        if tfm < 1:
+                                                        # Determine timeframe from capability's PERIOD with safe fallback
+                                                        try:
+                                                            period = getattr(data_streamer, 'PERIOD', 60)  # Default 60 seconds (1 minute)
+                                                            tfm = max(1, int(period // 60))  # Ensure minimum 1 minute
+                                                        except (TypeError, ValueError, AttributeError) as e:
+                                                            print(f"[Persistence] Invalid PERIOD value, using 1m default: {e}")
                                                             tfm = 1
                                                         
                                                         # Write newly closed candles
