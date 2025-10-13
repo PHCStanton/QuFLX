@@ -222,7 +222,7 @@ def monitor_chrome_status():
                 
                 if last_reconnection_time is None:
                     should_reconnect = True
-                elif (datetime.now() - last_reconnection_time).seconds > 60:
+                elif (datetime.now() - last_reconnection_time).total_seconds() > 60:
                     # Reset attempts after 1 minute
                     chrome_reconnection_attempts = 0
                     should_reconnect = True
