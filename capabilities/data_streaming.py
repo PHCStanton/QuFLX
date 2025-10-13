@@ -1087,7 +1087,7 @@ class RealtimeDataStreaming(Capability):
             return {"error": str(e), "timestamp": datetime.now().isoformat()}
 
     def apply_technical_indicators(self, asset: str, indicators_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply technical indicators to candle data for live trading signals."""
+        """Apply technical indicators to candle data and return full historical series."""
         try:
             if asset not in self.CANDLES or not self.CANDLES[asset]:
                 return {"error": f"No candle data available for {asset}"}
@@ -1110,85 +1110,225 @@ class RealtimeDataStreaming(Capability):
                 "latest_timestamp": timestamps[-1] if timestamps else None,
                 "latest_price": closes[-1] if closes else None,
                 "indicators": {},
+                "series": {},  # Add series data for charting
                 "signals": {},
                 "timestamp": datetime.now().isoformat()
             }
             
-            # Simple Moving Average
+            # Simple Moving Average - Calculate full series
             if "sma" in indicators_config:
                 sma_period = indicators_config["sma"].get("period", 20)
                 if len(closes) >= sma_period:
-                    sma_value = sum(closes[-sma_period:]) / sma_period
+                    sma_series = []
+                    for i in range(sma_period - 1, len(closes)):
+                        sma_value = sum(closes[i - sma_period + 1:i + 1]) / sma_period
+                        sma_series.append({
+                            "time": timestamps[i],
+                            "value": sma_value
+                        })
+                    
+                    latest_sma = sma_series[-1]["value"] if sma_series else None
                     indicators_result["indicators"]["sma"] = {
-                        "value": sma_value,
+                        "value": latest_sma,
                         "period": sma_period,
-                        "signal": "BUY" if closes[-1] > sma_value else "SELL"
+                        "signal": "BUY" if closes[-1] > latest_sma else "SELL"
                     }
+                    indicators_result["series"]["sma"] = sma_series
             
-            # RSI (simplified calculation)
+            # EMA - Exponential Moving Average
+            if "ema" in indicators_config:
+                ema_period = indicators_config["ema"].get("period", 20)
+                if len(closes) >= ema_period:
+                    multiplier = 2 / (ema_period + 1)
+                    ema_series = []
+                    
+                    # Initial EMA is SMA
+                    ema = sum(closes[:ema_period]) / ema_period
+                    ema_series.append({"time": timestamps[ema_period - 1], "value": ema})
+                    
+                    # Calculate remaining EMAs
+                    for i in range(ema_period, len(closes)):
+                        ema = (closes[i] - ema) * multiplier + ema
+                        ema_series.append({"time": timestamps[i], "value": ema})
+                    
+                    latest_ema = ema_series[-1]["value"] if ema_series else None
+                    indicators_result["indicators"]["ema"] = {
+                        "value": latest_ema,
+                        "period": ema_period,
+                        "signal": "BUY" if closes[-1] > latest_ema else "SELL"
+                    }
+                    indicators_result["series"]["ema"] = ema_series
+            
+            # RSI - Full series calculation
             if "rsi" in indicators_config:
                 rsi_period = indicators_config["rsi"].get("period", 14)
                 if len(closes) >= rsi_period + 1:
-                    gains = []
-                    losses = []
-                    for i in range(1, rsi_period + 1):
-                        change = closes[-i] - closes[-i-1]
-                        if change > 0:
-                            gains.append(change)
-                            losses.append(0)
-                        else:
-                            gains.append(0)
-                            losses.append(abs(change))
+                    rsi_series = []
                     
-                    avg_gain = sum(gains) / rsi_period
-                    avg_loss = sum(losses) / rsi_period
+                    for i in range(rsi_period, len(closes)):
+                        gains = []
+                        losses = []
+                        for j in range(i - rsi_period, i):
+                            change = closes[j + 1] - closes[j]
+                            if change > 0:
+                                gains.append(change)
+                                losses.append(0)
+                            else:
+                                gains.append(0)
+                                losses.append(abs(change))
+                        
+                        avg_gain = sum(gains) / rsi_period
+                        avg_loss = sum(losses) / rsi_period
+                        
+                        if avg_loss != 0:
+                            rs = avg_gain / avg_loss
+                            rsi_value = 100 - (100 / (1 + rs))
+                            rsi_series.append({
+                                "time": timestamps[i],
+                                "value": rsi_value
+                            })
                     
-                    if avg_loss != 0:
-                        rs = avg_gain / avg_loss
-                        rsi_value = 100 - (100 / (1 + rs))
-                        
-                        signal = "NEUTRAL"
-                        if rsi_value > 70:
-                            signal = "SELL"  # Overbought
-                        elif rsi_value < 30:
-                            signal = "BUY"   # Oversold
-                        
-                        indicators_result["indicators"]["rsi"] = {
-                            "value": rsi_value,
-                            "period": rsi_period,
-                            "signal": signal
-                        }
+                    latest_rsi = rsi_series[-1]["value"] if rsi_series else None
+                    signal = "NEUTRAL"
+                    if latest_rsi and latest_rsi > 70:
+                        signal = "SELL"
+                    elif latest_rsi and latest_rsi < 30:
+                        signal = "BUY"
+                    
+                    indicators_result["indicators"]["rsi"] = {
+                        "value": latest_rsi,
+                        "period": rsi_period,
+                        "signal": signal
+                    }
+                    indicators_result["series"]["rsi"] = rsi_series
             
-            # Bollinger Bands
+            # Bollinger Bands - Full series
             if "bollinger" in indicators_config:
                 bb_period = indicators_config["bollinger"].get("period", 20)
                 bb_std = indicators_config["bollinger"].get("std_dev", 2)
                 
                 if len(closes) >= bb_period:
-                    sma = sum(closes[-bb_period:]) / bb_period
-                    variance = sum((x - sma) ** 2 for x in closes[-bb_period:]) / bb_period
-                    std_dev = variance ** 0.5
+                    bb_upper_series = []
+                    bb_middle_series = []
+                    bb_lower_series = []
                     
-                    upper_band = sma + (bb_std * std_dev)
-                    lower_band = sma - (bb_std * std_dev)
+                    for i in range(bb_period - 1, len(closes)):
+                        period_closes = closes[i - bb_period + 1:i + 1]
+                        sma = sum(period_closes) / bb_period
+                        variance = sum((x - sma) ** 2 for x in period_closes) / bb_period
+                        std_dev = variance ** 0.5
+                        
+                        upper_band = sma + (bb_std * std_dev)
+                        lower_band = sma - (bb_std * std_dev)
+                        
+                        bb_upper_series.append({"time": timestamps[i], "value": upper_band})
+                        bb_middle_series.append({"time": timestamps[i], "value": sma})
+                        bb_lower_series.append({"time": timestamps[i], "value": lower_band})
+                    
+                    latest_upper = bb_upper_series[-1]["value"] if bb_upper_series else None
+                    latest_middle = bb_middle_series[-1]["value"] if bb_middle_series else None
+                    latest_lower = bb_lower_series[-1]["value"] if bb_lower_series else None
                     current_price = closes[-1]
                     
                     signal = "NEUTRAL"
-                    if current_price > upper_band:
-                        signal = "SELL"  # Price above upper band
-                    elif current_price < lower_band:
-                        signal = "BUY"   # Price below lower band
+                    if latest_upper and current_price > latest_upper:
+                        signal = "SELL"
+                    elif latest_lower and current_price < latest_lower:
+                        signal = "BUY"
                     
                     indicators_result["indicators"]["bollinger"] = {
-                        "upper_band": upper_band,
-                        "middle_band": sma,
-                        "lower_band": lower_band,
+                        "upper_band": latest_upper,
+                        "middle_band": latest_middle,
+                        "lower_band": latest_lower,
                         "current_price": current_price,
                         "signal": signal
                     }
+                    indicators_result["series"]["bollinger"] = {
+                        "upper": bb_upper_series,
+                        "middle": bb_middle_series,
+                        "lower": bb_lower_series
+                    }
+            
+            # MACD - Full series
+            if "macd" in indicators_config:
+                fast_period = indicators_config["macd"].get("fast_period", 12)
+                slow_period = indicators_config["macd"].get("slow_period", 26)
+                signal_period = indicators_config["macd"].get("signal_period", 9)
+                
+                if len(closes) >= slow_period:
+                    # Calculate fast EMA
+                    fast_mult = 2 / (fast_period + 1)
+                    fast_ema = sum(closes[:fast_period]) / fast_period
+                    fast_emas = [fast_ema]
+                    for i in range(fast_period, len(closes)):
+                        fast_ema = (closes[i] - fast_ema) * fast_mult + fast_ema
+                        fast_emas.append(fast_ema)
+                    
+                    # Calculate slow EMA
+                    slow_mult = 2 / (slow_period + 1)
+                    slow_ema = sum(closes[:slow_period]) / slow_period
+                    slow_emas = [slow_ema]
+                    for i in range(slow_period, len(closes)):
+                        slow_ema = (closes[i] - slow_ema) * slow_mult + slow_ema
+                        slow_emas.append(slow_ema)
+                    
+                    # Calculate MACD line
+                    macd_line = []
+                    start_idx = slow_period - 1
+                    for i in range(len(slow_emas)):
+                        fast_idx = i + (slow_period - fast_period)
+                        if fast_idx < len(fast_emas):
+                            macd_val = fast_emas[fast_idx] - slow_emas[i]
+                            macd_line.append(macd_val)
+                    
+                    # Calculate signal line (EMA of MACD)
+                    if len(macd_line) >= signal_period:
+                        signal_mult = 2 / (signal_period + 1)
+                        signal_ema = sum(macd_line[:signal_period]) / signal_period
+                        signal_line = [signal_ema]
+                        for i in range(signal_period, len(macd_line)):
+                            signal_ema = (macd_line[i] - signal_ema) * signal_mult + signal_ema
+                            signal_line.append(signal_ema)
+                        
+                        # Create series data
+                        macd_series = []
+                        signal_series = []
+                        histogram_series = []
+                        
+                        for i in range(len(signal_line)):
+                            idx = start_idx + signal_period - 1 + i
+                            macd_val = macd_line[signal_period - 1 + i]
+                            sig_val = signal_line[i]
+                            
+                            macd_series.append({"time": timestamps[idx], "value": macd_val})
+                            signal_series.append({"time": timestamps[idx], "value": sig_val})
+                            histogram_series.append({"time": timestamps[idx], "value": macd_val - sig_val})
+                        
+                        latest_macd = macd_series[-1]["value"] if macd_series else None
+                        latest_signal = signal_series[-1]["value"] if signal_series else None
+                        
+                        macd_signal = "BUY" if latest_macd and latest_signal and latest_macd > latest_signal else "SELL"
+                        
+                        indicators_result["indicators"]["macd"] = {
+                            "macd": latest_macd,
+                            "signal": latest_signal,
+                            "histogram": latest_macd - latest_signal if latest_macd and latest_signal else 0,
+                            "signal_trend": macd_signal
+                        }
+                        indicators_result["series"]["macd"] = {
+                            "macd": macd_series,
+                            "signal": signal_series,
+                            "histogram": histogram_series
+                        }
             
             # Generate overall signal based on multiple indicators
-            signals = [ind.get("signal") for ind in indicators_result["indicators"].values()]
+            signals = []
+            for key, ind in indicators_result["indicators"].items():
+                if "signal" in ind:
+                    signals.append(ind["signal"])
+                elif "signal_trend" in ind:
+                    signals.append(ind["signal_trend"])
+            
             buy_signals = signals.count("BUY")
             sell_signals = signals.count("SELL")
             

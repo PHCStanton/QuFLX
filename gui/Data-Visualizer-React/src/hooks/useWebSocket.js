@@ -173,7 +173,8 @@ export const useWebSocket = (url) => {
 
     // Stage 2: Listen for indicator calculation results
     socket.on('indicators_calculated', (data) => {
-      console.log(`[Indicators] Received indicators for ${data.asset}:`, data.indicators);
+      console.log(`[Indicators] Received full data for ${data.asset}:`, data);
+      console.log(`[Indicators] Has series data:`, !!data.series, data.series ? Object.keys(data.series) : 'none');
       setIndicatorData(data);
       setIndicatorError(null);
       setIsCalculatingIndicators(false);

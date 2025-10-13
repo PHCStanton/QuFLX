@@ -36,11 +36,11 @@ const INDICATOR_LIBRARY = {
     {
       id: 'macd',
       name: 'MACD',
-      defaultConfig: { fast: 12, slow: 26, signal: 9 },
+      defaultConfig: { fast_period: 12, slow_period: 26, signal_period: 9 },
       fields: [
-        { name: 'fast', label: 'Fast Period', type: 'number', min: 1, max: 50, default: 12 },
-        { name: 'slow', label: 'Slow Period', type: 'number', min: 1, max: 100, default: 26 },
-        { name: 'signal', label: 'Signal Period', type: 'number', min: 1, max: 50, default: 9 }
+        { name: 'fast_period', label: 'Fast Period', type: 'number', min: 1, max: 50, default: 12 },
+        { name: 'slow_period', label: 'Slow Period', type: 'number', min: 1, max: 100, default: 26 },
+        { name: 'signal_period', label: 'Signal Period', type: 'number', min: 1, max: 50, default: 9 }
       ]
     },
     {

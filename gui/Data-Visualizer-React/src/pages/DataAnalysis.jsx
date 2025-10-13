@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import LightweightChart from '../components/charts/LightweightChart';
+import MultiPaneChart from '../components/charts/MultiPaneChart';
 import IndicatorConfig from '../components/indicators/IndicatorConfig';
 import { fetchCurrencyPairs } from '../utils/fileUtils';
 import { parseTradingData } from '../utils/tradingData';
@@ -941,9 +941,9 @@ const DataAnalysis = () => {
             </div>
           </div>
         ) : (
-          <LightweightChart 
+          <MultiPaneChart 
             data={chartData} 
-            height={500} 
+            height={600} 
             backendIndicators={indicatorData}
           />
         )}
