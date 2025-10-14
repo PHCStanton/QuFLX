@@ -634,34 +634,92 @@ def handle_start_stream(data):
         'timestamp': datetime.now().isoformat()
     })
     
-    # Stage 1: Emit historical candles if available (from PocketOption WebSocket)
-    # This seeds the frontend chart with context for indicator calculation
-    historical_candles = data_streamer.get_all_candles(current_asset)
-    if historical_candles and len(historical_candles) > 0:
-        # Convert candle format to frontend-compatible format
-        formatted_candles = []
-        for candle in historical_candles:
-            timestamp, open_price, close_price, high_price, low_price = candle
-            formatted_candles.append({
-                'asset': current_asset,
-                'timestamp': timestamp,
-                'open': open_price,
-                'high': high_price,
-                'low': low_price,
-                'close': close_price,
-                'volume': 0,
-                'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
-            })
+    # Stage 1: Seed chart with historical CSV data FIRST, then start live stream
+    # This provides context for seamless transition from history to real-time
+    
+    # Try to load historical candles from CSV files first
+    historical_candles_csv = []
+    try:
+        import pandas as pd
+        from pathlib import Path
         
-        print(f"[Stream] Emitting {len(formatted_candles)} historical candles for {current_asset}")
+        # Search for CSV files matching the asset (1m timeframe)
+        data_collect_dir = Path('data/data_output/assets_data/data_collect/1M_candle_data')
+        if data_collect_dir.exists():
+            # Normalize asset name for file matching (EURUSD_OTC -> EURUSD_otc)
+            asset_normalized = current_asset.replace('_', '').lower()
+            matching_files = []
+            
+            for csv_file in data_collect_dir.glob('*.csv'):
+                # Check if filename contains the asset name
+                if asset_normalized in csv_file.stem.lower().replace('_', ''):
+                    matching_files.append(csv_file)
+            
+            if matching_files:
+                # Use the most recent file
+                latest_file = max(matching_files, key=lambda f: f.stat().st_mtime)
+                print(f"[Stream] Loading historical CSV data from {latest_file.name}")
+                
+                df = pd.read_csv(latest_file)
+                # Take last 200 candles for context
+                df = df.tail(200)
+                
+                for _, row in df.iterrows():
+                    # Safely convert row values with defaults
+                    timestamp = int(row['timestamp'])
+                    historical_candles_csv.append({
+                        'asset': current_asset,
+                        'timestamp': timestamp,
+                        'open': float(row['open']),
+                        'high': float(row['high']),
+                        'low': float(row['low']),
+                        'close': float(row['close']),
+                        'volume': int(row.get('volume', 0)),
+                        'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+                    })
+                
+                print(f"[Stream] Loaded {len(historical_candles_csv)} historical candles from CSV")
+    except Exception as e:
+        print(f"[Stream] Could not load CSV historical data: {e}")
+    
+    # If CSV data available, emit it first
+    if historical_candles_csv:
+        print(f"[Stream] Seeding chart with {len(historical_candles_csv)} historical candles")
         emit('historical_candles_loaded', {
             'asset': current_asset,
-            'candles': formatted_candles,
-            'count': len(formatted_candles),
+            'candles': historical_candles_csv,
+            'count': len(historical_candles_csv),
+            'source': 'csv',
             'timestamp': datetime.now().isoformat()
         })
     else:
-        print(f"[Stream] No historical candles available for {current_asset} yet")
+        # Fallback: Try WebSocket historical candles (usually empty at stream start)
+        historical_candles_ws = data_streamer.get_all_candles(current_asset)
+        if historical_candles_ws and len(historical_candles_ws) > 0:
+            formatted_candles = []
+            for candle in historical_candles_ws:
+                timestamp, open_price, close_price, high_price, low_price = candle
+                formatted_candles.append({
+                    'asset': current_asset,
+                    'timestamp': timestamp,
+                    'open': open_price,
+                    'high': high_price,
+                    'low': low_price,
+                    'close': close_price,
+                    'volume': 0,
+                    'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+                })
+            
+            print(f"[Stream] Emitting {len(formatted_candles)} WebSocket historical candles")
+            emit('historical_candles_loaded', {
+                'asset': current_asset,
+                'candles': formatted_candles,
+                'count': len(formatted_candles),
+                'source': 'websocket',
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            print(f"[Stream] No historical data available for {current_asset}")
 
 @socketio.on('stop_stream')
 def handle_stop_stream():
