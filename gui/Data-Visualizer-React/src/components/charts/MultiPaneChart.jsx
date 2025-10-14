@@ -129,14 +129,28 @@ const MultiPaneChart = forwardRef(({
       priceLineVisible: false,
     });
 
-    // Sync time scales
+    // Sync time scales using time-based synchronization
+    let timeRangeCallback = null;
     if (mainChartRef.current) {
-      mainChartRef.current.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        rsiChartRef.current?.timeScale().setVisibleLogicalRange(range);
-      });
+      timeRangeCallback = (timeRange) => {
+        if (timeRange && rsiChartRef.current && rsiSeriesRef.current) {
+          try {
+            rsiChartRef.current.timeScale().setVisibleRange({
+              from: timeRange.from,
+              to: timeRange.to,
+            });
+          } catch (e) {
+            // Ignore errors when chart doesn't have data yet
+          }
+        }
+      };
+      mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
     }
 
     return () => {
+      if (timeRangeCallback && mainChartRef.current) {
+        mainChartRef.current.timeScale().unsubscribeVisibleTimeRangeChange(timeRangeCallback);
+      }
       if (rsiChartRef.current) {
         rsiChartRef.current.remove();
         rsiChartRef.current = null;
@@ -173,14 +187,28 @@ const MultiPaneChart = forwardRef(({
       priceScaleId: '',
     });
 
-    // Sync time scales
+    // Sync time scales using time-based synchronization
+    let timeRangeCallback = null;
     if (mainChartRef.current) {
-      mainChartRef.current.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        macdChartRef.current?.timeScale().setVisibleLogicalRange(range);
-      });
+      timeRangeCallback = (timeRange) => {
+        if (timeRange && macdChartRef.current && macdSeriesRef.current.macd) {
+          try {
+            macdChartRef.current.timeScale().setVisibleRange({
+              from: timeRange.from,
+              to: timeRange.to,
+            });
+          } catch (e) {
+            // Ignore errors when chart doesn't have data yet
+          }
+        }
+      };
+      mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
     }
 
     return () => {
+      if (timeRangeCallback && mainChartRef.current) {
+        mainChartRef.current.timeScale().unsubscribeVisibleTimeRangeChange(timeRangeCallback);
+      }
       if (macdChartRef.current) {
         macdChartRef.current.remove();
         macdChartRef.current = null;
