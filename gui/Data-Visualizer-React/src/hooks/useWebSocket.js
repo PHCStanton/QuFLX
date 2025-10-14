@@ -266,8 +266,6 @@ export const useWebSocket = (url) => {
         asset,
         candles
       });
-    } else {
-      console.error('[CSV Storage] Not connected to backend');
     }
   }, [isConnected]);
 
