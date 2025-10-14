@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Header from './components/Header';
-import DataAnalysis from './pages/DataAnalysis';
+import DataAnalysis from './pages/DataAnalysis/index';
 import StrategyBacktest from './pages/StrategyBacktest';
 import LiveTrading from './pages/LiveTrading';
 

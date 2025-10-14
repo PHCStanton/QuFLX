@@ -25,14 +25,14 @@ export const parseTradingData = (csvText, symbol) => {
     let timestamp, open, close, high, low, volume = null;
     
     if (parts.length === 5) {
-      // Format: timestamp,open,close,high,low (OHLC)
+      // Format: timestamp,open,close,high,low (Non-standard but matches our CSV files)
       [timestamp, open, close, high, low] = parts;
     } else if (parts.length === 6) {
       if (hasIndexColumn) {
-        // Format: index,timestamp,open,high,low,close
+        // Format: index,timestamp,open,high,low,close (Standard OHLC)
         [, timestamp, open, high, low, close] = parts;
       } else {
-        // Format: timestamp,open,close,high,low,volume (OHLCV)
+        // Format: timestamp,open,close,high,low,volume (Non-standard but with volume)
         [timestamp, open, close, high, low, volume] = parts;
       }
     } else if (parts.length === 7) {

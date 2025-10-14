@@ -124,7 +124,14 @@ const LightweightChart = forwardRef(({
   
   // Memoize processed data to avoid reprocessing on every render
   const processedData = useMemo(() => {
-    if (!Array.isArray(data) || data.length === 0) return [];
+    console.log('[LightweightChart] processedData useMemo triggered, data:', data?.length, 'points');
+    
+    if (!Array.isArray(data) || data.length === 0) {
+      console.log('[LightweightChart] No data or empty array');
+      return [];
+    }
+    
+    console.log('[LightweightChart] Sample data point:', data[0]);
     
     try {
       // Limit data size for performance
@@ -132,21 +139,35 @@ const LightweightChart = forwardRef(({
         ? data.slice(-MAX_DATA_POINTS) 
         : data;
       
-      return limitedData
-        .filter(item => {
-          if (!item) return false;
-          const isValid = 
-            typeof item.timestamp === 'number' && !isNaN(item.timestamp) &&
-            typeof item.open === 'number' && !isNaN(item.open) &&
-            typeof item.high === 'number' && !isNaN(item.high) &&
-            typeof item.low === 'number' && !isNaN(item.low) &&
-            typeof item.close === 'number' && !isNaN(item.close) &&
-            item.high >= item.low &&
-            item.high >= Math.max(item.open, item.close) &&
-            item.low <= Math.min(item.open, item.close);
-          
-          return isValid;
-        })
+      const filtered = limitedData.filter(item => {
+        if (!item) return false;
+        const isValid =
+          typeof item.timestamp === 'number' && !isNaN(item.timestamp) &&
+          typeof item.open === 'number' && !isNaN(item.open) &&
+          typeof item.high === 'number' && !isNaN(item.high) &&
+          typeof item.low === 'number' && !isNaN(item.low) &&
+          typeof item.close === 'number' && !isNaN(item.close) &&
+          item.high >= item.low &&
+          item.high >= Math.max(item.open, item.close) &&
+          item.low <= Math.min(item.open, item.close);
+        
+        if (!isValid) {
+          console.log('[LightweightChart] Invalid item filtered out:', {
+            timestamp: typeof item.timestamp,
+            open: typeof item.open,
+            high: typeof item.high,
+            low: typeof item.low,
+            close: typeof item.close,
+            sample: item
+          });
+        }
+        
+        return isValid;
+      });
+      
+      console.log('[LightweightChart] After filtering: valid:', filtered.length, 'of', limitedData.length);
+      
+      return filtered
         .map(item => ({
           time: item.timestamp,
           open: item.open,
@@ -283,10 +304,16 @@ const LightweightChart = forwardRef(({
 
   // Update main series data - OPTIMIZED: Use setData() for initial load, update() for incremental changes
   useEffect(() => {
-    if (!chartRef.current || !seriesRef.current.main) return;
+    console.log('[LightweightChart] Update effect triggered, processedData.length:', processedData.length);
+    
+    if (!chartRef.current || !seriesRef.current.main) {
+      console.log('[LightweightChart] Chart or series not ready, chartRef:', !!chartRef.current, 'seriesRef.main:', !!seriesRef.current.main);
+      return;
+    }
 
     try {
       if (processedData.length === 0) {
+        console.log('[LightweightChart] processedData is empty, clearing series');
         seriesRef.current.main.setData([]);
         prevDataLengthRef.current = 0;
         return;
