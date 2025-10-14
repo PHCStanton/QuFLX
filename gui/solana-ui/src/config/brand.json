@@ -1,0 +1,34 @@
+{
+  "brand": {
+    "name": "Raze.BOT",
+    "displayName": "RAZE.BOT",
+    "altText": "Raze Bundler",
+    "domain": "raze.bot",
+    "appUrl": "https://app.raze.bot",
+    "docsUrl": "https://docs.raze.bot",
+    "githubUrl": "https://github.com/razedotbot/solana-ui/",
+    "githubOrg": "https://github.com/Razedotbot",
+    "social": {
+      "twitter": "@razedotbot",
+      "github": "razedotbot"
+    },
+    "seo": {
+      "title": "Bundler - raze.bot",
+      "ogTitle": "Dominate Every Trading Opportunity - raze.bot",
+      "description": "raze Tools Empowers You with Professional Tools for Maximum Market Impact",
+      "ogImage": "https://raze.bot/images/bannermeta.jpg",
+      "twitterImage": "https://raze.bot/images/bannermeta.png"
+    },
+    "favicon": {
+      "baseUrl": "https://raze.bot/images/favicon",
+      "themeColor": "#000000",
+      "tileColor": "#000000"
+    },
+    "api": {
+      "key": "9e5df81803be1e58888249911b96c3fb0bad01c2621fab5a54eb5c908313a646"
+    },
+    "theme": {
+      "name": "green"
+    }
+  }
+}
