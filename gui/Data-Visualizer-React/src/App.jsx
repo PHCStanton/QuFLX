@@ -17,7 +17,7 @@ function App() {
             className="glass text-slate-100 px-6 py-4 shadow-lg"
             style={{ borderColor: 'var(--card-border)' }}
           >
-            <div className="max-w-7xl mx-auto">
+            <div className="w-full">
               <ul className="flex gap-8">
                 <li>
                   <Link
@@ -71,7 +71,7 @@ function App() {
             </div>
           </nav>
 
-          <div className="max-w-7xl mx-auto p-6">
+          <div className="w-full p-6">
             <Routes>
               <Route path="/" element={<DataAnalysis />} />
               <Route path="/strategy" element={<StrategyBacktest />} />

@@ -6,12 +6,12 @@ const LiveTrading = () => {
   const [isRunning, setIsRunning] = useState(false);
 
   const getResponsiveColumns = () => {
-    if (typeof window === 'undefined') return 'minmax(260px, 280px) 1fr minmax(300px, 320px)';
+    if (typeof window === 'undefined') return 'clamp(240px, 20vw, 320px) 1fr clamp(220px, 14vw, 300px)';
     const width = window.innerWidth;
-    if (width >= 1440) return 'minmax(260px, 280px) 1fr minmax(300px, 320px)';
-    if (width >= 1280) return 'minmax(240px, 260px) 1fr minmax(280px, 300px)';
-    if (width >= 1024) return 'minmax(220px, 240px) 1fr minmax(260px, 280px)';
-    return 'minmax(200px, 220px) 1fr minmax(240px, 260px)';
+    if (width >= 1600) return 'clamp(260px, 18vw, 360px) 1fr clamp(220px, 14vw, 320px)';
+    if (width >= 1280) return 'clamp(240px, 20vw, 320px) 1fr clamp(220px, 14vw, 300px)';
+    if (width >= 1024) return 'clamp(220px, 22vw, 300px) 1fr clamp(220px, 16vw, 280px)';
+    return 'minmax(200px, 220px) 1fr minmax(220px, 260px)';
   };
 
   const [gridColumns, setGridColumns] = React.useState(getResponsiveColumns());
@@ -36,6 +36,11 @@ const LiveTrading = () => {
     padding: `${spacing.md} ${spacing.lg}`,
     minHeight: 'calc(100vh - 120px)',
   };
+
+  // Center chart height scales with viewport to maximize space
+  const centerChartMinHeight = typeof window !== 'undefined'
+    ? Math.max(480, Math.floor(window.innerHeight - 360))
+    : 480;
 
   return (
     <div style={containerStyle}>
@@ -252,7 +257,7 @@ const LiveTrading = () => {
           flex: 1,
           background: colors.bgPrimary,
           borderRadius: borderRadius.lg,
-          minHeight: '400px',
+          minHeight: `${centerChartMinHeight}px`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

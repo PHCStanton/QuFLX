@@ -332,11 +332,11 @@ const DataAnalysis = () => {
   };
 
   const getResponsiveColumns = () => {
-    if (typeof window === 'undefined') return 'minmax(260px, 280px) 1fr minmax(280px, 300px)';
+    if (typeof window === 'undefined') return 'clamp(240px, 20vw, 320px) 1fr clamp(260px, 16vw, 340px)';
     const width = window.innerWidth;
-    if (width >= 1440) return 'minmax(260px, 280px) 1fr minmax(280px, 300px)';
-    if (width >= 1280) return 'minmax(240px, 260px) 1fr minmax(260px, 280px)';
-    if (width >= 1024) return 'minmax(220px, 240px) 1fr minmax(240px, 260px)';
+    if (width >= 1600) return 'clamp(260px, 18vw, 360px) 1fr clamp(280px, 16vw, 380px)';
+    if (width >= 1280) return 'clamp(240px, 20vw, 320px) 1fr clamp(260px, 16vw, 340px)';
+    if (width >= 1024) return 'clamp(220px, 22vw, 300px) 1fr clamp(240px, 18vw, 320px)';
     return 'minmax(200px, 220px) 1fr minmax(220px, 240px)';
   };
 
@@ -355,6 +355,10 @@ const DataAnalysis = () => {
     padding: `${spacing.md} ${spacing.lg}`,
     minHeight: 'calc(100vh - 120px)',
   };
+
+  const chartHeight = typeof window !== 'undefined'
+    ? Math.max(560, Math.floor(window.innerHeight - 240))
+    : 600;
 
   return (
     <div style={containerStyle}>
@@ -637,11 +641,11 @@ const DataAnalysis = () => {
 
         <div style={{ flex: 1, minHeight: '500px' }}>
           {chartData.length > 0 ? (
-            <MultiPaneChart 
+            <MultiPaneChart
               data={chartData}
               indicators={activeIndicators}
               indicatorData={indicatorData}
-              height={500}
+              height={chartHeight}
             />
           ) : (
             <div style={{
