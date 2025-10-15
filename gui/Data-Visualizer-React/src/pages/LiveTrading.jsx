@@ -5,6 +5,22 @@ const LiveTrading = () => {
   const [mode, setMode] = useState('signals');
   const [isRunning, setIsRunning] = useState(false);
 
+  const getResponsiveColumns = () => {
+    if (typeof window === 'undefined') return '20% 65% 15%';
+    const width = window.innerWidth;
+    if (width >= 1280) return '20% 65% 15%';
+    if (width >= 1024) return '22% 60% 18%';
+    return '20% 65% 15%';
+  };
+
+  const [gridColumns, setGridColumns] = React.useState(getResponsiveColumns());
+
+  React.useEffect(() => {
+    const handleResize = () => setGridColumns(getResponsiveColumns());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const cardStyle = {
     background: colors.cardBg,
     border: `1px solid ${colors.cardBorder}`,
@@ -14,7 +30,7 @@ const LiveTrading = () => {
 
   const containerStyle = {
     display: 'grid',
-    gridTemplateColumns: '300px 1fr 340px',
+    gridTemplateColumns: gridColumns,
     gap: spacing.lg,
     padding: spacing.lg,
     minHeight: 'calc(100vh - 120px)',

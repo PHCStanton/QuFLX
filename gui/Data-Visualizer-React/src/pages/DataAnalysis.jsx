@@ -331,9 +331,25 @@ const DataAnalysis = () => {
     padding: spacing.lg,
   };
 
+  const getResponsiveColumns = () => {
+    if (typeof window === 'undefined') return '20% 65% 15%';
+    const width = window.innerWidth;
+    if (width >= 1280) return '20% 65% 15%';
+    if (width >= 1024) return '22% 60% 18%';
+    return '20% 65% 15%';
+  };
+
+  const [gridColumns, setGridColumns] = useState(getResponsiveColumns());
+
+  useEffect(() => {
+    const handleResize = () => setGridColumns(getResponsiveColumns());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const containerStyle = {
     display: 'grid',
-    gridTemplateColumns: '280px 1fr 300px',
+    gridTemplateColumns: gridColumns,
     gap: spacing.lg,
     padding: spacing.lg,
     minHeight: 'calc(100vh - 120px)',

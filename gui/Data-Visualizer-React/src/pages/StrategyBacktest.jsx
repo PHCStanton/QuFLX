@@ -14,6 +14,22 @@ const StrategyBacktest = () => {
     positionSize: 1
   });
 
+  const getResponsiveColumns = () => {
+    if (typeof window === 'undefined') return '20% 65% 15%';
+    const width = window.innerWidth;
+    if (width >= 1280) return '20% 65% 15%';
+    if (width >= 1024) return '22% 60% 18%';
+    return '20% 65% 15%';
+  };
+
+  const [gridColumns, setGridColumns] = useState(getResponsiveColumns());
+
+  useEffect(() => {
+    const handleResize = () => setGridColumns(getResponsiveColumns());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     strategyService.initializeSocket();
     loadDataFiles();
@@ -58,7 +74,7 @@ const StrategyBacktest = () => {
 
   const containerStyle = {
     display: 'grid',
-    gridTemplateColumns: '280px 1fr 320px',
+    gridTemplateColumns: gridColumns,
     gap: spacing.lg,
     padding: spacing.lg,
     minHeight: 'calc(100vh - 120px)',
