@@ -284,19 +284,85 @@ React Components (Data Analysis, Strategy Lab, Trading Hub)
 - [x] Add EXECUTE TRADE button (prominent green)
 - [x] Apply design tokens consistently
 
-### Phase 6: Strategy Design Features 📅 **NEXT PRIORITY**
+### Phase 6: Chart Optimization & Enhancement 🎯 **CURRENT PRIORITY**
+**Goal**: Optimize chart layout and add professional trading features inspired by TradingView Lightweight Charts library and Solana-UI design.
+
+**Reference Materials:**
+- Solana-UI layout: `attached_assets/solana-ui#3_1760485877349.png`
+- Lightweight Charts tutorials: `gui/lightweight-charts/website/tutorials/`
+- Plugin examples: `gui/lightweight-charts/plugin-examples/src/plugins/`
+
+#### Sub-Phase 6.1: Layout Expansion (Desktop/Tablet Focus) ⏳ **NEXT**
+- [ ] **Adjust 3-column widths for wider charts**
+  - Desktop (1280px+): Left 20%, Center 65%, Right 15%
+  - Tablet Horizontal (1024px-1279px): Left 22%, Center 60%, Right 18%
+  - Remove mobile breakpoints (desktop/tablet only)
+- [ ] **Update DataAnalysis.jsx responsive layout**
+- [ ] **Update StrategyLab.jsx responsive layout**
+- [ ] **Update TradingHub.jsx responsive layout**
+- [ ] **Test chart visibility across breakpoints**
+
+#### Sub-Phase 6.2: Tooltips & Visual Markers 📅 **QUEUED**
+- [ ] **Floating Tooltip Implementation**
+  - Reference: `tutorials/how_to/tooltip-floating.js`
+  - Show OHLC data on hover without cluttering
+  - Display indicator values at crosshair position
+- [ ] **Delta Tooltip Plugin**
+  - Reference: `plugin-examples/delta-tooltip/`
+  - Show price changes elegantly
+- [ ] **Custom Series Markers**
+  - Reference: `tutorials/how_to/series-markers.js`
+  - Visual BUY/SELL signal markers on chart
+  - Color-coded (green = buy, red = sell)
+  - Click interaction for trade details
+
+#### Sub-Phase 6.3: Visual Polish & UX 📅 **QUEUED**
+- [ ] **Price Lines for Key Levels**
+  - Reference: `tutorials/how_to/price-line.js`
+  - Entry/exit signals, support/resistance
+- [ ] **Chart Watermarks**
+  - Reference: `tutorials/how_to/watermark-simple.js`
+  - Asset/timeframe identification
+- [ ] **Cleaner Grid & Crosshair Styling**
+  - Subtle grid lines (match Solana-UI)
+  - Enhanced crosshair visibility
+- [ ] **Floating Legend (Top-Left Overlay)**
+  - Asset name, current price, change %
+  - Match Solana-UI aesthetic
+
+#### Sub-Phase 6.4: Advanced Chart Features 📅 **QUEUED**
+- [ ] **Range Switcher**
+  - Reference: `tutorials/demos/range-switcher.js`
+  - Quick timeframe/date range selection
+- [ ] **Realtime Update Optimization**
+  - Reference: `tutorials/demos/realtime-updates.js`
+  - Throttling for rapid data updates
+- [ ] **User Price Alerts Plugin**
+  - Reference: `plugin-examples/user-price-alerts/`
+  - Click-to-set price alerts on chart
+- [ ] **Trend Line Drawing Tool**
+  - Reference: `plugin-examples/trend-line/`
+  - Manual technical analysis capability
+- [ ] **Session Highlighting**
+  - Reference: `plugin-examples/session-highlighting/`
+  - Highlight trading sessions/market hours
+- [ ] **Volume Histogram (Bottom Pane)**
+  - Add volume bars below main chart
+  - Match Solana-UI layout
+
+### Phase 7: Strategy Design Features 📅 **QUEUED**
 - [ ] **Replay Function**: Candle-by-candle historical playback
 - [ ] **Visual Signal Markers**: Overlay strategy signals on chart
 - [ ] **Parameter Tweaking**: Real-time indicator adjustment
 - [ ] **Quick Backtest**: Instant strategy validation
 
-### Phase 7: Live Trading Integration 📅 **QUEUED**
+### Phase 8: Live Trading Integration 📅 **QUEUED**
 - [ ] Real-time signal generation integration
 - [ ] Trade execution controls functionality
 - [ ] Position monitoring with auto-close
 - [ ] PocketOption API integration
 
-### Phase 8: Testing & Refinement 📅 **QUEUED**
+### Phase 9: Testing & Refinement 📅 **QUEUED**
 - [ ] End-to-end testing of all workflows
 - [ ] Performance optimization
 - [ ] UI/UX polish
@@ -358,13 +424,19 @@ React Components (Data Analysis, Strategy Lab, Trading Hub)
 - [x] **Code Quality**: Zero LSP errors, architect-verified
 
 ### Next Steps 📅
-1. **Strategy Design Features** (Data Analysis Enhancement)
+1. **Chart Optimization & Enhancement** (All Pages - Phase 6)
+   - Layout expansion for wider charts (desktop/tablet)
+   - Floating tooltips & visual markers
+   - Visual polish & UX improvements
+   - Advanced chart features (alerts, drawing tools, volume)
+
+2. **Strategy Design Features** (Data Analysis Enhancement - Phase 7)
    - Replay Function
    - Visual Signal Markers
    - Parameter Tweaking
    - Quick Backtest
 
-2. **Live Trading Integration** (Trading Hub)
+3. **Live Trading Integration** (Trading Hub - Phase 8)
    - Real-time signal generation
    - Trade execution controls
    - Position monitoring
@@ -381,6 +453,6 @@ React Components (Data Analysis, Strategy Lab, Trading Hub)
 
 ---
 
-**Development Status**: UI/UX Complete ✅ → Strategy Design Features Next 🚀
+**Development Status**: UI/UX Complete ✅ → Chart Optimization Phase 6 Next 🚀
 
 **Last Reviewed**: October 15, 2025
