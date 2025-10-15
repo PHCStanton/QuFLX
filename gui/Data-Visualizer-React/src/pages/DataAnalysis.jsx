@@ -569,55 +569,10 @@ const DataAnalysis = () => {
           }}>
             Indicators
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
-            {Object.entries(activeIndicators).map(([id, indicator]) => (
-              <div key={id} style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: spacing.sm,
-                background: colors.bgSecondary,
-                borderRadius: borderRadius.lg,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                  <div style={{
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '50%',
-                    background: indicator.color
-                  }}></div>
-                  <span style={{
-                    fontSize: typography.fontSize.sm,
-                    color: colors.textPrimary
-                  }}>
-                    {id}
-                  </span>
-                </div>
-                <button
-                  onClick={() => {
-                    const newIndicators = { ...activeIndicators };
-                    delete newIndicators[id];
-                    handleIndicatorUpdate(newIndicators);
-                  }}
-                  style={{
-                    padding: `${spacing.xs} ${spacing.sm}`,
-                    background: 'transparent',
-                    border: `1px solid ${colors.cardBorder}`,
-                    borderRadius: borderRadius.md,
-                    fontSize: typography.fontSize.xs,
-                    color: colors.textSecondary,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
           
           <IndicatorManager 
-            activeIndicators={activeIndicators}
-            onIndicatorUpdate={handleIndicatorUpdate}
+            indicators={activeIndicators}
+            onChange={handleIndicatorUpdate}
           />
         </div>
       </div>
