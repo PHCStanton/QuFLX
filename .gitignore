@@ -39,6 +39,7 @@ archive/
 Historical_Data/
 screenshots/
 test_artifacts/
+live2/
 tmp_tests/
 
 # Browser/user profile (sensitive)

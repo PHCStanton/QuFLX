@@ -791,20 +791,27 @@ class BeastTradingBot:
         self.max_trades = MAX_TRADES_LIMIT
         self.session_start_time = 0
         self.risk_manager = AdvancedRiskManager()
-        
+
+        # CSV data upload attributes
+        self.csv_data_loaded = False
+        self.csv_data_type = None  # 'tick' or 'candle'
+        self.csv_asset_name = None
+        self.csv_data_count = 0
+        self.csv_time_range = None
+
         # Initialize security manager
         self.security = SecurityManager()
         self.session_data = self.security.load_session_data()
-        
+
         # Check if session is valid
         if not self.security.is_session_valid(self.session_data):
             self.show_session_ended()
             return
-        
+
         # Load existing trade count
         self.total_trades = self.session_data['trades_used']
         logging.info(f"🔒 Session loaded: {self.total_trades}/{MAX_TRADES_LIMIT} trades used")
-        
+
         self.setup_driver()
         if self.driver:
             self.navigate_to_trading_page()
@@ -911,87 +918,78 @@ class BeastTradingBot:
         logging.error("🔒 SESSION ENDED - Trade limit reached")
 
     def setup_driver(self) -> bool:
+        """Setup driver to attach to existing Chrome session instead of creating new one"""
         try:
-            options = uc.ChromeOptions()
-            options.add_argument('--disable-blink-features=AutomationControlled')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--disable-extensions')
-            options.add_argument('--disable-infobars')
-            options.add_argument('--disable-logging')
-            options.add_argument('--disable-web-security')
-            options.add_argument('--log-level=3')
-            options.add_argument('--disable-background-timer-throttling')
-            options.add_argument('--disable-backgrounding-occluded-windows')
-            options.add_argument('--disable-renderer-backgrounding')
-            options.add_argument('--disable-features=TranslateUI')
-            options.add_argument('--disable-ipc-flooding-protection')
-            
-            self.driver = uc.Chrome(
-                version_main=137,
-                options=options,
-                driver_executable_path=None
-            )
-            
-            self.driver.set_window_size(1920, 1080)
-            logging.info("✅ Chrome driver initialized successfully")
+            # Import selenium webdriver
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+
+            # Configure options for attaching to existing session
+            options = Options()
+            options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+            options.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
+
+            # Compatibility flags (non-invasive)
+            options.add_argument("--ignore-ssl-errors")
+            options.add_argument("--ignore-certificate-errors")
+            options.add_argument("--disable-web-security")
+            options.add_argument("--allow-running-insecure-content")
+            options.add_argument("--no-first-run")
+            options.add_argument("--no-default-browser-check")
+            options.add_argument("--disable-default-apps")
+            options.add_argument("--disable-popup-blocking")
+
+            # Create driver that attaches to existing Chrome session
+            self.driver = webdriver.Chrome(options=options)
+
+            # Verify connection
+            try:
+                current_url = self.driver.current_url
+                logging.info(f"✅ Successfully attached to Chrome session at: {current_url}")
+            except Exception:
+                logging.info("✅ Successfully attached to Chrome session")
+
             return True
+
         except Exception as e:
-            logging.error(f"❌ Failed to setup driver: {e}")
+            logging.error(f"❌ Failed to attach to Chrome session: {e}")
+            logging.error("💡 Make sure Chrome is running with --remote-debugging-port=9222")
+            logging.error("💡 Run 'python start_hybrid_session.py' first")
             return False
 
     def navigate_to_trading_page(self):
-        """Updated navigation to use the new Pocket Option URL"""
+        """Check if we're already on the trading page (since we attach to existing session)"""
         try:
-            logging.info("🚀 Navigating to Pocket Option...")
-            
-            # Updated URLs with the new URL provided
-            urls_to_try = [
-                "https://pocketoption.com/en",  # NEW URL PROVIDED
-                "https://pocketoption.com/en/login/",
-                "https://pocketoption.com/en/cabinet/demo-quick-high-low",
-                "https://pocketoption.com/cabinet/demo-quick-high-low", 
-                "https://pocketoption.com/en/demo",
-                "https://pocketoption.com/demo"
-            ]
-            
-            for url in urls_to_try:
-                try:
-                    logging.info(f"Trying URL: {url}")
-                    self.driver.get(url)
-                    
-                    # Wait for page to start loading
-                    WebDriverWait(self.driver, 10).until(
-                        lambda driver: driver.execute_script("return document.readyState") != "loading"
-                    )
-                    
-                    # Check if we're on a valid page (login or trading)
-                    if self.is_login_page_loaded() or self.is_trading_page_loaded():
-                        logging.info("✅ Successfully navigated to Pocket Option")
-                        return
-                    else:
-                        logging.info("Page loaded but not recognized interface, trying next URL...")
-                        continue
-                        
-                except TimeoutException:
-                    logging.warning(f"Timeout loading {url}, trying next...")
-                    continue
-                except Exception as e:
-                    logging.warning(f"Error loading {url}: {e}, trying next...")
-                    continue
-            
-            # If all URLs failed, try the main site
-            logging.info("All direct URLs failed, trying main site...")
-            self.driver.get("https://pocketoption.com")
-            
-            # Wait a bit for the main page to load
-            time.sleep(3)
-            
-            logging.info("✅ Navigation completed - please login manually if needed")
-            
+            logging.info("🔍 Checking current page in attached Chrome session...")
+
+            # Check current URL
+            current_url = self.driver.current_url
+            logging.info(f"Current URL: {current_url}")
+
+            # Check if we're already on a Pocket Option trading page
+            if "pocketoption.com" in current_url:
+                if self.is_trading_page_loaded():
+                    logging.info("✅ Already on Pocket Option trading page")
+                    return
+                elif self.is_login_page_loaded():
+                    logging.info("📋 On Pocket Option login page - please login manually")
+                    return
+                else:
+                    logging.info("📄 On Pocket Option site but not trading page")
+                    # Try to navigate to trading page
+                    try:
+                        self.driver.get("https://pocketoption.com/en/cabinet/demo-quick-high-low")
+                        time.sleep(3)
+                        if self.is_trading_page_loaded():
+                            logging.info("✅ Successfully navigated to trading page")
+                            return
+                    except Exception as e:
+                        logging.warning(f"Could not navigate to trading page: {e}")
+
+            logging.info("ℹ️ Please ensure you're logged into Pocket Option demo trading page")
+
         except Exception as e:
-            logging.error(f"❌ Error in navigation: {e}")
+            logging.error(f"❌ Error checking current page: {e}")
 
     def is_login_page_loaded(self) -> bool:
         """Check if we're on a login page"""
@@ -1104,6 +1102,10 @@ class BeastTradingBot:
         return self.balance
 
     def get_candle_data(self) -> List[Candle]:
+        # If CSV data is loaded, use that instead of browser data
+        if self.csv_data_loaded and self.csv_data_type == 'candle':
+            return self.candles[-50:] if self.candles else self.generate_mock_candles()
+
         if not self.driver:
             return self.generate_mock_candles()
         try:
@@ -1293,6 +1295,218 @@ class BeastTradingBot:
             return True
         return False
 
+    def load_csv_tick_data(self, file_path: str) -> bool:
+        """Load tick data from CSV file and convert to candles"""
+        try:
+            logging.info(f"📊 Loading tick data from: {file_path}")
+
+            # Read CSV file
+            import pandas as pd
+            df = pd.read_csv(file_path)
+
+            # Validate CSV format
+            if 'timestamp' not in df.columns or 'asset' not in df.columns or 'price' not in df.columns:
+                raise ValueError("CSV must contain 'timestamp', 'asset', and 'price' columns")
+
+            # Skip header row if it contains column names as data
+            if df['timestamp'].iloc[0] == 'timestamp':
+                df = df.iloc[1:].reset_index(drop=True)
+
+            # Extract asset name from first row
+            asset_name = df['asset'].iloc[0]
+            logging.info(f"🎯 Detected asset: {asset_name}")
+
+            # Convert timestamps - handle the time-only format (HH:MM:SSZ)
+            def parse_timestamp(ts):
+                if isinstance(ts, str) and ts.endswith('Z'):
+                    # Convert time-only format to full datetime
+                    # Assume today's date for the timestamp
+                    today = datetime.datetime.now().date()
+                    time_str = ts[:-1]  # Remove 'Z'
+                    try:
+                        time_obj = datetime.datetime.strptime(time_str, '%H:%M:%S').time()
+                        return datetime.datetime.combine(today, time_obj)
+                    except ValueError:
+                        # Try with different format
+                        time_obj = datetime.datetime.strptime(time_str, '%H:%M:%S').time()
+                        return datetime.datetime.combine(today, time_obj)
+                else:
+                    return pd.to_datetime(ts, utc=True)
+
+            df['timestamp'] = df['timestamp'].apply(parse_timestamp)
+            df = df.sort_values('timestamp')
+
+            # Convert to Candle objects (aggregate ticks into 1-minute candles)
+            candles = []
+            current_minute = None
+            minute_data = []
+
+            for _, row in df.iterrows():
+                timestamp = row['timestamp']
+                price = float(row['price'])
+
+                # Get minute boundary
+                minute_boundary = timestamp.replace(second=0, microsecond=0)
+
+                if current_minute != minute_boundary:
+                    # Process previous minute's data
+                    if minute_data:
+                        self._process_minute_ticks(minute_data, candles, current_minute)
+
+                    # Start new minute
+                    current_minute = minute_boundary
+                    minute_data = []
+
+                minute_data.append(price)
+
+            # Process final minute
+            if minute_data:
+                self._process_minute_ticks(minute_data, candles, current_minute)
+
+            # Store data
+            self.candles = candles
+            self.csv_data_loaded = True
+            self.csv_data_type = 'tick'
+            self.csv_asset_name = asset_name
+            self.csv_data_count = len(candles)
+
+            # Calculate time range
+            if candles:
+                start_time = datetime.datetime.fromtimestamp(candles[0].timestamp)
+                end_time = datetime.datetime.fromtimestamp(candles[-1].timestamp)
+                self.csv_time_range = f"{start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')}"
+
+            logging.info(f"✅ Loaded {len(candles)} candles from tick data for {asset_name}")
+            return True
+
+        except Exception as e:
+            logging.error(f"❌ Error loading tick CSV: {e}")
+            return False
+
+    def load_csv_candle_data(self, file_path: str) -> bool:
+        """Load candle data directly from CSV file"""
+        try:
+            logging.info(f"📊 Loading candle data from: {file_path}")
+
+            # Read CSV file
+            import pandas as pd
+            df = pd.read_csv(file_path)
+
+            # Validate CSV format
+            required_cols = ['timestamp', 'open', 'close', 'high', 'low']
+            if not all(col in df.columns for col in required_cols):
+                raise ValueError(f"CSV must contain columns: {required_cols}")
+
+            # Extract asset name from filename
+            from pathlib import Path
+            filename = Path(file_path).name
+            asset_match = filename.split('_otc_')[0] if '_otc_' in filename else filename.split('_')[0]
+            asset_name = asset_match.upper()
+
+            logging.info(f"🎯 Detected asset: {asset_name}")
+
+            # Convert timestamps and sort
+            df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+            df = df.sort_values('timestamp')
+
+            # Convert to Candle objects
+            candles = []
+            for _, row in df.iterrows():
+                candle = Candle(
+                    timestamp=row['timestamp'].timestamp(),
+                    open=float(row['open']),
+                    high=float(row['high']),
+                    low=float(row['low']),
+                    close=float(row['close']),
+                    volume=1.0  # Default volume
+                )
+                candles.append(candle)
+
+            # Store data
+            self.candles = candles
+            self.csv_data_loaded = True
+            self.csv_data_type = 'candle'
+            self.csv_asset_name = asset_name
+            self.csv_data_count = len(candles)
+
+            # Calculate time range
+            if candles:
+                start_time = datetime.datetime.fromtimestamp(candles[0].timestamp)
+                end_time = datetime.datetime.fromtimestamp(candles[-1].timestamp)
+                self.csv_time_range = f"{start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')}"
+
+            logging.info(f"✅ Loaded {len(candles)} candles from candle data for {asset_name}")
+            return True
+
+        except Exception as e:
+            logging.error(f"❌ Error loading candle CSV: {e}")
+            return False
+
+    def _process_minute_ticks(self, minute_data: List[float], candles: List[Candle], minute_timestamp: datetime.datetime) -> None:
+        """Process tick data for a single minute into a candle"""
+        if not minute_data:
+            return
+
+        open_price = minute_data[0]
+        close_price = minute_data[-1]
+        high_price = max(minute_data)
+        low_price = min(minute_data)
+
+        candle = Candle(
+            timestamp=minute_timestamp.timestamp(),
+            open=open_price,
+            high=high_price,
+            low=low_price,
+            close=close_price,
+            volume=len(minute_data)  # Use tick count as volume
+        )
+        candles.append(candle)
+
+    def load_csv_data(self, file_path: str) -> bool:
+        """Main method to load CSV data - auto-detects format and calls appropriate loader"""
+        try:
+            from pathlib import Path
+            if not Path(file_path).exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            # Read first few lines to detect format
+            with open(file_path, 'r', encoding='utf-8') as f:
+                first_line = f.readline().strip()
+                second_line = f.readline().strip() if f.readline() else ""
+
+            # Detect format based on headers
+            if 'timestamp,asset,price' in first_line.lower():
+                logging.info("🎯 Detected tick data format")
+                return self.load_csv_tick_data(file_path)
+            elif 'timestamp,open,close,high,low' in first_line.lower():
+                logging.info("🎯 Detected candle data format")
+                return self.load_csv_candle_data(file_path)
+            else:
+                # Try to infer from filename
+                filename = Path(file_path).name.lower()
+                if 'tick' in filename:
+                    logging.info("🎯 Inferred tick data format from filename")
+                    return self.load_csv_tick_data(file_path)
+                elif 'candle' in filename:
+                    logging.info("🎯 Inferred candle data format from filename")
+                    return self.load_csv_candle_data(file_path)
+                else:
+                    raise ValueError("Could not determine CSV format from headers or filename")
+
+        except Exception as e:
+            logging.error(f"❌ Error loading CSV data: {e}")
+            return False
+
+    def clear_csv_data(self) -> None:
+        """Clear loaded CSV data and reset to browser data"""
+        self.csv_data_loaded = False
+        self.csv_data_type = None
+        self.csv_asset_name = None
+        self.csv_data_count = 0
+        self.csv_time_range = None
+        self.candles = []
+        logging.info("🗑️ CSV data cleared - using browser data")
+
     def run_trading_session(self):
         # Check session validity before starting
         if not self.security.is_session_valid(self.session_data):
@@ -1445,9 +1659,10 @@ class NeuralBeastGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("🌟 NEURAL BEAST QUANTUM FUSION 🌟")
-        self.root.geometry("740x620")
+        self.root.geometry("800x700")
         self.root.configure(bg='#000000')
-        self.root.resizable(False, False)
+        self.root.resizable(True, True)
+        self.root.minsize(740, 620)  # Minimum size to prevent too small window
         
         # State variables
         self.is_active = False
@@ -1516,6 +1731,10 @@ class NeuralBeastGUI:
         # Main content area (2 columns now)
         content_frame = tk.Frame(main_frame, bg='#000000')
         content_frame.pack(fill='both', expand=True, pady=5)
+
+        # Configure grid weights for responsive layout
+        content_frame.grid_columnconfigure(0, weight=1)  # Control panel
+        content_frame.grid_columnconfigure(1, weight=1)  # Stats panel
         
         # Left column - Control Panel
         self.create_control_panel(content_frame)
@@ -1627,47 +1846,99 @@ class NeuralBeastGUI:
     
     def create_control_panel(self, parent):
         control_frame = tk.Frame(parent, bg='#1a1a1a', relief='ridge', bd=2)
-        control_frame.pack(side='left', fill='both', padx=(0, 2))
-        
+        control_frame.pack(side='left', fill='both', expand=True, padx=(0, 2))
+
         title = tk.Label(control_frame,
                         text="⚙️ FUSION CONTROL",
                         bg='#1a1a1a',
                         fg='#FF8800',
                         font=('Courier', 9, 'bold'))
         title.pack(pady=5)
-        
+
+        # CSV Data Upload Section
+        csv_frame = tk.Frame(control_frame, bg='#1a1a1a')
+        csv_frame.pack(fill='x', padx=5, pady=5)
+
+        csv_title = tk.Label(csv_frame,
+                            text="📊 CSV DATA UPLOAD",
+                            bg='#1a1a1a',
+                            fg='#00FFFF',
+                            font=('Courier', 7, 'bold'))
+        csv_title.pack(anchor='w')
+
+        # Upload buttons
+        upload_buttons_frame = tk.Frame(csv_frame, bg='#1a1a1a')
+        upload_buttons_frame.pack(fill='x', pady=2)
+
+        self.upload_tick_btn = tk.Button(upload_buttons_frame,
+                                        text="📈 UPLOAD TICK DATA",
+                                        bg='#22C55E',
+                                        fg='white',
+                                        font=('Courier', 6, 'bold'),
+                                        command=self.upload_tick_csv)
+        self.upload_tick_btn.pack(side='left', fill='x', expand=True, padx=(0, 1))
+
+        self.upload_candle_btn = tk.Button(upload_buttons_frame,
+                                          text="🕯️ UPLOAD CANDLE DATA",
+                                          bg='#3B82F6',
+                                          fg='white',
+                                          font=('Courier', 6, 'bold'),
+                                          command=self.upload_candle_csv)
+        self.upload_candle_btn.pack(side='left', fill='x', expand=True, padx=(1, 0))
+
+        # Clear data button
+        self.clear_csv_btn = tk.Button(csv_frame,
+                                      text="🗑️ CLEAR CSV DATA",
+                                      bg='#DC2626',
+                                      fg='white',
+                                      font=('Courier', 6, 'bold'),
+                                      command=self.clear_csv_data_gui,
+                                      state='disabled')
+        self.clear_csv_btn.pack(fill='x', pady=2)
+
+        # CSV data status
+        self.csv_status_frame = tk.Frame(csv_frame, bg='#333333', relief='solid', bd=1)
+        self.csv_status_frame.pack(fill='x', pady=2)
+
+        self.csv_status_label = tk.Label(self.csv_status_frame,
+                                        text="No CSV data loaded",
+                                        bg='#333333',
+                                        fg='#888888',
+                                        font=('Courier', 5))
+        self.csv_status_label.pack(anchor='w', padx=2, pady=1)
+
         # Settings with confirmation
         settings_frame = tk.Frame(control_frame, bg='#1a1a1a')
         settings_frame.pack(fill='x', padx=5, pady=5)
-        
+
         self.setting_vars = {}
         for setting, value in self.settings.items():
             label = tk.Label(settings_frame,
-                           text=f"{setting.replace('_', ' ').upper()} ($):",
-                           bg='#1a1a1a',
-                           fg='#CCCCCC',
-                           font=('Courier', 7))
+                            text=f"{setting.replace('_', ' ').upper()} ($):",
+                            bg='#1a1a1a',
+                            fg='#CCCCCC',
+                            font=('Courier', 7))
             label.pack(anchor='w')
-            
+
             var = tk.StringVar(value=str(value))
             entry = tk.Entry(settings_frame,
-                           textvariable=var,
-                           bg='#333333',
-                           fg='#00FFFF',
-                           font=('Courier', 8),
-                           width=15)
+                            textvariable=var,
+                            bg='#333333',
+                            fg='#00FFFF',
+                            font=('Courier', 8),
+                            width=15)
             entry.pack(fill='x', pady=2)
-            
+
             # Bind validation with confirmation
             entry.bind('<FocusOut>', lambda e, s=setting, v=var: self.validate_setting_change(s, v))
             entry.bind('<Return>', lambda e, s=setting, v=var: self.validate_setting_change(s, v))
-            
+
             self.setting_vars[setting] = var
-        
+
         # Control buttons
         button_frame = tk.Frame(control_frame, bg='#1a1a1a')
         button_frame.pack(fill='x', padx=5, pady=10)
-        
+
         self.activate_btn = tk.Button(button_frame,
                                      text="🚀 ACTIVATE FUSION 🚀",
                                      bg='#F97316',
@@ -1675,7 +1946,7 @@ class NeuralBeastGUI:
                                      font=('Courier', 8, 'bold'),
                                      command=self.toggle_fusion)
         self.activate_btn.pack(fill='x', pady=2)
-        
+
         self.stop_btn = tk.Button(button_frame,
                                  text="🛑 STOP FUSION",
                                  bg='#DC2626',
@@ -1684,7 +1955,7 @@ class NeuralBeastGUI:
                                  command=self.stop_fusion,
                                  state='disabled')
         self.stop_btn.pack(fill='x', pady=2)
-        
+
         # Reset session button
         self.reset_btn = tk.Button(button_frame,
                                   text="🔑 RESET SESSION",
@@ -1693,58 +1964,61 @@ class NeuralBeastGUI:
                                   font=('Courier', 8, 'bold'),
                                   command=self.reset_session)
         self.reset_btn.pack(fill='x', pady=2)
-        
+
         # Strategy components - Made scrollable to show all content
         strategy_frame = tk.Frame(control_frame, bg='#1a1a1a')
         strategy_frame.pack(fill='both', expand=True, padx=5, pady=5)
-        
+
         strategy_title = tk.Label(strategy_frame,
                                  text="🔒 CLASSIFIED ALGORITHMS 🔒",
                                  bg='#1a1a1a',
                                  fg='#FF4444',
                                  font=('Courier', 7, 'bold'))
         strategy_title.pack()
-        
+
         # Create a canvas and scrollbar for the algorithms
         canvas_frame = tk.Frame(strategy_frame, bg='#1a1a1a')
         canvas_frame.pack(fill='both', expand=True, pady=5)
-        
-        algorithms_canvas = tk.Canvas(canvas_frame, bg='#1a1a1a', highlightthickness=0, height=120)
+
+        algorithms_canvas = tk.Canvas(canvas_frame, bg='#1a1a1a', highlightthickness=0, height=150)
         scrollbar = tk.Scrollbar(canvas_frame, orient="vertical", command=algorithms_canvas.yview)
         scrollable_frame = tk.Frame(algorithms_canvas, bg='#1a1a1a')
-        
+
         scrollable_frame.bind(
             "<Configure>",
             lambda e: algorithms_canvas.configure(scrollregion=algorithms_canvas.bbox("all"))
         )
-        
+
         algorithms_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         algorithms_canvas.configure(yscrollcommand=scrollbar.set)
-        
+
         algorithms = [
             ("NEURAL ENGINE", "#00FFFF"),
             ("BEAST CORE", "#FF4444"),
-            ("QUANTUM MATRIX", "#8855FF")
+            ("QUANTUM MATRIX", "#8855FF"),
+            ("FUSION ALGORITHM", "#FF8800"),
+            ("RISK MANAGER", "#44FF44"),
+            ("SESSION CONTROL", "#8855FF")
         ]
-        
+
         for name, color in algorithms:
             algo_frame = tk.Frame(scrollable_frame, bg='#333333', relief='solid', bd=1)
-            algo_frame.pack(fill='x', pady=2)
-            
+            algo_frame.pack(fill='x', pady=2, padx=2)
+
             algo_label = tk.Label(algo_frame,
-                                 text=name,
-                                 bg='#333333',
-                                 fg=color,
-                                 font=('Courier', 6, 'bold'))
-            algo_label.pack(anchor='w', padx=2)
-            
+                                  text=name,
+                                  bg='#333333',
+                                  fg=color,
+                                  font=('Courier', 7, 'bold'))
+            algo_label.pack(anchor='w', padx=3, pady=1)
+
             status_label = tk.Label(algo_frame,
-                                   text="[CLASSIFIED]",
-                                   bg='#333333',
-                                   fg='#666666',
-                                   font=('Courier', 5))
-            status_label.pack(anchor='w', padx=2)
-        
+                                    text="[ACTIVE]",
+                                    bg='#333333',
+                                    fg='#888888',
+                                    font=('Courier', 6))
+            status_label.pack(anchor='w', padx=3, pady=1)
+
         algorithms_canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
     
@@ -1903,6 +2177,66 @@ class NeuralBeastGUI:
                 logging.info("🔒 Session reset via GUI")
             else:
                 messagebox.showerror("Error", "Invalid license key!")
+
+    def upload_tick_csv(self):
+        """Upload tick data CSV file"""
+        file_path = filedialog.askopenfilename(
+            title="Select Tick Data CSV File",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialdir="data/tick_data"
+        )
+
+        if file_path:
+            try:
+                if self.bot.load_csv_data(file_path):
+                    self.update_csv_status()
+                    messagebox.showinfo("Success", f"Tick data loaded successfully!\n\nAsset: {self.bot.csv_asset_name}\nData points: {self.bot.csv_data_count}")
+                    logging.info("✅ Tick CSV uploaded via GUI")
+                else:
+                    messagebox.showerror("Error", "Failed to load tick data. Check the file format and try again.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Error loading file: {str(e)}")
+
+    def upload_candle_csv(self):
+        """Upload candle data CSV file"""
+        file_path = filedialog.askopenfilename(
+            title="Select Candle Data CSV File",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialdir="data/candle_data"
+        )
+
+        if file_path:
+            try:
+                if self.bot.load_csv_data(file_path):
+                    self.update_csv_status()
+                    messagebox.showinfo("Success", f"Candle data loaded successfully!\n\nAsset: {self.bot.csv_asset_name}\nData points: {self.bot.csv_data_count}")
+                    logging.info("✅ Candle CSV uploaded via GUI")
+                else:
+                    messagebox.showerror("Error", "Failed to load candle data. Check the file format and try again.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Error loading file: {str(e)}")
+
+    def clear_csv_data_gui(self):
+        """Clear CSV data via GUI"""
+        if messagebox.askyesno("Confirm", "Clear all loaded CSV data and return to browser data?"):
+            self.bot.clear_csv_data()
+            self.update_csv_status()
+            messagebox.showinfo("Success", "CSV data cleared. Using browser data.")
+            logging.info("🗑️ CSV data cleared via GUI")
+
+    def update_csv_status(self):
+        """Update CSV data status display"""
+        if self.bot.csv_data_loaded:
+            status_text = f"✅ {self.bot.csv_data_type.upper()} DATA LOADED\n"
+            status_text += f"Asset: {self.bot.csv_asset_name}\n"
+            status_text += f"Points: {self.bot.csv_data_count:,}\n"
+            status_text += f"Range: {self.bot.csv_time_range}"
+
+            self.csv_status_label.config(text=status_text, fg='#44FF44')
+            self.clear_csv_btn.config(state='normal')
+        else:
+            self.csv_status_label.config(text="No CSV data loaded", fg='#888888')
+            self.clear_csv_btn.config(state='disabled')
     
     def update_energy_bars(self):
         if self.is_active:
