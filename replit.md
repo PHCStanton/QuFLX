@@ -9,6 +9,21 @@ QuantumFlux is an automated trading platform designed for PocketOption. It integ
 - **Data handling**: Explicit control over data sources (no auto-switching)
 - **UI/UX**: Solana-inspired dark aesthetic, professional trading terminal
 
+## Recent Changes
+
+### Phase 6.1: Layout Expansion (Completed - October 15, 2025)
+**Goal**: Optimize chart layout for wider views on desktop and tablet devices.
+
+**Changes Implemented:**
+- Converted all three main pages (DataAnalysis, LiveTrading, StrategyBacktest) from fixed pixel widths to responsive percentage-based grid layouts
+- **Desktop (1280px+)**: Left 20%, Center 65%, Right 15%
+- **Tablet Horizontal (1024px-1279px)**: Left 22%, Center 60%, Right 18%
+- Added dynamic resize listeners to update grid columns on viewport changes
+- SSR-safe implementation with proper window guards
+- No breaking changes or regressions detected
+
+**Impact**: Chart area now expands significantly on wider screens, providing better data visualization and analysis capabilities.
+
 ## System Architecture
 The platform utilizes a **Capabilities-First Design** with **Dual Data Pipelines** for historical data collection (backtesting) and real-time streaming (live trading and visualization).
 
