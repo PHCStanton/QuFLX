@@ -249,10 +249,26 @@ export const useWebSocket = (url) => {
         bollinger: { period: 20, std_dev: 2 }
       };
       
-      socketRef.current.emit('calculate_indicators', {
-        asset,
-        indicators: indicatorsConfig || defaultConfig
-      });
+      const config = indicatorsConfig || defaultConfig;
+      
+      // Check if config is instance-based (has 'type' and 'params' fields)
+      const isInstanceBased = Object.values(config).some(val => val?.type && val?.params);
+      
+      if (isInstanceBased) {
+        // New instance-based format
+        console.log('[Indicators] Using instance-based format with', Object.keys(config).length, 'instances');
+        socketRef.current.emit('calculate_indicators', {
+          asset,
+          instances: config
+        });
+      } else {
+        // Legacy format (backward compatible)
+        console.log('[Indicators] Using legacy format');
+        socketRef.current.emit('calculate_indicators', {
+          asset,
+          indicators: config
+        });
+      }
     } else {
       setIndicatorError('Not connected to backend');
       setIsCalculatingIndicators(false);

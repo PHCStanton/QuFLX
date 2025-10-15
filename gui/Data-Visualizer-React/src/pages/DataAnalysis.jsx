@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MultiPaneChart from '../components/charts/MultiPaneChart';
-import IndicatorConfig from '../components/indicators/IndicatorConfig';
+import IndicatorManager from '../components/indicators/IndicatorManager';
 import { fetchCurrencyPairs } from '../utils/fileUtils';
 import { parseTradingData } from '../utils/tradingData';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -31,11 +31,26 @@ const DataAnalysis = () => {
   const [streamError, setStreamError] = useState(null);
   const [detectedAsset, setDetectedAsset] = useState(null);
   
-  // Dynamic indicator configuration
+  // Dynamic indicator configuration (instance-based format)
   const [activeIndicators, setActiveIndicators] = useState({
-    sma: { period: 20 },
-    rsi: { period: 14 },
-    bollinger: { period: 20, std_dev: 2 }
+    'SMA-20': { 
+      type: 'sma', 
+      params: { period: 20 },
+      color: '#10b981',
+      definition: { name: 'Simple Moving Average (SMA)', renderType: 'line' }
+    },
+    'RSI-14': { 
+      type: 'rsi', 
+      params: { period: 14 },
+      color: '#f59e0b',
+      definition: { name: 'Relative Strength Index (RSI)', renderType: 'line' }
+    },
+    'BB-20': { 
+      type: 'bollinger', 
+      params: { period: 20, std_dev: 2 },
+      color: '#6366f1',
+      definition: { name: 'Bollinger Bands', renderType: 'band' }
+    }
   });
   
   // WebSocket connection for live streaming (dynamic backend URL detection)
@@ -835,10 +850,9 @@ const DataAnalysis = () => {
         >Technical Indicators</h3>
 
         {/* Dynamic Indicator Configuration */}
-        <IndicatorConfig
-          activeIndicators={activeIndicators}
-          onIndicatorsChange={setActiveIndicators}
-          disabled={isCalculatingIndicators}
+        <IndicatorManager
+          indicators={activeIndicators}
+          onChange={setActiveIndicators}
         />
 
         {indicatorError && (
