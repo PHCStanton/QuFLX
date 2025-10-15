@@ -1,224 +1,87 @@
 # QuantumFlux Trading Platform
 
 ## Overview
-
-QuantumFlux is an automated trading platform for PocketOption, integrating real-time WebSocket data, browser automation, and AI-driven technical analysis. It features a React GUI with dynamic indicators, multi-pane chart rendering, backtesting, and live streaming visualization. The platform captures market data, forms OHLC candles, generates AI-driven trading signals, and provides comprehensive market analysis for algorithmic traders, quantitative researchers, and developers.
+QuantumFlux is an automated trading platform designed for PocketOption. It integrates real-time WebSocket data, browser automation, and AI-driven technical analysis to provide a comprehensive solution for algorithmic traders, quantitative researchers, and developers. The platform features a Solana-inspired React GUI with dynamic indicators, multi-pane charting, strategy design tools, backtesting capabilities, and live streaming visualization. Its core purpose is to capture market data, form OHLC candles, generate AI-driven trading signals, and offer in-depth market analysis.
 
 ## User Preferences
-
 - **Communication style**: Simple, everyday language
 - **Technical approach**: Clear separation of concerns, modular architecture
 - **Data handling**: Explicit control over data sources (no auto-switching)
+- **UI/UX**: Solana-inspired dark aesthetic, professional trading terminal
 
 ## System Architecture
+The platform utilizes a **Capabilities-First Design** with **Dual Data Pipelines** for historical data collection (backtesting) and real-time streaming (live trading and visualization).
 
-### Core Architecture Pattern: Capabilities-First Design + Dual Data Pipelines
+**Core Architectural Decisions:**
+- **Hybrid Chrome Session Management**: Persistent Chrome session with remote debugging (port 9222) for login and WebSocket connections, allowing Selenium to attach.
+- **WebSocket Data Interception**: Captures and decodes WebSocket messages from PocketOption via Chrome DevTools Protocol.
+- **Dual Data Pipeline Separation**: Dedicated pipelines for historical data collection and real-time streaming.
+- **Dedicated GUI Backend Server**: A Flask-SocketIO server (`streaming_server.py` on port 3001) for real-time data streaming to the React frontend.
+- **Intelligent Timeframe Detection**: Analyzes PocketOption's timestamp intervals for reliable candle timeframe determination.
+- **Modular Capabilities Framework**: Trading operations are structured as self-contained capabilities.
+- **Multi-Interface Access Pattern**: Capabilities accessible via FastAPI, Flask-SocketIO GUI backend, React GUI, and a CLI tool.
+- **Frontend Data Provider Separation**: React GUI distinguishes "CSV Mode" for historical data and "Platform Mode" for live WebSocket streaming.
+- **Chunked CSV Persistence**: Data saved into rotating CSV files by timeframe.
+- **Strategy Engine with Confidence Scoring**: Modular system generating multi-indicator signals with confidence scores.
+- **Platform Mode State Machine**: 6-state machine for robust streaming control with explicit asset detection.
+- **Normalized Asset Naming**: Handles asset name variations for consistent data.
+- **Candle Timestamp Alignment**: Candles align to minute boundaries to match PocketOption timing.
+- **Dynamic Indicator System**: Frontend supports adding/removing indicators with full time-series data (SMA, EMA, RSI, MACD, Bollinger Bands, etc.).
+- **Multi-Pane Chart Architecture**: Main chart for candlesticks with overlay indicators; separate, synchronized panes for oscillators (RSI, MACD).
+- **Memory-Safe Resource Management**: Proper cleanup of timers, event listeners, and chart instances.
+- **Solana-Inspired UI/UX**: Professional 3-page trading terminal with a cohesive design system and dark aesthetic.
 
-The platform uses a **capabilities-first architecture** and **two distinct data pipelines** for historical data collection (backtesting) and real-time streaming (live trading and visualization).
+**Frontend Architecture (Solana-Inspired Design):**
+- **Data Analysis Page**: For strategy design, chart testing, and indicator configuration. Features a 3-column layout with data source toggles, asset selector, indicator manager, live chart, and quick stats.
+- **Strategy Lab Page**: For strategy development, validation, and performance analysis. Includes strategy selection, data picking, an equity curve chart, performance metrics, and trade history.
+- **Trading Hub Page**: For real-time signal generation and trade execution. Displays active positions, a live chart with strategy signal overlays, and a live signal panel with execution controls.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CHROME SESSION (Port 9222)                   │
-│                  ← WebSocket Data Interception →                │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-        ┌─────────────────────────────────────────┐
-        │      CAPABILITIES FRAMEWORK             │
-        ├─────────────────────────────────────────┤
-        │  1. RealtimeDataStreaming               │
-        │     (data_streaming.py)                 │
-        │     - Real-time candle formation        │
-        │     - Asset focus filtering             │
-        │                                         │
-        │  2. RealtimeDataStreaming (CSV Save)    │
-        │     (data_streaming_csv_save.py)        │
-        │     - Historical topdown collection     │
-        │     - Timeframe-organized storage       │
-        └─────────────────────────────────────────┘
-                              ↓
-        ┌─────────────────────────────────────────┐
-        │         MULTIPLE INTERFACES             │
-        ├─────────────────────────────────────────┤
-        │  • streaming_server.py (Port 3001)      │
-        │  • FastAPI Backend (Port 8000)          │
-        │  • React GUI (Port 5000)                │
-        │  • CLI Tool (qf.py)                     │
-        └─────────────────────────────────────────┘
-```
+**Chart System:**
+- **Main Chart**: Candlestick data with overlay indicators.
+- **Oscillator Panes**: Separate synchronized panes for RSI and MACD.
+- **Time Synchronization**: Ensures alignment across all panes.
+- **Dynamic Indicators**: Modal-based configuration with multiple instances support for various trend, momentum, and volatility indicators.
 
-### Key Architectural Decisions
-
-1.  **Hybrid Chrome Session Management**: Persistent Chrome session with remote debugging (port 9222) for login and WebSocket connections, allowing Selenium to attach.
-2.  **WebSocket Data Interception**: Captures and decodes WebSocket messages from PocketOption via Chrome DevTools Protocol.
-3.  **Dual Data Pipeline Separation**: Dedicated pipelines for historical data collection and real-time streaming, ensuring no overlap.
-4.  **Dedicated GUI Backend Server** (`streaming_server.py`): A Flask-SocketIO server on port 3001 for real-time data streaming to React frontend, delegating core logic to `RealtimeDataStreaming`.
-5.  **Intelligent Timeframe Detection**: Analyzes PocketOption's timestamp intervals and chart settings for reliable candle timeframe determination.
-6.  **Modular Capabilities Framework**: Trading operations are structured as self-contained capabilities.
-7.  **Multi-Interface Access Pattern**: Capabilities are accessible via FastAPI, Flask-SocketIO GUI backend, React GUI, and a CLI tool.
-8.  **Frontend Data Provider Separation**: React GUI explicitly distinguishes "CSV Mode" for historical data and "Platform Mode" for live WebSocket streaming.
-9.  **Chunked CSV Persistence**: Data saved into rotating CSV files by timeframe.
-10. **Strategy Engine with Confidence Scoring**: Modular strategy system generates multi-indicator signals with confidence scores.
-11. **Platform Mode State Machine**: Implemented a 6-state machine for robust streaming control (idle, ready, detecting, asset_detected, streaming, error) with explicit asset detection.
-12. **Normalized Asset Naming**: Handles asset name variations (e.g., USDJPY_otc vs USDJPYOTC) for consistent data filtering and retrieval.
-13. **Candle Timestamp Alignment**: Candles align to minute boundaries (e.g., :00 seconds) to match PocketOption timing.
-14. **Dynamic Indicator System**: Frontend supports add/remove indicators with full time-series data (SMA, EMA, RSI, MACD, Bollinger Bands).
-15. **Multi-Pane Chart Architecture**: Overlay indicators on main chart, separate synchronized panes for oscillators (RSI, MACD) with time-based synchronization.
-16. **Memory-Safe Resource Management**: All timers, event listeners, and chart instances properly cleaned up to prevent memory leaks.
-
-## Frontend Architecture
-
-### 3-Page Trading Platform (Solana-Inspired Design)
-
-#### 1. Chart Viewer (Development/Testing)
-**Purpose**: Test chart functionalities and indicator rendering
-- **Role**: Development sandbox, not primary user interface
-- Data source toggle: CSV (historical) vs Platform (live)
-- Modal-based indicator configuration
-- Multi-pane chart with synchronized oscillators
-
-#### 2. Strategy Lab (Core: Backtesting)
-**Purpose**: Strategy development, validation, and performance analysis
-- **Layout**: 3-column design
-  - Left: Strategy selector, data picker, config, quick metrics
-  - Center: Equity curve chart + performance metrics grid
-  - Right: Strategy parameters, trade history
-- **Features**: Upload custom strategies, backtest execution, comparison tools
-- **Priority**: PRIMARY FOCUS for strategy validation
-
-#### 3. Trading Hub (Core: Live Trading Execution)
-**Purpose**: Real-time signal generation and trade execution
-- **Layout**: 3-column design
-  - Left: Active positions monitor, signal log, P/L tracker
-  - Center: Live chart with strategy signal overlays
-  - Right: Live signal panel with confidence, execute button, risk controls
-- **Features**: Real-time signals, one-click execution, position monitoring
-- **Priority**: PRIMARY FOCUS for automated trading
-
-### Chart System
-- **Main Chart**: Candlestick data with overlay indicators (SMA, EMA, Bollinger Bands)
-- **Oscillator Panes**: Separate synchronized panes for RSI, MACD
-- **Time Synchronization**: Time-based range subscription ensures perfect alignment across all panes
-- **Dynamic Indicators**: Modal-based configuration with multiple instances support
-
-### Enhanced Indicator System (Phase 7.2 - Complete ✅)
-**Architecture:**
-- **IndicatorDropdown**: Categorized selector with search functionality
-- **IndicatorConfigModal**: Dynamic parameter inputs based on indicator type
-- **IndicatorManager**: Manages multiple indicator instances with add/remove
-- **API Support**: Both legacy and instance-based formats with backward compatibility
-
-**Available Indicators:**
-- **Trend**: SMA, EMA, WMA, MACD, Bollinger Bands, SuperTrend
-- **Momentum**: RSI, Stochastic, Williams %R, ROC, **Schaff Trend Cycle**, **DeMarker**, **CCI**
-- **Volatility**: ATR, Bollinger Bands
-- **Custom**: SuperTrend, Pivot Points
-
-**Features:**
-- Multiple instances support (e.g., SMA-10, SMA-20, SMA-50 for crossovers)
-- Dynamic parameter validation with min/max constraints
-- Color-coded indicators with visual preview
-- Keyboard navigation and screen reader support
-- Clean, modal-based UI without clutter
-
-### Component Structure
-```
-App.jsx (Router)
-├── Chart Viewer (Dev/Test)
-│   ├── DataAnalysis.jsx
-│   ├── MultiPaneChart.jsx (Chart Container)
-│   ├── IndicatorModal.jsx (Modal Configuration)
-│   └── IndicatorConfig.jsx (Management Panel)
-│
-├── Strategy Lab (Backtesting)
-│   ├── StrategyBacktest.jsx
-│   ├── StrategySelector.jsx
-│   ├── EquityCurveChart.jsx
-│   ├── MetricsDashboard.jsx
-│   └── TradeHistoryTable.jsx
-│
-└── Trading Hub (Live Trading)
-    ├── LiveTrading.jsx
-    ├── LiveSignalPanel.jsx
-    ├── PositionMonitor.jsx
-    ├── TradeExecutionControls.jsx
-    └── RiskManagement.jsx
-```
-
-### Design System (Solana-Inspired)
-**Color Palette:**
-- Dark theme: #0a0e1a (base), #1e293b (cards), #334155 (borders)
-- Accents: #10b981 (green/buy), #ef4444 (red/sell), #3b82f6 (blue/info)
-- Typography: Inter font family, clean and modern
-- Components: Card-based with glass effects, minimal borders
-
-### Technical Implementation
-- **Time Sync Pattern**: Main chart publishes visible time range changes → oscillator panes subscribe and apply same range
-- **Resource Cleanup**: All setInterval/setTimeout/ResizeObserver/timeRange callbacks properly cleaned up
-- **Performance**: O(1) chart updates using `update()` method for real-time data (10-100x faster than `setData()`)
-- **Backend Integration**: Full time-series data for all indicators via Socket.IO events
+**Design System:**
+- **Color Palette**: Dark theme with base `#0b0f19`, card backgrounds `#1e293b`, borders `#334155`, and accents like green `#22c55e`, red `#ef4444`, and blue `#3b82f6`.
+- **Typography**: Inter font family.
+- **Components**: Card-based with glass effects and minimal borders.
+- **Design Tokens**: Centralized in `gui/Data-Visualizer-React/src/styles/designTokens.js` for consistent styling.
 
 ## External Dependencies
 
-### Browser Automation & Session Management
--   **Chrome Browser**
--   **Selenium WebDriver**
--   **Chrome Remote Debugging Protocol (Port 9222)**
+**Browser Automation & Session Management:**
+- Chrome Browser
+- Selenium WebDriver
+- Chrome Remote Debugging Protocol
 
-### Data Processing & Analysis
--   **Pandas**
--   **NumPy**
+**Data Processing & Analysis:**
+- Pandas
+- NumPy
 
-### Web Framework & API
--   **FastAPI** (Port 8000)
--   **Flask / Flask-SocketIO** (Port 3001)
--   **Uvicorn**
--   **WebSocket Support**
--   **CORS Support**
+**Web Framework & API:**
+- FastAPI (Port 8000)
+- Flask / Flask-SocketIO (Port 3001)
+- Uvicorn
+- WebSocket Support
+- CORS Support
 
-### Frontend Stack
--   **React 18**
--   **Vite** (Port 5000)
--   **Socket.IO Client**
--   **Lightweight Charts v4.2.0**
--   **TailwindCSS**
--   **React Router**
+**Frontend Stack:**
+- React 18
+- Vite (Port 5000)
+- Socket.IO Client
+- Lightweight Charts v4.2.0
+- TailwindCSS (legacy components only)
+- React Router
 
-### CLI & Automation
--   **Typer**
--   **asyncio**
+**CLI & Automation:**
+- Typer
+- asyncio
 
-### Platform Integration
--   **PocketOption**
+**Platform Integration:**
+- PocketOption
 
-### Data Storage
--   **CSV Files**
--   **JSON Files**
--   **File System**
-
-## Production Readiness
-
-### Testing Status ✅
-- Chart rendering verified (100 data points)
-- Indicator system tested (all indicators rendering correctly)
-- Multi-pane synchronization validated
-- Build process clean (426KB JS, 25KB CSS)
-- Code quality verified (no LSP errors)
-- Memory management confirmed (zero leaks)
-- WebSocket handling tested (reconnection works)
-- All pages functional (Data Analysis, Strategy/Backtesting, Live Trading)
-- Backend health confirmed (port 3001, API responding)
-
-### Performance Metrics ✅
-- API Response: <500ms
-- Chart Updates: O(1) incremental updates
-- Memory: Proper cleanup, no leaks
-- Build: Optimized production bundle
-- Real-time Processing: Minimal latency
-
-### Reliability ✅
-- Session Persistence: Stable Chrome management
-- Graceful Degradation: Works with/without Chrome
-- State Machine: Zero race conditions
-- Asset Filtering: Prevents unwanted switches
-- Buffer Management: Backpressure protection
-- Resource Cleanup: All timers/listeners cleaned up
+**Data Storage:**
+- CSV Files
+- JSON Files
+- File System
