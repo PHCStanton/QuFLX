@@ -7,6 +7,7 @@ export const colors = {
   // Primary Backgrounds
   bgPrimary: '#0a0e1a',           // Deep space
   bgSecondary: '#141824',         // Slightly lighter
+  backgroundSecondary: '#141824', // Alias for bgSecondary (for consistency)
   cardBg: '#1e293b',              // Card background
   cardBorder: '#334155',          // Subtle borders
   
@@ -16,6 +17,11 @@ export const colors = {
   accentBlue: '#3b82f6',          // Info/highlight
   accentPurple: '#8b5cf6',        // Secondary accent
   accentYellow: '#f59e0b',        // Warning/caution
+  
+  // Brand Colors (for buttons and interactive elements)
+  brandPrimary: '#10b981',        // Primary brand color (green)
+  brandHover: '#059669',          // Hover state for primary brand
+  brandSecondary: '#3b82f6',      // Secondary brand color (blue)
   
   // Text
   textPrimary: '#f8fafc',         // White text
@@ -189,6 +195,13 @@ export const components = {
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     shadow: shadows.xl,
+  },
+  dropdown: {
+    bg: colors.cardBg,
+    border: colors.cardBorder,
+    borderRadius: borderRadius.lg,
+    shadow: shadows.xl,
+    itemHoverBg: colors.backgroundSecondary,
   },
 };
 
