@@ -11,18 +11,32 @@ QuantumFlux is an automated trading platform designed for PocketOption. It integ
 
 ## Recent Changes
 
-### Phase 6.1: Layout Expansion (Completed - October 15, 2025)
-**Goal**: Optimize chart layout for wider views on desktop and tablet devices.
+### Phase 6.1: Layout Expansion - Improved Flexibility (Completed - October 15, 2025)
+**Goal**: Maximize chart space and create flexible layouts that adapt to different screen sizes without squishing panels.
 
 **Changes Implemented:**
-- Converted all three main pages (DataAnalysis, LiveTrading, StrategyBacktest) from fixed pixel widths to responsive percentage-based grid layouts
-- **Desktop (1280px+)**: Left 20%, Center 65%, Right 15%
-- **Tablet Horizontal (1024px-1279px)**: Left 22%, Center 60%, Right 18%
-- Added dynamic resize listeners to update grid columns on viewport changes
-- SSR-safe implementation with proper window guards
-- No breaking changes or regressions detected
+- Converted all three main pages (DataAnalysis, LiveTrading, StrategyBacktest) to flexible CSS Grid layouts using `minmax()` and `1fr` units
+- **Flexible Grid Strategy**:
+  - Left sidebar: `minmax(200px-280px)` (prevents squishing, varies by breakpoint)
+  - Center chart: `1fr` (takes all remaining space for maximum chart area)
+  - Right sidebar: `minmax(220px-320px)` (content-aware sizing, varies by breakpoint)
+- **Responsive Breakpoints**:
+  - 1440px+ (large desktop): Wider minimum widths for optimal viewing
+  - 1280px+ (desktop): Balanced sidebar/chart proportions
+  - 1024px+ (tablet horizontal): Optimized for tablet screens
+  - <1024px (smaller screens): Compact but usable layout
+- **Space Optimization**:
+  - Reduced grid gap from `spacing.lg` to `spacing.md`
+  - Optimized padding: `spacing.md` vertical, `spacing.lg` horizontal
+  - Less wasted margin space, more usable screen area
+- Dynamic resize listeners update grid on viewport changes
+- SSR-safe with proper window guards
 
-**Impact**: Chart area now expands significantly on wider screens, providing better data visualization and analysis capabilities.
+**Impact**: 
+- Chart area maximizes available space across all screen sizes
+- Sidebars maintain readable content without squishing
+- Better flexibility for manual window resizing
+- More professional, space-efficient trading terminal layout
 
 ## System Architecture
 The platform utilizes a **Capabilities-First Design** with **Dual Data Pipelines** for historical data collection (backtesting) and real-time streaming (live trading and visualization).
