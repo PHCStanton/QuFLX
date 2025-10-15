@@ -31,15 +31,25 @@ const Card = ({
     ...style,
   };
 
-  return (
-    <div 
-      className={`transition-all duration-200 ${className}`}
-      style={baseStyle}
-      onClick={onClick}
-    >
-      {children}
-    </div>
-  );
+  const handleKeyDown = (e) => {
+    if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      onClick(e);
+    }
+  };
+
+  const elementProps = {
+    className: `transition-all duration-200 ${className}`,
+    style: baseStyle,
+    ...(onClick ? {
+      role: 'button',
+      tabIndex: 0,
+      onClick,
+      onKeyDown: handleKeyDown,
+    } : {}),
+  };
+
+  return <div {...elementProps}>{children}</div>;
 };
 
 Card.propTypes = {

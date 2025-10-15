@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useId } from 'react';
 import PropTypes from 'prop-types';
 import { components, colors, typography, spacing, zIndex } from '../../styles/designTokens';
 
 /**
  * Modal - Overlay dialog for configurations and confirmations
+ * Implements ARIA best practices and focus management
  */
 const Modal = ({ 
   isOpen,
@@ -13,12 +14,30 @@ const Modal = ({
   footer = null,
   size = 'default',
   closeOnOverlayClick = true,
+  ariaDescribedBy = null,
 }) => {
+  const modalRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const previousActiveElement = useRef(null);
+  const uniqueId = useId();
+  const titleId = `modal-title-${uniqueId}`;
+
   useEffect(() => {
     if (isOpen) {
+      previousActiveElement.current = document.activeElement;
       document.body.style.overflow = 'hidden';
+      
+      setTimeout(() => {
+        if (closeButtonRef.current) {
+          closeButtonRef.current.focus();
+        }
+      }, 0);
     } else {
       document.body.style.overflow = 'unset';
+      
+      if (previousActiveElement.current && previousActiveElement.current.focus) {
+        previousActiveElement.current.focus();
+      }
     }
     
     return () => {
@@ -33,8 +52,34 @@ const Modal = ({
       }
     };
 
+    const handleTab = (e) => {
+      if (!isOpen || !modalRef.current) return;
+
+      const focusableElements = modalRef.current.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (e.key === 'Tab') {
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
     document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener('keydown', handleTab);
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('keydown', handleTab);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -48,6 +93,10 @@ const Modal = ({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      {...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {})}
       style={{
         position: 'fixed',
         top: 0,
@@ -64,6 +113,7 @@ const Modal = ({
       onClick={closeOnOverlayClick ? onClose : undefined}
     >
       <div
+        ref={modalRef}
         style={{
           background: components.modal.bg,
           borderRadius: components.modal.borderRadius,
@@ -88,6 +138,7 @@ const Modal = ({
           }}
         >
           <h2
+            id={titleId}
             style={{
               fontSize: typography.fontSize['2xl'],
               fontWeight: typography.fontWeight.semibold,
@@ -98,7 +149,9 @@ const Modal = ({
             {title}
           </h2>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
+            aria-label="Close modal"
             style={{
               background: 'transparent',
               border: 'none',
@@ -154,6 +207,7 @@ Modal.propTypes = {
   footer: PropTypes.node,
   size: PropTypes.oneOf(['sm', 'default', 'lg', 'xl']),
   closeOnOverlayClick: PropTypes.bool,
+  ariaDescribedBy: PropTypes.string,
 };
 
 export default Modal;

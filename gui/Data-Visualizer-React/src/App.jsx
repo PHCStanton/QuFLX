@@ -5,6 +5,7 @@ import Header from './components/Header';
 import DataAnalysis from './pages/DataAnalysis';
 import StrategyBacktest from './pages/StrategyBacktest';
 import LiveTrading from './pages/LiveTrading';
+import ComponentShowcase from './pages/ComponentShowcase';
 
 function App() {
   return (
@@ -54,6 +55,18 @@ function App() {
                     <span>Live Trading</span>
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    to="/components"
+                    className="flex items-center gap-2 transition-colors font-medium"
+                    style={{ color: 'var(--text-primary)' }}
+                    onMouseEnter={(e) => e.target.style.color = 'var(--accent-blue)'}
+                    onMouseLeave={(e) => e.target.style.color = 'var(--text-primary)'}
+                  >
+                    <span>🎨</span>
+                    <span>Components</span>
+                  </Link>
+                </li>
               </ul>
             </div>
           </nav>
@@ -63,6 +76,7 @@ function App() {
               <Route path="/" element={<DataAnalysis />} />
               <Route path="/strategy" element={<StrategyBacktest />} />
               <Route path="/live" element={<LiveTrading />} />
+              <Route path="/components" element={<ComponentShowcase />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
