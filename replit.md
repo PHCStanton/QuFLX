@@ -100,12 +100,25 @@ The platform uses a **capabilities-first architecture** and **two distinct data 
 - **Time Synchronization**: Time-based range subscription ensures perfect alignment across all panes
 - **Dynamic Indicators**: Modal-based configuration with multiple instances support
 
-### Enhanced Indicator System
-**Modal-Based Configuration:**
-- Dropdown selector → Modal opens with parameters
-- Support multiple instances (SMA-10, SMA-20, SMA-50 for crossovers)
-- **New Indicators**: Schaff Trend Cycle, DeMarker, CCI
-- Clean UI without clutter
+### Enhanced Indicator System (Phase 7.2 - Complete ✅)
+**Architecture:**
+- **IndicatorDropdown**: Categorized selector with search functionality
+- **IndicatorConfigModal**: Dynamic parameter inputs based on indicator type
+- **IndicatorManager**: Manages multiple indicator instances with add/remove
+- **API Support**: Both legacy and instance-based formats with backward compatibility
+
+**Available Indicators:**
+- **Trend**: SMA, EMA, WMA, MACD, Bollinger Bands, SuperTrend
+- **Momentum**: RSI, Stochastic, Williams %R, ROC, **Schaff Trend Cycle**, **DeMarker**, **CCI**
+- **Volatility**: ATR, Bollinger Bands
+- **Custom**: SuperTrend, Pivot Points
+
+**Features:**
+- Multiple instances support (e.g., SMA-10, SMA-20, SMA-50 for crossovers)
+- Dynamic parameter validation with min/max constraints
+- Color-coded indicators with visual preview
+- Keyboard navigation and screen reader support
+- Clean, modal-based UI without clutter
 
 ### Component Structure
 ```
