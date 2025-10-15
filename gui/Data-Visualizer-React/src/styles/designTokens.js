@@ -4,23 +4,23 @@
  */
 
 export const colors = {
-  // Primary Backgrounds
-  bgPrimary: '#0a0e1a',           // Deep space
-  bgSecondary: '#141824',         // Slightly lighter
-  backgroundSecondary: '#141824', // Alias for bgSecondary (for consistency)
-  cardBg: '#1e293b',              // Card background
-  cardBorder: '#334155',          // Subtle borders
+  // Primary Backgrounds (Mockup-matched: darker, more refined)
+  bgPrimary: '#0b0f19',           // Almost pure black (mockup background)
+  bgSecondary: '#131720',         // Slightly lighter
+  backgroundSecondary: '#131720', // Alias for bgSecondary (for consistency)
+  cardBg: '#1a1f2e',              // Card background (darker than before)
+  cardBorder: '#2a2f3e',          // Subtle borders (more muted)
   
-  // Accents
-  accentGreen: '#10b981',         // Primary green (success, buy, CALL)
+  // Accents (Mockup-matched)
+  accentGreen: '#22c55e',         // Brighter green (mockup green)
   accentRed: '#ef4444',           // Primary red (danger, sell, PUT)
   accentBlue: '#3b82f6',          // Info/highlight
   accentPurple: '#8b5cf6',        // Secondary accent
   accentYellow: '#f59e0b',        // Warning/caution
   
-  // Brand Colors (for buttons and interactive elements)
-  brandPrimary: '#10b981',        // Primary brand color (green)
-  brandHover: '#059669',          // Hover state for primary brand
+  // Brand Colors (Updated to match mockup green)
+  brandPrimary: '#22c55e',        // Primary brand color (brighter green)
+  brandHover: '#16a34a',          // Hover state for primary brand
   brandSecondary: '#3b82f6',      // Secondary brand color (blue)
   
   // Text
@@ -28,22 +28,22 @@ export const colors = {
   textSecondary: '#94a3b8',       // Muted text
   textTertiary: '#64748b',        // Very muted
   
-  // State Colors
-  success: '#10b981',
+  // State Colors (Updated to match mockup)
+  success: '#22c55e',
   error: '#ef4444',
   warning: '#f59e0b',
   info: '#3b82f6',
   
-  // Chart Colors
-  chartUp: '#10b981',             // Bullish candles
+  // Chart Colors (Updated to match mockup)
+  chartUp: '#22c55e',             // Bullish candles (brighter green)
   chartDown: '#ef4444',           // Bearish candles
-  chartGrid: '#334155',           // Grid lines
+  chartGrid: '#2a2f3e',           // Grid lines (more subtle)
   
-  // Opacity variants
+  // Opacity variants (Updated to match new green)
   greenAlpha: {
-    10: 'rgba(16, 185, 129, 0.1)',
-    20: 'rgba(16, 185, 129, 0.2)',
-    30: 'rgba(16, 185, 129, 0.3)',
+    10: 'rgba(34, 197, 94, 0.1)',
+    20: 'rgba(34, 197, 94, 0.2)',
+    30: 'rgba(34, 197, 94, 0.3)',
   },
   redAlpha: {
     10: 'rgba(239, 68, 68, 0.1)',
