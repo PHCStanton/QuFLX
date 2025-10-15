@@ -81,6 +81,11 @@ class IndicatorSet:
     support_1: Optional[float] = None
     resistance_1: Optional[float] = None
     
+    # New Indicators (Phase 7.2)
+    schaff_tc: Optional[float] = None
+    demarker: Optional[float] = None
+    cci: Optional[float] = None
+    
     # Pattern Recognition
     doji: Optional[bool] = None
     hammer: Optional[bool] = None
@@ -523,6 +528,11 @@ class TechnicalIndicatorsPipeline:
                 support_1=self._safe_float(df_row.get('support_1')),
                 resistance_1=self._safe_float(df_row.get('resistance_1')),
                 
+                # New indicators (Phase 7.2)
+                schaff_tc=self._safe_float(df_row.get('schaff_tc')),
+                demarker=self._safe_float(df_row.get('demarker')),
+                cci=self._safe_float(df_row.get('cci')),
+                
                 # Patterns
                 doji=self._safe_bool(df_row.get('doji')),
                 hammer=self._safe_bool(df_row.get('hammer')),
@@ -560,6 +570,164 @@ class TechnicalIndicatorsPipeline:
             return bool(value)
         except (ValueError, TypeError):
             return None
+    
+    def _calculate_schaff_trend_cycle(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate Schaff Trend Cycle (STC) indicator.
+        
+        The STC is a cyclical indicator that combines MACD and Stochastic oscillator concepts.
+        It helps identify trend changes and overbought/oversold conditions.
+        
+        Parameters from config:
+        - schaff_fast: Fast period (default: 10)
+        - schaff_slow: Slow period (default: 20)
+        - schaff_d_macd: MACD smoothing period (default: 3)
+        - schaff_d_pf: PF smoothing period (default: 3)
+        """
+        try:
+            fast = self.params['schaff_fast']
+            slow = self.params['schaff_slow']
+            d_macd = self.params['schaff_d_macd']
+            d_pf = self.params['schaff_d_pf']
+            
+            # Calculate MACD
+            ema_fast = df['close'].ewm(span=fast, adjust=False).mean()
+            ema_slow = df['close'].ewm(span=slow, adjust=False).mean()
+            macd = ema_fast - ema_slow
+            
+            # Calculate Stochastic of MACD
+            macd_min = macd.rolling(window=d_macd).min()
+            macd_max = macd.rolling(window=d_macd).max()
+            
+            stoch_macd = pd.Series(index=df.index, dtype=float)
+            for i in range(len(df)):
+                if macd_max.iloc[i] - macd_min.iloc[i] != 0:
+                    stoch_macd.iloc[i] = 100 * (macd.iloc[i] - macd_min.iloc[i]) / (macd_max.iloc[i] - macd_min.iloc[i])
+                else:
+                    stoch_macd.iloc[i] = 0
+            
+            # Calculate PF (Percentage Factor)
+            pf = stoch_macd.ewm(span=d_macd, adjust=False).mean()
+            
+            # Calculate Stochastic of PF
+            pf_min = pf.rolling(window=d_pf).min()
+            pf_max = pf.rolling(window=d_pf).max()
+            
+            stc = pd.Series(index=df.index, dtype=float)
+            for i in range(len(df)):
+                if pf_max.iloc[i] - pf_min.iloc[i] != 0:
+                    stc.iloc[i] = 100 * (pf.iloc[i] - pf_min.iloc[i]) / (pf_max.iloc[i] - pf_min.iloc[i])
+                else:
+                    stc.iloc[i] = 0
+            
+            df['schaff_tc'] = stc.ewm(span=d_pf, adjust=False).mean()
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating Schaff Trend Cycle: {str(e)}")
+            df['schaff_tc'] = None
+        
+        return df
+    
+    def _calculate_demarker(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate DeMarker (DeM) indicator.
+        
+        The DeMarker indicator identifies potential price exhaustion points
+        by comparing recent highs and lows.
+        
+        Parameters from config:
+        - demarker_period: Calculation period (default: 10)
+        
+        Returns values between 0-1:
+        - Above 0.7: Overbought (potential reversal down)
+        - Below 0.3: Oversold (potential reversal up)
+        """
+        try:
+            period = self.params['demarker_period']
+            
+            # Calculate DeMax (DeMarker High)
+            demax = pd.Series(index=df.index, dtype=float)
+            for i in range(1, len(df)):
+                if df['high'].iloc[i] > df['high'].iloc[i-1]:
+                    demax.iloc[i] = df['high'].iloc[i] - df['high'].iloc[i-1]
+                else:
+                    demax.iloc[i] = 0
+            
+            # Calculate DeMin (DeMarker Low)
+            demin = pd.Series(index=df.index, dtype=float)
+            for i in range(1, len(df)):
+                if df['low'].iloc[i] < df['low'].iloc[i-1]:
+                    demin.iloc[i] = df['low'].iloc[i-1] - df['low'].iloc[i]
+                else:
+                    demin.iloc[i] = 0
+            
+            # Calculate SMA of DeMax and DeMin
+            demax_sma = demax.rolling(window=period).mean()
+            demin_sma = demin.rolling(window=period).mean()
+            
+            # Calculate DeMarker
+            demarker = pd.Series(index=df.index, dtype=float)
+            for i in range(len(df)):
+                denominator = demax_sma.iloc[i] + demin_sma.iloc[i]
+                if denominator != 0:
+                    demarker.iloc[i] = demax_sma.iloc[i] / denominator
+                else:
+                    demarker.iloc[i] = 0
+            
+            df['demarker'] = demarker
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating DeMarker: {str(e)}")
+            df['demarker'] = None
+        
+        return df
+    
+    def _calculate_cci(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate CCI (Commodity Channel Index) indicator.
+        
+        CCI measures the difference between current price and its average over a period.
+        It's useful for identifying cyclical trends and overbought/oversold conditions.
+        
+        Parameters from config:
+        - cci_period: Calculation period (default: 20)
+        
+        Common thresholds:
+        - Above +100: Overbought
+        - Below -100: Oversold
+        """
+        try:
+            period = self.params['cci_period']
+            
+            # Calculate Typical Price
+            typical_price = (df['high'] + df['low'] + df['close']) / 3
+            
+            # Calculate SMA of Typical Price
+            sma_tp = typical_price.rolling(window=period).mean()
+            
+            # Calculate Mean Deviation
+            mean_dev = pd.Series(index=df.index, dtype=float)
+            for i in range(period - 1, len(df)):
+                deviations = []
+                for j in range(i - period + 1, i + 1):
+                    deviations.append(abs(typical_price.iloc[j] - sma_tp.iloc[i]))
+                mean_dev.iloc[i] = np.mean(deviations)
+            
+            # Calculate CCI
+            cci = pd.Series(index=df.index, dtype=float)
+            for i in range(len(df)):
+                if mean_dev.iloc[i] != 0:
+                    cci.iloc[i] = (typical_price.iloc[i] - sma_tp.iloc[i]) / (0.015 * mean_dev.iloc[i])
+                else:
+                    cci.iloc[i] = 0
+            
+            df['cci'] = cci
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating CCI: {str(e)}")
+            df['cci'] = None
+        
+        return df
     
     def get_indicator_summary(self) -> Dict[str, Any]:
         """Get summary of available indicators"""
