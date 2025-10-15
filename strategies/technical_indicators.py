@@ -120,7 +120,14 @@ class TechnicalIndicatorsPipeline:
             'williams_period': 14,
             'roc_period': 10,
             'supertrend_period': 10,
-            'supertrend_multiplier': 3.0
+            'supertrend_multiplier': 3.0,
+            # New indicators (Phase 7.2)
+            'schaff_fast': 10,
+            'schaff_slow': 20,
+            'schaff_d_macd': 3,
+            'schaff_d_pf': 3,
+            'demarker_period': 10,
+            'cci_period': 20
         }
         
         # Update with user config
@@ -261,6 +268,15 @@ class TechnicalIndicatorsPipeline:
                 df['roc_10'] = ta.roc(df['close'], length=self.params['roc_period'])
             elif TALIB_AVAILABLE:
                 df['roc_10'] = talib.ROC(df['close'], timeperiod=self.params['roc_period'])
+            
+            # Schaff Trend Cycle
+            df = self._calculate_schaff_trend_cycle(df)
+            
+            # DeMarker
+            df = self._calculate_demarker(df)
+            
+            # CCI (Commodity Channel Index)
+            df = self._calculate_cci(df)
             
         except Exception as e:
             self.logger.error(f"Error calculating momentum indicators: {str(e)}")
