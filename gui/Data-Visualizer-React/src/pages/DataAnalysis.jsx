@@ -332,11 +332,12 @@ const DataAnalysis = () => {
   };
 
   const getResponsiveColumns = () => {
-    if (typeof window === 'undefined') return '20% 65% 15%';
+    if (typeof window === 'undefined') return 'minmax(260px, 280px) 1fr minmax(280px, 300px)';
     const width = window.innerWidth;
-    if (width >= 1280) return '20% 65% 15%';
-    if (width >= 1024) return '22% 60% 18%';
-    return '20% 65% 15%';
+    if (width >= 1440) return 'minmax(260px, 280px) 1fr minmax(280px, 300px)';
+    if (width >= 1280) return 'minmax(240px, 260px) 1fr minmax(260px, 280px)';
+    if (width >= 1024) return 'minmax(220px, 240px) 1fr minmax(240px, 260px)';
+    return 'minmax(200px, 220px) 1fr minmax(220px, 240px)';
   };
 
   const [gridColumns, setGridColumns] = useState(getResponsiveColumns());
@@ -350,8 +351,8 @@ const DataAnalysis = () => {
   const containerStyle = {
     display: 'grid',
     gridTemplateColumns: gridColumns,
-    gap: spacing.lg,
-    padding: spacing.lg,
+    gap: spacing.md,
+    padding: `${spacing.md} ${spacing.lg}`,
     minHeight: 'calc(100vh - 120px)',
   };
 
