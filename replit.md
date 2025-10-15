@@ -67,24 +67,76 @@ The platform uses a **capabilities-first architecture** and **two distinct data 
 
 ## Frontend Architecture
 
+### 3-Page Trading Platform (Solana-Inspired Design)
+
+#### 1. Chart Viewer (Development/Testing)
+**Purpose**: Test chart functionalities and indicator rendering
+- **Role**: Development sandbox, not primary user interface
+- Data source toggle: CSV (historical) vs Platform (live)
+- Modal-based indicator configuration
+- Multi-pane chart with synchronized oscillators
+
+#### 2. Strategy Lab (Core: Backtesting)
+**Purpose**: Strategy development, validation, and performance analysis
+- **Layout**: 3-column design
+  - Left: Strategy selector, data picker, config, quick metrics
+  - Center: Equity curve chart + performance metrics grid
+  - Right: Strategy parameters, trade history
+- **Features**: Upload custom strategies, backtest execution, comparison tools
+- **Priority**: PRIMARY FOCUS for strategy validation
+
+#### 3. Trading Hub (Core: Live Trading Execution)
+**Purpose**: Real-time signal generation and trade execution
+- **Layout**: 3-column design
+  - Left: Active positions monitor, signal log, P/L tracker
+  - Center: Live chart with strategy signal overlays
+  - Right: Live signal panel with confidence, execute button, risk controls
+- **Features**: Real-time signals, one-click execution, position monitoring
+- **Priority**: PRIMARY FOCUS for automated trading
+
 ### Chart System
 - **Main Chart**: Candlestick data with overlay indicators (SMA, EMA, Bollinger Bands)
-- **Oscillator Panes**: Separate synchronized panes for RSI and MACD
+- **Oscillator Panes**: Separate synchronized panes for RSI, MACD
 - **Time Synchronization**: Time-based range subscription ensures perfect alignment across all panes
-- **Dynamic Indicators**: Add/remove functionality with configuration panels
+- **Dynamic Indicators**: Modal-based configuration with multiple instances support
+
+### Enhanced Indicator System
+**Modal-Based Configuration:**
+- Dropdown selector → Modal opens with parameters
+- Support multiple instances (SMA-10, SMA-20, SMA-50 for crossovers)
+- **New Indicators**: Schaff Trend Cycle, DeMarker, CCI
+- Clean UI without clutter
 
 ### Component Structure
 ```
-DataAnalysis.jsx (Main Page)
-    ↓
-MultiPaneChart.jsx (Chart Container)
-    ├── Main Chart (Candlesticks + Overlays)
-    ├── RSI Pane (Separate synchronized chart)
-    └── MACD Pane (Separate synchronized chart)
-    ↓
-IndicatorConfig.jsx (Configuration Panel)
-    └── Dynamic indicator management
+App.jsx (Router)
+├── Chart Viewer (Dev/Test)
+│   ├── DataAnalysis.jsx
+│   ├── MultiPaneChart.jsx (Chart Container)
+│   ├── IndicatorModal.jsx (Modal Configuration)
+│   └── IndicatorConfig.jsx (Management Panel)
+│
+├── Strategy Lab (Backtesting)
+│   ├── StrategyBacktest.jsx
+│   ├── StrategySelector.jsx
+│   ├── EquityCurveChart.jsx
+│   ├── MetricsDashboard.jsx
+│   └── TradeHistoryTable.jsx
+│
+└── Trading Hub (Live Trading)
+    ├── LiveTrading.jsx
+    ├── LiveSignalPanel.jsx
+    ├── PositionMonitor.jsx
+    ├── TradeExecutionControls.jsx
+    └── RiskManagement.jsx
 ```
+
+### Design System (Solana-Inspired)
+**Color Palette:**
+- Dark theme: #0a0e1a (base), #1e293b (cards), #334155 (borders)
+- Accents: #10b981 (green/buy), #ef4444 (red/sell), #3b82f6 (blue/info)
+- Typography: Inter font family, clean and modern
+- Components: Card-based with glass effects, minimal borders
 
 ### Technical Implementation
 - **Time Sync Pattern**: Main chart publishes visible time range changes → oscillator panes subscribe and apply same range

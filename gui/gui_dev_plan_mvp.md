@@ -1,455 +1,298 @@
-# GUI Real-Time Streaming Development - Current Status
+# QuantumFlux GUI Development Plan - Trading Platform Redesign
 
-**Last Updated**: October 10, 2025
+**Last Updated**: October 15, 2025
 
-## 🎯 Current Focus: Real-Time Streaming Infrastructure
+## 🎯 Vision: Professional Trading Platform
 
-This document tracks the development of real-time streaming capabilities for the QuantumFlux GUI. This is **separate from historical/topdown data collection** which uses a different pipeline.
+A Solana-inspired, minimalist trading terminal focused on **backtesting, signal generation, and automated trading** on the Pocket Option platform.
 
-## 📊 Data Architecture Clarification
-
-### Two Distinct Data Pipelines
-
-#### 1. **Historical/Topdown Data Collection** (Separate)
-- **Capability**: `capabilities/data_streaming_csv_save.py`
-- **Scripts**: `scripts/custom_sessions/favorites_select_topdown_collect.py`
-- **Purpose**: Captures historical candles when timeframe changes (1H, 15M, 5M, 1M)
-- **Saves to**: `data/data_output/assets_data/data_collect/`
-- **Use case**: Historical backtesting, strategy development
-- **Status**: ✅ Working independently, not part of GUI streaming
-
-#### 2. **Real-Time Streaming** (Current Development)
-- **Capability**: `capabilities/data_streaming.py` (RealtimeDataStreaming)
-- **Server**: `streaming_server.py` (Flask-SocketIO on port 3001)
-- **Purpose**: Live WebSocket streaming, candle formation, GUI visualization
-- **Saves to**: `data/data_output/assets_data/realtime_stream/` (optional with --collect-stream)
-- **Use case**: Live trading, real-time analysis, GUI visualization
-- **Status**: ✅ Phases 1-6 complete (Production Ready)
-
-## ✅ Completed Phases
-
-### Phase 1: Backend Infrastructure Fixes (October 9, 2025)
-**Critical fixes to streaming_server.py foundation**
-
-- [x] Fixed eventlet/WebSocket configuration (eliminated AssertionError)
-- [x] Resolved import issues and consolidated streaming servers
-- [x] Added ChromeDriver support with fast-fail port checking (1s timeout on port 9222)
-- [x] Backend starts gracefully with/without Chrome connection
-- [x] Chrome connection status monitoring (5-second polling)
-- [x] Clear error messages when Chrome unavailable
-
-**Impact**: Backend is stable and resilient to Chrome disconnection
-
-### Phase 2: Stream Data Collection (October 9, 2025)
-**Optional data persistence for real-time streams**
-
-- [x] Implemented `--collect-stream {tick,candle,both,none}` CLI argument
-- [x] Integrated StreamPersistenceManager with streaming_server.py
-- [x] Rotating CSV writers with configurable chunk sizes:
-  - Default: 100 candles per file
-  - Default: 1000 ticks per file
-- [x] Data saves to `data/data_output/assets_data/realtime_stream/1M_candle_data/`
-- [x] Data saves to `data/data_output/assets_data/realtime_stream/1M_tick_data/`
-- [x] Fixed tick persistence method signature bug
-- [x] Session timestamp-based file naming
-
-**Impact**: Users can optionally persist streaming data for later analysis
-
-### Phase 3: Frontend Data Provider Separation (October 9, 2025)
-**Clear distinction between CSV historical and Platform live streaming**
-
-- [x] Removed "Auto" mode - enforced explicit data provider selection
-- [x] Fixed critical bugs:
-  - [x] **False live state**: Live mode only activates with valid connections
-  - [x] **Disconnect handling**: Auto-stop stream on Chrome/backend disconnect
-  - [x] **Asset validation**: Prevents invalid assets when switching modes
-  - [x] **Race condition**: Validates assets before streaming starts
-- [x] Platform mode locked to 1M timeframe (timeframe selector disabled)
-- [x] CSV mode supports all timeframes (1m, 5m, 15m, 1h, 4h)
-- [x] Asset reset with console logging when switching modes
-- [x] Timeframe helper text: "Platform uses 1M timeframe"
-
-**Impact**: Clean user experience with no unexpected behavior when switching modes
-
-### Phase 3.5: Code Quality Improvements (October 9, 2025)
-**Bug fixes and semantic corrections**
-
-- [x] Fixed LSP error (added `log_output=False` to socketio.run)
-- [x] Corrected asset switching logic:
-  - First time: Uses `startStream(asset)` to enable live mode
-  - Subsequent: Uses `changeAsset(asset)` for semantic correctness
-- [x] Improved Chrome disconnect handling:
-  - Proactive check before accessing Chrome logs
-  - Detects Chrome-related errors in exception handler
-  - Emits `stream_error` event to frontend
-  - Sets `streaming_active=False` on disconnect
-
-**Impact**: More robust error handling and semantically correct event flow
-
-### Phase 4: Asset Focus Integration (October 9, 2025)
-**Verified existing implementation is complete**
-
-- [x] Backend API methods working:
-  - `set_asset_focus(asset)` - Locks stream to specific asset
-  - `release_asset_focus()` - Allows auto-switching
-  - `get_current_asset()` - Gets focused asset
-- [x] Socket.IO events properly wired:
-  - `start_stream` → calls `set_asset_focus(asset)`
-  - `change_asset` → calls `set_asset_focus(new_asset)`
-  - `stop_stream` → calls `release_asset_focus()`
-- [x] Frontend uses correct event sequence
-- [x] Asset filtering at capability level (filters unwanted assets)
-
-**Impact**: No code changes needed - asset focus system fully functional
-
-### Phase 5: Reconnection Lifecycle Management (October 9, 2025)
-**✅ COMPLETED - Graceful reconnection with automatic state recovery**
-
-- [x] Backend reconnection state management:
-  - Added `reset_backend_state()` function to clear candle buffers and persistence tracking
-  - Socket.IO session tracking to detect client reconnection
-  - Emits `backend_reconnected` event with Chrome status on reconnection
-  - Clear logging for all reconnection events
-- [x] Chrome auto-reconnection:
-  - Automatic reconnection attempts (max 3 per minute)
-  - Exponential backoff: 5s, 10s, 20s delays
-  - Emits `chrome_reconnected` event when Chrome reconnects
-  - Rate limiting prevents excessive connection attempts
-- [x] Frontend reconnection handling:
-  - Added reconnection callback mechanism in `useWebSocket` hook
-  - Automatic state cleanup on `backend_reconnected` event
-  - DataAnalysis.jsx clears chart buffers and reloads data
-  - CSV mode: Automatically reloads historical data
-  - Platform mode: Restarts live stream if Chrome connected
-- [x] UI indicators for reconnection status:
-  - Visual notification when backend reconnects (blue badge, 3s auto-hide)
-  - Visual notification when Chrome reconnects (green badge, 3s auto-hide)
-  - Connection status indicators show real-time state
-
-**Impact**: Zero data corruption on reconnection, automatic recovery, clear user feedback
-
-### Phase 6: Platform Mode State Machine & Explicit Detection Flow (October 10, 2025)
-**✅ COMPLETED - Production-ready architecture overhaul**
-
-- [x] **6-State Machine Implementation**:
-  - States: `idle`, `ready`, `detecting`, `asset_detected`, `streaming`, `error`
-  - State transitions based on Chrome connection and user actions
-  - State machine exclusively controls all Platform mode operations
-  - No bypass paths or race conditions
-
-- [x] **Backend Asset Detection**:
-  - Added `detect_asset` Socket.IO endpoint
-  - Queries current asset from PocketOption via `data_streamer.get_current_asset()`
-  - Emits `asset_detected` (success) or `asset_detection_failed` (error) events
-  - Frontend useWebSocket hook properly wired to handle detection
-
-- [x] **Stream Control Panel UI**:
-  - Replaced manual asset dropdown with state-based control panel in Platform mode
-  - Dynamic UI based on state:
-    - **IDLE**: "Waiting for Chrome connection..." indicator
-    - **READY**: "Detect Asset from PocketOption" button
-    - **DETECTING**: Animated spinner with "Detecting asset..." message
-    - **ASSET_DETECTED**: Shows detected asset + "Start Stream" button
-    - **STREAMING**: Shows streaming asset + "Stop Stream" button
-    - **ERROR**: Shows error message + "Retry Detection" button
-  - Statistics panel now only shows in CSV mode
-  - Chart data properly clears when switching from CSV to Platform mode
-
-- [x] **Critical Race Condition Fixes**:
-  - Removed all auto-start logic from reconnection callback
-  - Separated `selectedAsset` (CSV mode) from `detectedAsset` (Platform mode)
-  - State machine reset on reconnection (READY/IDLE based on Chrome status)
-  - `handleStartStream` uses `detectedAsset` exclusively
-  - Removed legacy `toggleLiveMode` function (dead code bypass prevention)
-
-**Key Benefits**:
-- ✅ Sequential logic: Detect → Start → Stream → Visualize (explicit user control)
-- ✅ Zero race conditions: State machine controls all transitions
-- ✅ Functional simplicity: Clear separation between CSV and Platform modes
-- ✅ Auto-detection: Asset pulled from actual PocketOption state (no hardcoded defaults)
-- ✅ Production ready: Architect-verified implementation
-
-**Impact**: Platform mode now follows systematic lifecycle with zero race conditions or auto-start conflicts
-
-## 🚧 Current Phase
-
-### Phase 7: TradingView Chart Pattern & Component Separation (Ready to Start)
-**Chart streaming improvements and code organization**
-
-#### Objectives
-- [ ] Implement TradingView's recommended streaming pattern:
-  - [ ] Add `lastBar` cache to track the most recent bar
-  - [ ] Use bar time comparison to distinguish updates vs new bars
-  - [ ] Prevent duplicate bar rendering and flickering
-- [ ] Separate DataAnalysis into focused components:
-  - [ ] HistoricalAnalysis component (CSV mode)
-  - [ ] LiveStreaming component (Platform mode)
-  - [ ] Shared chart visualization components
-- [ ] End-to-end testing with actual Chrome connection
-
-**Status**: 📅 Ready to Start (State machine complete)
-
-## 📋 Pending Phases
-
-### Phase 8: Comprehensive Testing & Validation
-**End-to-end verification**
-
-- [ ] Chrome disconnect/reconnect scenarios (basic testing complete)
-- [ ] Mode switching (CSV ↔ Platform)
-- [ ] Asset switching in live mode
-- [ ] Stream persistence verification
-- [ ] Extended stability testing (30+ minutes)
-- [ ] Backpressure handling under load
-- [ ] State machine transition testing
-
-### Phase 9: Strategy & Indicator Integration (Decision Pending)
-**Live trading strategy implementation - Three implementation approaches available**
-
-#### Available Strategy Engines
-- **Quantum Flux Strategy** (Primary) - Multi-indicator AI-driven with confidence scoring
-- **Neural Beast Quantum Fusion** - 3-phase strategy (Neural Quantum Engine, Beast Hybrid Core, Quantum Momentum Matrix)
-- **Advanced Strategies** (Tier 1) - 5 sophisticated strategies with proven performance
-- **Alternative Strategies** (Tier 2) - 5 unique approaches with different methodologies
-- **Basic Strategies** (Tier 3) - Simple, reliable implementations
-
-#### Available Technical Indicators
-- RSI (Relative Strength Index)
-- EMA/SMA (Exponential/Simple Moving Averages)
-- MACD (Moving Average Convergence Divergence)
-- Bollinger Bands
-- Stochastic Oscillator
-- ATR (Average True Range)
-- SuperTrend
-- Volume Analysis
-
-#### Implementation Options (User Decision Required)
-
-**Option 1: Backend-Only Strategy Testing (Fastest)**
-- ✅ Keep all indicators and strategy logic in backend
-- ✅ Apply strategy engines to live candle data
-- ✅ Emit `strategy_signal` events to frontend (call/put + confidence score)
-- ✅ Display signals as overlays on GUI chart (arrows, badges, recommendation panel)
-- ✅ Validate visually on PocketOption platform (use existing platform indicators)
-
-**Advantages:**
-- Fastest development cycle - strategy engine already exists
-- No chart library limitations or complex rendering
-- Use exact PocketOption platform visualization for validation
-- Focus on signal quality and accuracy, not UI complexity
-- Immediate strategy testing capability
-
-**Best For:** Rapid strategy testing, validation, and iteration
+### Core Philosophy
+- **Functional Simplicity**: Clean, focused interfaces without bloat
+- **Backtesting First**: Strategy validation is the primary workflow
+- **Live Trading Ready**: Real-time signal generation and execution
+- **Professional Aesthetic**: Dark theme with green accents, inspired by Solana-UI
 
 ---
 
-**Option 2: Lightweight Charts Indicator Overlays (Visual)**
-- ✅ Calculate indicators in backend
-- ✅ Send indicator data via Socket.IO events
-- ✅ Frontend adds indicator series to Lightweight Charts
-- ✅ Display strategy signals as chart markers
+## 📐 New Architecture: 3-Page System
 
-**TradingView Lightweight Charts Supports:**
-- Line overlays (SMA, EMA, Bollinger Bands upper/lower)
-- Histogram overlays (Volume bars)
-- Separate panes (RSI, MACD, Stochastic - below main chart)
-- Price markers and annotations
+### 1. **Chart Viewer** (Development/Testing Tab)
+**Purpose**: Test chart functionalities and indicator rendering
 
-**Limitations:**
-- Cannot render complex visual patterns (requires custom rendering)
-- Limited to line/histogram/area series types
-- More development effort for multi-pane layouts
+- Real-time chart with lightweight-charts v4.2
+- Data source toggle: CSV (historical) vs Platform (live WebSocket)
+- Dynamic indicator testing with modal-based configuration
+- **Role**: Development sandbox, not primary user interface
 
-**Best For:** Comprehensive UI experience with visual indicator feedback
+### 2. **Strategy Lab** (Core: Backtesting & Analysis)
+**Purpose**: Strategy development, backtesting, and performance analysis
 
----
+**Left Sidebar:**
+- Strategy selector (Quantum Flux, Neural Beast, custom uploads)
+- Data file picker (CSV historical data)
+- Backtest configuration (capital, position size, risk params)
+- Quick metrics cards (Total Trades, Win Rate, P/L, Sharpe)
 
-**Option 3: Hybrid Approach (Recommended)**
-- ✅ Backend: Calculate all indicators + generate strategy signals
-- ✅ Frontend Chart: Display basic overlays (EMAs, Bollinger Bands only)
-- ✅ PocketOption Platform: Validate complex visual patterns and execution
-- ✅ GUI Dashboard: Show signal alerts, confidence scores, trade recommendations, performance metrics
+**Center Panel:**
+- Large equity curve chart (profit over time)
+- Performance metrics grid with card-based layout
+- Trade history table with expandable details
 
-**Implementation Flow:**
-1. Backend applies strategy engine to live candles
-2. Emits indicator data for basic overlays (EMA/Bollinger)
-3. Emits strategy signals with confidence scores
-4. Frontend displays:
-   - Basic indicator lines on chart
-   - Signal badges/arrows at entry points
-   - Trade recommendation panel (CALL/PUT, confidence, reasoning)
-   - Performance tracking (win rate, P/L, signal accuracy)
-5. User validates visual patterns on PocketOption for final execution
+**Right Sidebar:**
+- Strategy parameters editor
+- Indicator configuration
+- Export/save results
 
-**Advantages:**
-- Best of both worlds - speed + visualization
-- Focus on what matters: signal quality
-- Enhanced UX without over-engineering
-- Leverages existing PocketOption platform for complex indicators
+**Key Features:**
+- Upload custom strategies (.py, .json)
+- Compare multiple strategies side-by-side
+- Monte Carlo simulation
+- Walk-forward optimization
+- Export reports (PDF, CSV)
 
-**Best For:** Production-ready implementation with balanced approach
+### 3. **Trading Hub** (Core: Live Trading Execution)
+**Purpose**: Real-time signal generation and trade execution
 
----
+**Left Sidebar:**
+- Active positions monitor
+- Signal log with confidence scores
+- P/L tracker (real-time)
 
-#### Recommended Implementation Sequence (Pending User Decision)
+**Center Panel:**
+- Live candlestick chart with strategy signals
+- Signal overlay badges (CALL/PUT with confidence %)
+- Current asset display with timeframe
 
-**Phase 9.1: Strategy Signal Integration (Quick Win)**
-- [ ] Integrate strategy engine into streaming pipeline (`capabilities/data_streaming.py`)
-- [ ] Add strategy configuration selection (Quantum Flux, Neural Beast, Advanced, etc.)
-- [ ] Emit `strategy_signal` events with: direction, confidence, reasoning, indicators
-- [ ] Create signal display components (badges, arrows, recommendation panel)
-- [ ] Add real-time signal monitoring dashboard
+**Right Sidebar:**
+- Live signal panel with:
+  - Current signal (CALL/PUT/NEUTRAL)
+  - Confidence score (0-100%)
+  - Indicator metrics (RSI, MACD, etc.)
+  - Execute trade button (prominent green)
+- Risk management controls
+- Position sizing calculator
 
-**Phase 9.2: Basic Indicator Overlays (If Option 2 or 3 chosen)**
-- [ ] Add EMA/SMA line series to Lightweight Charts
-- [ ] Implement Bollinger Bands visualization (upper/lower/middle bands)
-- [ ] Create RSI separate pane below main chart
-- [ ] Create MACD separate pane with histogram
-- [ ] Add indicator configuration panel (periods, colors, visibility toggles)
-
-**Phase 9.3: Strategy Testing & Validation**
-- [ ] Live signal monitoring and tracking
-- [ ] Signal accuracy metrics (win rate, profit factor)
-- [ ] Performance comparison dashboard (strategy A vs B)
-- [ ] Backtesting integration (test strategies on historical CSV data)
-- [ ] Signal history and replay functionality
-
-**Phase 9.4: Advanced Features (Future)**
-- [ ] Multi-strategy ensemble (combine signals from multiple engines)
-- [ ] Custom strategy builder UI
-- [ ] Machine learning model integration for confidence optimization
-- [ ] Trade execution automation (with user confirmation)
-- [ ] Risk management controls (position sizing, stop-loss automation)
-
-## 🏗️ Architecture Summary
-
-### Backend: streaming_server.py
-```
-streaming_server.py (Flask-SocketIO on port 3001)
-├── Uses: capabilities/data_streaming.py (RealtimeDataStreaming)
-├── Chrome connection: Port 9222 (optional, graceful degradation)
-├── Socket.IO events:
-│   ├── start_stream → Enable streaming for asset
-│   ├── stop_stream → Disable streaming
-│   ├── change_asset → Switch focused asset
-│   ├── detect_asset → Query current PocketOption asset (NEW)
-│   ├── candle_update → Emit to frontend (outbound)
-│   ├── asset_detected → Detection success (outbound, NEW)
-│   ├── asset_detection_failed → Detection error (outbound, NEW)
-│   ├── stream_error → Error notification (outbound)
-│   └── connection_status → Chrome status updates (outbound)
-├── Optional persistence: --collect-stream {tick,candle,both,none}
-└── Data flow: Chrome → Capability → Server → Socket.IO → Frontend
-```
-
-### Frontend: React GUI (Port 5000)
-```
-DataAnalysis.jsx
-├── Data Sources:
-│   ├── CSV Files (Historical) → /public/data, backend serves files
-│   └── Platform WebSocket (Live) → streaming_server.py:3001
-├── CSV Mode:
-│   ├── Asset Dropdown (manual selection)
-│   ├── Statistics Panel
-│   ├── All Timeframes (1m, 5m, 15m, 1h, 4h)
-│   └── "Load CSV Data" button
-├── Platform Mode:
-│   ├── Stream Control Panel (state-based)
-│   ├── Asset Detection (from PocketOption)
-│   ├── Stream Status Display
-│   ├── Locked to 1M timeframe
-│   └── State Machine: idle → ready → detecting → asset_detected → streaming
-└── State Management:
-    ├── isLiveMode: Controlled by state machine
-    ├── streamState: 6-state machine (idle, ready, detecting, asset_detected, streaming, error)
-    ├── detectedAsset: Asset from PocketOption detection
-    └── Backpressure: 1000-item buffer limit
-```
-
-### Platform Mode State Flow
-```
-User Journey:
-1. Select "Platform" data provider
-   ↓ (Chrome connected)
-2. State: READY → Click "Detect Asset"
-   ↓
-3. State: DETECTING → Backend queries PocketOption
-   ↓
-4. State: ASSET_DETECTED → Shows detected asset (e.g., "EUR/USD OTC")
-   ↓
-5. Click "Start Stream"
-   ↓
-6. State: STREAMING → Real-time chart updates
-   ↓
-7. Click "Stop Stream"
-   ↓
-8. State: READY → Back to start
-
-Reconnection:
-- Backend reconnects → State resets to READY/IDLE (no auto-start)
-- Chart data clears → User must explicitly restart detection flow
-```
-
-## 🔧 Key Implementation Details
-
-### Stream Collection Arguments
-```bash
-# No collection (default)
-uv run python streaming_server.py
-
-# Collect candles only
-uv run python streaming_server.py --collect-stream candle
-
-# Collect ticks only
-uv run python streaming_server.py --collect-stream tick
-
-# Collect both
-uv run python streaming_server.py --collect-stream both --candle-chunk-size 200 --tick-chunk-size 2000
-```
-
-### Chrome Connection
-- **Port**: 9222 (Chrome DevTools Protocol)
-- **Timeout**: 1 second fast-fail on startup
-- **Monitoring**: 5-second polling for disconnect detection
-- **Graceful**: Backend runs without Chrome, streaming just unavailable
-
-### Asset Focus System
-- **Enabled**: When user selects asset in Platform mode
-- **Effect**: Filters out other assets at capability level
-- **Release**: When user stops stream or switches to CSV mode
-- **Detection**: Real-time query from PocketOption (no hardcoded defaults)
-
-## 📊 Success Metrics
-
-| Metric | Target | Current | Status |
-|--------|--------|---------|--------|
-| Backend Stability | No crashes | Stable | ✅ |
-| Chrome Disconnect Handling | Graceful | Implemented | ✅ |
-| Reconnection Management | Auto-recovery | Implemented | ✅ |
-| Asset Validation | 100% correct | Implemented | ✅ |
-| Mode Switching | Seamless | Working | ✅ |
-| Data Collection | Optional | Configurable | ✅ |
-| Frontend Responsiveness | <100ms | Good | ✅ |
-| State Machine | Zero race conditions | Verified | ✅ |
-| Platform Mode | Production ready | Complete | ✅ |
-
-## 🎯 Next Steps
-
-1. **TradingView Chart Pattern**: Implement lastBar cache and time validation (Phase 7)
-2. **Component Separation**: Split DataAnalysis into HistoricalAnalysis + LiveStreaming
-3. **Testing**: Comprehensive end-to-end validation (Phase 8)
-4. **Documentation**: Update user guides for Platform mode state machine
-
-## 📝 Important Notes
-
-- **Separation of Concerns**: Historical collection (data_collect/) is completely separate from real-time streaming (realtime_stream/)
-- **Import Path**: streaming_server.py uses `from data_streaming import RealtimeDataStreaming` (direct import, working as intended)
-- **No Simulation**: All data comes from Chrome/PocketOption WebSocket interception
-- **Asset Detection**: Platform mode uses real-time detection from PocketOption (no hardcoded assets)
-- **1M Limitation**: Platform streaming currently only supports 1-minute candles
-- **State Machine**: Platform mode uses 6-state machine for lifecycle control
+**Key Features:**
+- Real-time WebSocket streaming from Pocket Option
+- Strategy signal generation on live candles
+- One-click trade execution
+- Position monitoring with auto-close
+- Performance tracking (win rate, profit factor)
 
 ---
 
-**Development Status**: Phases 1-6 Complete ✅ | Phase 7 Ready 🚀 | Phase 8 Queued 📅
+## 🎨 Design System: Solana-Inspired Aesthetic
 
-**Last Reviewed**: October 10, 2025
+### Color Palette
+```css
+/* Primary Backgrounds */
+--bg-primary: #0a0e1a;           /* Deep space */
+--bg-secondary: #141824;         /* Slightly lighter */
+--card-bg: #1e293b;              /* Card background */
+--card-border: #334155;          /* Subtle borders */
+
+/* Accents */
+--accent-green: #10b981;         /* Primary green (success, buy) */
+--accent-red: #ef4444;           /* Primary red (danger, sell) */
+--accent-blue: #3b82f6;          /* Info/highlight */
+--accent-purple: #8b5cf6;        /* Secondary accent */
+
+/* Text */
+--text-primary: #f8fafc;         /* White text */
+--text-secondary: #94a3b8;       /* Muted text */
+--text-tertiary: #64748b;        /* Very muted */
+```
+
+### Typography
+- **Headers**: Inter, 600 weight, tight tracking
+- **Body**: Inter, 400 weight
+- **Mono**: JetBrains Mono (for prices, metrics)
+
+### Component Style
+- **Cards**: Dark glass effect with subtle borders
+- **Buttons**: Solid green (#10b981) with hover states
+- **Inputs**: Dark background with green focus rings
+- **Tables**: Minimal borders, alternating row highlights
+- **Badges**: Pill-shaped with background opacity
+
+---
+
+## 🔧 Enhanced Indicator System
+
+### Current Limitations
+- Hardcoded indicators (single instance of SMA, EMA, etc.)
+- No support for crossover strategies (need SMA-10 AND SMA-20)
+- Limited indicator types
+
+### New System: Modal-Based Configuration
+
+**UI Flow:**
+1. **Indicator Dropdown** → Select indicator type (SMA, EMA, RSI, etc.)
+2. **Modal Opens** → Configure parameters:
+   - SMA: Period (default: 20)
+   - EMA: Period (default: 20)
+   - RSI: Period (default: 14)
+   - MACD: Fast (12), Slow (26), Signal (9)
+   - Bollinger: Period (20), Std Dev (2)
+   - **Schaff Trend Cycle**: Fast (10), Slow (20), %D(MACD) (3), %D(PF) (3)
+   - **DeMarker**: Period (10)
+   - **CCI**: Period (20)
+3. **Add Multiple Instances** → User can add SMA-10, SMA-20, SMA-50 for crossovers
+4. **Visual Management** → List of active indicators with edit/remove options
+
+**Backend Support:**
+- Dynamic indicator calculation based on user config
+- Support for multiple instances of same indicator type
+- Full time-series data for all indicators
+- Efficient caching to prevent recalculation
+
+**New Indicators to Add:**
+1. **Schaff Trend Cycle** - Cycle-based trend indicator
+   - Fast Length: 10
+   - Slow Length: 20
+   - %D(MACD) Length: 3
+   - %D(PF) Length: 3
+
+2. **DeMarker** - Price exhaustion indicator
+   - Period: 10
+
+3. **CCI (Commodity Channel Index)** - Momentum oscillator
+   - Period: 20
+
+---
+
+## 📊 Technical Implementation
+
+### Frontend Stack
+- **React 18** with hooks
+- **Vite** for fast dev builds
+- **TailwindCSS** for styling
+- **Lightweight Charts v4.2** for candlestick visualization
+- **Socket.IO Client** for real-time data
+- **React Router** for navigation
+
+### Backend Stack
+- **Flask-SocketIO** (port 3001) for GUI backend
+- **RealtimeDataStreaming** capability for WebSocket interception
+- **Quantum Flux Strategy** for signal generation
+- **Technical Indicators** library for calculations
+
+### Data Flow
+```
+PocketOption (Browser)
+    ↓ (WebSocket via Chrome DevTools)
+Chrome Port 9222
+    ↓
+RealtimeDataStreaming Capability
+    ↓
+streaming_server.py (Flask-SocketIO)
+    ↓
+Socket.IO Events → Frontend
+    ↓
+React Components (Chart Viewer, Strategy Lab, Trading Hub)
+```
+
+---
+
+## 🚀 Development Phases
+
+### Phase 1: Design System Foundation ✅ (Current)
+- [x] Create design tokens file
+- [x] Build core UI components (Card, Button, Badge, Input)
+- [x] Setup Solana color palette
+- [x] Typography and spacing system
+
+### Phase 2: Enhanced Indicator System
+- [ ] Backend: Add Schaff Trend Cycle calculation
+- [ ] Backend: Add DeMarker indicator
+- [ ] Backend: Add CCI indicator
+- [ ] Frontend: Indicator dropdown component
+- [ ] Frontend: Modal configuration UI
+- [ ] Frontend: Multiple instance management
+- [ ] Integration: Connect to backend calculation endpoints
+
+### Phase 3: Chart Viewer Refinement
+- [ ] Apply new design system to existing DataAnalysis page
+- [ ] Rename to "Chart Viewer" (dev/test focus)
+- [ ] Implement modal-based indicator configuration
+- [ ] Clean up redundant code
+- [ ] Focus on functionality testing only
+
+### Phase 4: Strategy Lab (Backtesting Core)
+- [ ] Design new StrategyBacktest page with 3-column layout
+- [ ] Build strategy selector with upload capability
+- [ ] Create equity curve chart component
+- [ ] Build performance metrics dashboard
+- [ ] Implement trade history table
+- [ ] Add strategy comparison tools
+- [ ] Integration testing with backend backtest engine
+
+### Phase 5: Trading Hub (Live Execution)
+- [ ] Design new LiveTrading page with signal-focused layout
+- [ ] Build live signal panel with confidence display
+- [ ] Create position monitor component
+- [ ] Implement trade execution controls
+- [ ] Add P/L tracker with real-time updates
+- [ ] Risk management UI
+- [ ] Integration with Pocket Option trade execution
+
+### Phase 6: Testing & Refinement
+- [ ] End-to-end testing of all workflows
+- [ ] Performance optimization
+- [ ] UI/UX polish
+- [ ] Documentation updates
+- [ ] Production deployment preparation
+
+---
+
+## 📋 Key Design Decisions
+
+### 1. DataAnalysis → Chart Viewer
+- **Purpose Shift**: From primary interface to dev/test sandbox
+- **Focus**: Indicator testing and chart functionality validation
+- **User Expectation**: Not the main trading interface
+
+### 2. Strategy Lab as Core
+- **Primary Workflow**: Strategy → Data → Backtest → Analyze → Refine
+- **Goal**: Fast iteration on strategy development
+- **Output**: Validated strategies ready for live trading
+
+### 3. Trading Hub as Execution Layer
+- **Primary Workflow**: Live Data → Strategy Signals → Execute → Monitor
+- **Goal**: Real-time signal generation and trade execution
+- **Safety**: Confirmation modals, risk controls, position limits
+
+### 4. Indicator System Flexibility
+- **Multiple Instances**: Essential for crossover strategies
+- **Modal Configuration**: Cleaner UI, less clutter
+- **Extensibility**: Easy to add new indicators
+
+---
+
+## 🎯 Success Metrics
+
+| Metric | Target | Status |
+|--------|--------|--------|
+| Backtest Execution Time | <5 seconds for 1000 candles | Pending |
+| Signal Generation Latency | <100ms | Pending |
+| UI Responsiveness | 60fps chart rendering | ✅ Achieved |
+| Trade Execution Speed | <500ms click-to-API | Pending |
+| Indicator Calculation | <50ms per indicator | Pending |
+| Strategy Win Rate Display | Real-time accuracy | Pending |
+
+---
+
+## 📝 Next Immediate Steps
+
+1. **Update Documentation** ✅ (This file)
+2. **Create Design Tokens** → `src/styles/designTokens.js`
+3. **Build Core Components** → `src/components/ui/`
+4. **Implement Indicator Modal** → `src/components/indicators/IndicatorModal.jsx`
+5. **Add Backend Indicators** → `strategies/technical_indicators.py`
+6. **Rebuild Pages** → Chart Viewer, Strategy Lab, Trading Hub
+
+---
+
+**Development Status**: Design System → Component Library → Page Rebuild 🚀
+
+**Last Reviewed**: October 15, 2025
