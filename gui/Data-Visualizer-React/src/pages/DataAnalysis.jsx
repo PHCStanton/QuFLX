@@ -4,15 +4,15 @@ import IndicatorManager from '../components/indicators/IndicatorManager';
 import { fetchCurrencyPairs } from '../utils/fileUtils';
 import { parseTradingData } from '../utils/tradingData';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { colors, typography, spacing, borderRadius } from '../styles/designTokens';
 
-// Stream lifecycle states for Platform mode
 const STREAM_STATES = {
-  IDLE: 'idle',                    // Chrome not connected
-  READY: 'ready',                  // Chrome connected, ready to detect
-  DETECTING: 'detecting',          // Detecting asset from PocketOption
-  ASSET_DETECTED: 'asset_detected', // Asset detected, ready to stream
-  STREAMING: 'streaming',          // Active stream
-  ERROR: 'error'                   // Detection or streaming error
+  IDLE: 'idle',
+  READY: 'ready',
+  DETECTING: 'detecting',
+  ASSET_DETECTED: 'asset_detected',
+  STREAMING: 'streaming',
+  ERROR: 'error'
 };
 
 const DataAnalysis = () => {
@@ -26,17 +26,15 @@ const DataAnalysis = () => {
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [statistics, setStatistics] = useState(null);
   
-  // State machine for Platform streaming lifecycle
   const [streamState, setStreamState] = useState(STREAM_STATES.IDLE);
   const [streamError, setStreamError] = useState(null);
   const [detectedAsset, setDetectedAsset] = useState(null);
   
-  // Dynamic indicator configuration (instance-based format)
   const [activeIndicators, setActiveIndicators] = useState({
     'SMA-20': { 
       type: 'sma', 
       params: { period: 20 },
-      color: '#10b981',
+      color: '#22c55e',
       definition: { name: 'Simple Moving Average (SMA)', renderType: 'line' }
     },
     'RSI-14': { 
@@ -53,7 +51,6 @@ const DataAnalysis = () => {
     }
   });
   
-  // WebSocket connection for live streaming (dynamic backend URL detection)
   const { 
     isConnected, 
     isConnecting, 
@@ -78,24 +75,21 @@ const DataAnalysis = () => {
     storeCsvCandles,
     setReconnectionCallback 
   } = useWebSocket();
-  // Buffer for candle updates with backpressure handling
+
   const candleBufferRef = useRef([]);
   const processingRef = useRef(false);
   const processTimerRef = useRef(null);
   const MAX_BUFFER_SIZE = 1000;
 
-  // Platform WebSocket is only enabled when Chrome is connected
   const chromeConnected = chromeStatus === 'connected';
   
   const dataSources = [
-    { id: 'csv', name: 'CSV Files (Historical Data)' },
-    { id: 'platform', name: 'Platform WebSocket (Live Streaming)' },
-    { id: 'binance', name: 'Binance API', disabled: true },
+    { id: 'csv', name: 'CSV' },
+    { id: 'platform', name: 'Platform' },
   ];
 
   const timeframes = ['1m', '5m', '15m', '1h', '4h'];
 
-  // Platform assets (hardcoded - available via WebSocket streaming)
   const platformAssets = [
     { id: 'EURUSD_OTC', name: 'EUR/USD OTC', file: null },
     { id: 'GBPUSD_OTC', name: 'GBP/USD OTC', file: null },
@@ -105,862 +99,726 @@ const DataAnalysis = () => {
 
   const loadAvailableAssets = useCallback(async () => {
     if (dataSource === 'csv') {
-      // Load CSV files from backend (filtered by timeframe)
       const pairs = await fetchCurrencyPairs(timeframe);
       setAvailableAssets(pairs);
       
-      // Validate current asset is in the new list, reset if not
       const isValidAsset = pairs.some(p => p.id === selectedAsset);
       if (!isValidAsset && pairs.length > 0) {
         setSelectedAsset(pairs[0].id);
-        console.log(`Asset reset to ${pairs[0].id} (previous asset not in CSV list)`);
       }
     } else if (dataSource === 'platform') {
-      // Platform mode: No asset dropdown, detection-based only
-      // Clear any previous selectedAsset to prevent conflicts
       setAvailableAssets([]);
       setSelectedAsset('');
     }
   }, [dataSource, timeframe, selectedAsset]);
 
-  const loadHistoricalData = useCallback(async () => {
+  useEffect(() => {
+    loadAvailableAssets();
+  }, [dataSource, timeframe]);
+
+  useEffect(() => {
+    if (dataSource === 'csv' && selectedAsset && timeframe) {
+      loadCsvData(selectedAsset, timeframe);
+    }
+  }, [selectedAsset, timeframe, dataSource]);
+
+  const loadCsvData = async (assetId, tf) => {
+    if (!assetId) return;
+    
     setLoading(true);
-    setLoadingStatus('Fetching CSV file...');
-    setStatistics(null);
+    setLoadingStatus(`Loading ${assetId} (${tf})...`);
+    setIsLiveMode(false);
     
     try {
-      const assetInfo = availableAssets.find(a => a.id === selectedAsset);
-      if (assetInfo && dataSource === 'csv') {
-        // Use the new API endpoint to fetch CSV data (using Vite proxy)
-        const response = await fetch(`/api/csv-data/${assetInfo.file}`, { 
-          cache: 'no-store' 
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to load data: ${response.statusText}`);
-        }
-        
-        setLoadingStatus('Parsing CSV data...');
-        const csvText = await response.text();
-        const data = parseTradingData(csvText, selectedAsset);
-        
-        setLoadingStatus('Storing in backend...');
-        // Store CSV candles in backend for indicator calculation
-        storeCsvCandles(selectedAsset, data);
-        
-        setLoadingStatus('Rendering chart...');
-        setChartData(data);
-        
-        // Auto-calculate indicators after data loads (with small delay for backend to store)
-        setTimeout(() => {
-          console.log('[DataAnalysis] Auto-calculating indicators after CSV load...');
-          calculateIndicators(selectedAsset, activeIndicators);
-        }, 300);
-        
-        // Calculate statistics
-        if (data.length > 0) {
-          const latest = data[data.length - 1];
-          const first = data[0];
-          const priceChange = latest.close - first.close;
-          const priceChangePercent = ((priceChange / first.close) * 100).toFixed(2);
-          
-          setStatistics({
-            latestPrice: latest.close.toFixed(5),
-            open: latest.open.toFixed(5),
-            high: latest.high.toFixed(5),
-            low: latest.low.toFixed(5),
-            priceChange: priceChange.toFixed(5),
-            priceChangePercent: priceChangePercent,
-            dataPoints: data.length,
-            timeRange: `${first.date.toLocaleString()} - ${latest.date.toLocaleString()}`
-          });
-        }
-        
-        console.log(`Loaded ${data.length} data points for ${selectedAsset}`);
+      const response = await fetch(`http://localhost:3001/api/csv/${assetId}?timeframe=${tf}`);
+      if (!response.ok) throw new Error('Failed to load CSV data');
+      
+      const rawData = await response.json();
+      const parsedData = parseTradingData(rawData);
+      setChartData(parsedData);
+      
+      const config = Object.entries(activeIndicators).reduce((acc, [id, ind]) => {
+        acc[ind.type] = ind.params;
+        return acc;
+      }, {});
+      
+      await storeCsvCandles(parsedData, assetId);
+      await calculateIndicators(assetId, config);
+      
+      setLoadingStatus('Data loaded successfully');
+      setTimeout(() => setLoadingStatus(''), 2000);
+    } catch (err) {
+      console.error('[CSV] Load error:', err);
+      setLoadingStatus(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (dataSource === 'platform') {
+      if (chromeConnected) {
+        setStreamState(STREAM_STATES.READY);
+        setStreamError(null);
+      } else {
+        setStreamState(STREAM_STATES.IDLE);
       }
-    } catch (error) {
-      console.error('Error loading data:', error);
-      alert(`Failed to load data: ${error.message || 'Unknown error'}`);
-      setStatistics(null);
     }
-    setLoading(false);
-    setLoadingStatus('');
-  }, [availableAssets, selectedAsset, dataSource, timeframe, activeIndicators, calculateIndicators, storeCsvCandles]);
+  }, [dataSource, chromeConnected]);
 
-  // State machine: Manage Platform mode stream state transitions
   useEffect(() => {
-    if (dataSource !== 'platform') {
-      // Reset stream state when not in platform mode
-      setStreamState(STREAM_STATES.IDLE);
-      setDetectedAsset(null);
-      setStreamError(null);
-      return;
-    }
-
-    // Platform mode state transitions based on Chrome connection
-    if (!chromeConnected) {
-      setStreamState(STREAM_STATES.IDLE);
-      setDetectedAsset(null);
-    } else if (chromeConnected && streamState === STREAM_STATES.IDLE) {
-      setStreamState(STREAM_STATES.READY);
-      setStreamError(null);
-    }
-  }, [dataSource, chromeConnected, streamState]);
-
-  // Sync WebSocket detection state with local state machine
-  useEffect(() => {
-    if (wsDetectedAsset && streamState === STREAM_STATES.DETECTING) {
+    if (wsDetectedAsset) {
       setDetectedAsset(wsDetectedAsset);
       setStreamState(STREAM_STATES.ASSET_DETECTED);
-      setStreamError(null);
-    } else if (wsDetectionError && streamState === STREAM_STATES.DETECTING) {
+    }
+  }, [wsDetectedAsset]);
+
+  useEffect(() => {
+    if (wsDetectionError) {
       setStreamError(wsDetectionError);
       setStreamState(STREAM_STATES.ERROR);
-      setDetectedAsset(null);
     }
-  }, [wsDetectedAsset, wsDetectionError, streamState]);
+  }, [wsDetectionError]);
 
-  // Handler: Detect asset from PocketOption
-  const handleDetectAsset = useCallback(() => {
-    if (!isConnected) {
-      setStreamError('Backend not connected');
-      setStreamState(STREAM_STATES.ERROR);
+  useEffect(() => {
+    if (streamActive && streamAsset) {
+      setStreamState(STREAM_STATES.STREAMING);
+      setIsLiveMode(true);
+    } else if (dataSource === 'platform' && !streamActive) {
+      setIsLiveMode(false);
+    }
+  }, [streamActive, streamAsset, dataSource]);
+
+  useEffect(() => {
+    if (lastMessage?.type === 'candle_update' && isLiveMode) {
+      const candle = lastMessage.data;
+      candleBufferRef.current.push(candle);
+      
+      if (candleBufferRef.current.length > MAX_BUFFER_SIZE) {
+        candleBufferRef.current = candleBufferRef.current.slice(-MAX_BUFFER_SIZE);
+      }
+      
+      if (!processTimerRef.current) {
+        processTimerRef.current = setTimeout(processBufferedCandles, 100);
+      }
+    }
+  }, [lastMessage, isLiveMode]);
+
+  const processBufferedCandles = useCallback(() => {
+    if (processingRef.current || candleBufferRef.current.length === 0) {
+      processTimerRef.current = null;
       return;
     }
+    
+    processingRef.current = true;
+    const candles = [...candleBufferRef.current];
+    candleBufferRef.current = [];
+    
+    setChartData(prevData => {
+      const newData = [...prevData];
+      candles.forEach(candle => {
+        const existingIndex = newData.findIndex(c => c.time === candle.time);
+        if (existingIndex >= 0) {
+          newData[existingIndex] = candle;
+        } else {
+          newData.push(candle);
+        }
+      });
+      return newData.sort((a, b) => a.time - b.time);
+    });
+    
+    processingRef.current = false;
+    processTimerRef.current = null;
+  }, []);
 
+  useEffect(() => {
+    return () => {
+      if (processTimerRef.current) {
+        clearTimeout(processTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (historicalCandles && historicalCandles.length > 0) {
+      const parsedData = parseTradingData(historicalCandles);
+      setChartData(parsedData);
+    }
+  }, [historicalCandles]);
+
+  const handleDetectAsset = () => {
     setStreamState(STREAM_STATES.DETECTING);
     setStreamError(null);
-    wsDetectAsset(); // Use real WebSocket detection
-  }, [isConnected, wsDetectAsset]);
+    setDetectedAsset(null);
+    wsDetectAsset();
+  };
 
-  // Handler: Start streaming with detected asset
-  const handleStartStream = useCallback(() => {
-    if (!detectedAsset) {
-      setStreamError('No asset detected');
-      setStreamState(STREAM_STATES.ERROR);
-      return;
+  const handleStartStream = () => {
+    if (detectedAsset) {
+      setChartData([]);
+      startStream(detectedAsset.asset);
+      
+      const config = Object.entries(activeIndicators).reduce((acc, [id, ind]) => {
+        acc[ind.type] = ind.params;
+        return acc;
+      }, {});
+      
+      setTimeout(() => {
+        calculateIndicators(detectedAsset.asset, config);
+      }, 2000);
     }
+  };
 
-    console.log(`[StartStream] Starting stream for ${detectedAsset}...`);
-    
-    // Clear previous chart data
-    setChartData([]);
-    candleBufferRef.current = [];
-    setStatistics(null);
-    
-    // Start streaming
-    setIsLiveMode(true);
-    startStream(detectedAsset);
-    setStreamState(STREAM_STATES.STREAMING);
-  }, [detectedAsset, startStream]);
-
-  // Handler: Stop streaming
-  const handleStopStream = useCallback(() => {
-    console.log('[StopStream] Stopping stream...');
-    setIsLiveMode(false);
+  const handleStopStream = () => {
     stopStream();
     setStreamState(STREAM_STATES.READY);
     setDetectedAsset(null);
-  }, [stopStream]);
+  };
 
-  // Stage 2: Handler for indicator calculation request (uses dynamic config)
-  const handleCalculateIndicators = useCallback(() => {
-    const asset = dataSource === 'platform' ? (streamAsset || detectedAsset) : selectedAsset;
-    if (asset) {
-      console.log('[Indicators] Requesting indicators for:', asset, 'with config:', activeIndicators);
-      calculateIndicators(asset, activeIndicators);
-    } else {
-      alert('No asset selected. Please select an asset or start streaming first.');
-    }
-  }, [dataSource, selectedAsset, streamAsset, detectedAsset, calculateIndicators, activeIndicators]);
-
-  useEffect(() => {
-    loadAvailableAssets();
-  }, [loadAvailableAssets]);
-
-  // Setup reconnection callback to clear state and reload data
-  useEffect(() => {
-    const handleReconnection = () => {
-      console.log('[Reconnection] Clearing chart data and reloading...');
-      
-      // Clear chart data and buffers
-      setChartData([]);
-      candleBufferRef.current = [];
-      setStatistics(null);
-      
-      // Stop current stream if active
-      if (isLiveMode) {
-        stopStream();
-        setIsLiveMode(false);
-      }
-      
-      // Reset state machine for Platform mode
-      if (dataSource === 'platform') {
-        setStreamState(chromeConnected ? STREAM_STATES.READY : STREAM_STATES.IDLE);
-        setDetectedAsset(null);
-        setStreamError(null);
-      }
-      
-      // Reload data based on current source
-      if (dataSource === 'csv' && selectedAsset) {
-        setTimeout(() => {
-          loadHistoricalData();
-        }, 500); // Short delay to ensure state is cleared
-      }
-      // Platform mode: State machine controls streaming, no auto-start
-    };
+  const handleIndicatorUpdate = async (indicators) => {
+    setActiveIndicators(indicators);
     
-    setReconnectionCallback(handleReconnection);
-  }, [dataSource, selectedAsset, chromeConnected, isLiveMode, loadHistoricalData, stopStream, setReconnectionCallback]);
-
-  // Auto-load CSV data when asset or timeframe changes
-  useEffect(() => {
-    if (selectedAsset && dataSource === 'csv') {
-      loadHistoricalData();
+    const config = Object.entries(indicators).reduce((acc, [id, ind]) => {
+      acc[ind.type] = ind.params;
+      return acc;
+    }, {});
+    
+    if (dataSource === 'csv' && selectedAsset) {
+      await calculateIndicators(selectedAsset, config);
+    } else if (dataSource === 'platform' && streamAsset) {
+      await calculateIndicators(streamAsset, config);
     }
-  }, [selectedAsset, timeframe, loadHistoricalData, dataSource]);
+  };
 
-  // Clear chart when switching to Platform mode
-  useEffect(() => {
-    if (dataSource === 'platform') {
-      // Clear everything when entering platform mode
-      setChartData([]);
-      setStatistics(null);
-      candleBufferRef.current = [];
-      setIsLiveMode(false);
-      stopStream();
-      setSelectedAsset(''); // Clear asset - will be detected
+  const getLatestPrice = () => {
+    if (chartData.length === 0) return null;
+    return chartData[chartData.length - 1].close;
+  };
+
+  const getPriceChange = () => {
+    if (chartData.length < 2) return null;
+    const first = chartData[0].close;
+    const last = chartData[chartData.length - 1].close;
+    return (((last - first) / first) * 100).toFixed(2);
+  };
+
+  const getVolume = () => {
+    if (chartData.length === 0) return null;
+    const totalVolume = chartData.reduce((sum, candle) => sum + (candle.volume || 0), 0);
+    return (totalVolume / chartData.length).toFixed(0);
+  };
+
+  const getIndicatorReading = (type) => {
+    if (!indicatorData || !indicatorData.indicators) return null;
+    
+    const ind = indicatorData.indicators[type];
+    if (!ind) return null;
+    
+    if (type === 'rsi') {
+      return { value: ind.value?.toFixed(0), signal: ind.signal };
+    } else if (type === 'macd') {
+      return { value: ind.signal, signal: ind.signal };
+    } else if (type === 'bollinger') {
+      return { value: ind.signal, signal: ind.signal };
     }
-  }, [dataSource, stopStream]);
+    return null;
+  };
 
-  // Stage 1: Handle historical candles loaded event - seed chart with context
-  useEffect(() => {
-    if (historicalCandles && historicalCandles.candles && historicalCandles.candles.length > 0) {
-      console.log(`[HistoricalData] Seeding chart with ${historicalCandles.count} historical candles`);
-      
-      // Convert historical candles to chart format
-      const formattedCandles = historicalCandles.candles.map(candle => ({
-        timestamp: candle.timestamp,
-        date: new Date(candle.date || candle.timestamp * 1000),
-        open: candle.open,
-        high: candle.high,
-        low: candle.low,
-        close: candle.close,
-        volume: candle.volume || 0,
-        symbol: candle.asset
-      }));
-      
-      // Seed chart with historical data
-      setChartData(formattedCandles);
-      
-      // Auto-calculate indicators for Platform mode historical data
-      const asset = historicalCandles.asset;
-      if (asset && formattedCandles.length >= 20) {
-        setTimeout(() => {
-          console.log('[DataAnalysis] Auto-calculating indicators after historical load...');
-          calculateIndicators(asset, activeIndicators);
-        }, 300);
-      }
-      
-      // Update statistics with latest historical candle
-      if (formattedCandles.length > 0) {
-        const latest = formattedCandles[formattedCandles.length - 1];
-        const first = formattedCandles[0];
-        const priceChange = latest.close - first.close;
-        const priceChangePercent = ((priceChange / first.close) * 100).toFixed(2);
-        
-        setStatistics({
-          latestPrice: latest.close.toFixed(5),
-          open: latest.open.toFixed(5),
-          high: latest.high.toFixed(5),
-          low: latest.low.toFixed(5),
-          priceChange: priceChange.toFixed(5),
-          priceChangePercent: priceChangePercent,
-          dataPoints: formattedCandles.length,
-          timeRange: `${first.date.toLocaleString()} - ${latest.date.toLocaleString()}`
-        });
-      }
-    }
-  }, [historicalCandles, activeIndicators, calculateIndicators]);
+  const cardStyle = {
+    background: colors.cardBg,
+    border: `1px solid ${colors.cardBorder}`,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+  };
 
-  // Push candles into buffer with asset gating and backpressure handling
-  useEffect(() => {
-    if (!isLiveMode || !lastMessage) return;
-    const gateAsset = dataSource === 'platform' ? (streamAsset || selectedAsset) : selectedAsset;
-    if (lastMessage.asset === gateAsset) {
-      // Backpressure: limit buffer size
-      if (candleBufferRef.current.length > MAX_BUFFER_SIZE) {
-        candleBufferRef.current = candleBufferRef.current.slice(-MAX_BUFFER_SIZE / 2);
-      }
-      candleBufferRef.current.push(lastMessage);
-    }
-  }, [isLiveMode, lastMessage, selectedAsset, dataSource, streamAsset]);
-
-  // Simplified candle processing loop (~10 fps)
-  useEffect(() => {
-    if (!isLiveMode) {
-      // Clear buffer and stop processing when not live
-      candleBufferRef.current = [];
-      if (processTimerRef.current) {
-        clearInterval(processTimerRef.current);
-        processTimerRef.current = null;
-      }
-      return;
-    }
-
-    if (!processTimerRef.current) {
-      processTimerRef.current = setInterval(() => {
-        if (processingRef.current) return;
-        processingRef.current = true;
-
-        const buffer = candleBufferRef.current;
-        if (buffer.length === 0) {
-          processingRef.current = false;
-          return;
-        }
-
-        // Take a snapshot of current buffer and clear it
-        candleBufferRef.current = [];
-
-        // Update chart with pre-formed candles from backend
-        setChartData(prevData => {
-          let data = prevData.slice();
-          
-          for (const candle of buffer) {
-            const timestamp = candle.timestamp;
-            
-            if (data.length > 0) {
-              const last = data[data.length - 1];
-              
-              // Update existing candle if same timestamp
-              if (last.timestamp === timestamp) {
-                data[data.length - 1] = {
-                  timestamp: timestamp,
-                  date: new Date(candle.date || timestamp * 1000),
-                  open: candle.open,
-                  high: candle.high,
-                  low: candle.low,
-                  close: candle.close,
-                  volume: candle.volume || 0,
-                  symbol: candle.asset
-                };
-                continue;
-              }
-              
-              // Skip out-of-order candles
-              if (timestamp < last.timestamp) {
-                continue;
-              }
-            }
-
-            // Append new candle
-            data.push({
-              timestamp: timestamp,
-              date: new Date(candle.date || timestamp * 1000),
-              open: candle.open,
-              high: candle.high,
-              low: candle.low,
-              close: candle.close,
-              volume: candle.volume || 0,
-              symbol: candle.asset
-            });
-          }
-          
-          // Cap data length to prevent memory issues
-          return data.slice(-500);
-        });
-
-        processingRef.current = false;
-      }, 100); // ~10 fps
-    }
-
-    return () => {
-      if (processTimerRef.current) {
-        clearInterval(processTimerRef.current);
-        processTimerRef.current = null;
-      }
-    };
-  }, [isLiveMode]);
-
-  // Legacy toggleLiveMode removed - use state machine handlers instead (handleDetectAsset, handleStartStream, handleStopStream)
+  const containerStyle = {
+    display: 'grid',
+    gridTemplateColumns: '280px 1fr 300px',
+    gap: spacing.lg,
+    padding: spacing.lg,
+    minHeight: 'calc(100vh - 120px)',
+  };
 
   return (
-    <div className="space-y-6">
-      <div
-        className="glass rounded-xl p-6"
-        style={{ borderColor: 'var(--card-border)' }}
-      >
-        <h2
-          className="text-2xl font-bold mb-6"
-          style={{ color: 'var(--text-primary)' }}
-        >Data Source Configuration</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <label
-              className="block text-sm font-medium mb-2"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Data Provider
-            </label>
-            <select
-              value={dataSource}
-              onChange={(e) => setDataSource(e.target.value)}
-              className="w-full glass border rounded-lg px-4 py-2 focus:outline-none focus:ring-2"
-              style={{
-                backgroundColor: 'var(--card-bg)',
-                borderColor: 'var(--card-border)',
-                color: 'var(--text-primary)'
-              }}
-            >
-              {dataSources.map(source => (
-                <option key={source.id} value={source.id} disabled={source.disabled}>
-                  {source.name} {source.disabled ? '(Coming Soon)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label
-              className="block text-sm font-medium mb-2"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Timeframe
-            </label>
-            <select
-              value={timeframe}
-              onChange={(e) => setTimeframe(e.target.value)}
-              className="w-full glass border rounded-lg px-4 py-2 focus:outline-none focus:ring-2"
-              style={{
-                backgroundColor: 'var(--card-bg)',
-                borderColor: 'var(--card-border)',
-                color: 'var(--text-primary)'
-              }}
-              disabled={dataSource === 'platform' || isLiveMode}
-            >
-              {timeframes.map(tf => (
-                <option key={tf} value={tf}>{tf}</option>
-              ))}
-            </select>
-            {dataSource === 'platform' && (
-              <p className="text-xs text-slate-400 mt-1">Platform uses 1M timeframe</p>
-            )}
-          </div>
-
-          {/* CSV Mode: Show Asset Dropdown */}
-          {dataSource === 'csv' && (
-            <div>
-              <label
-                className="block text-sm font-medium mb-2"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                CSV File
-              </label>
-              <select
-                value={selectedAsset}
-                onChange={(e) => setSelectedAsset(e.target.value)}
-                className="w-full glass border rounded-lg px-4 py-2 focus:outline-none focus:ring-2"
+    <div style={containerStyle}>
+      {/* LEFT COLUMN - Controls */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg }}>
+        {/* Data Source Toggle */}
+        <div style={cardStyle}>
+          <h3 style={{
+            margin: 0,
+            marginBottom: spacing.md,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.textPrimary
+          }}>
+            Data Source
+          </h3>
+          <div style={{ display: 'flex', gap: spacing.sm }}>
+            {dataSources.map(source => (
+              <button
+                key={source.id}
+                onClick={() => setDataSource(source.id)}
                 style={{
-                  backgroundColor: 'var(--card-bg)',
-                  borderColor: 'var(--card-border)',
-                  color: 'var(--text-primary)'
+                  flex: 1,
+                  padding: `${spacing.sm} ${spacing.md}`,
+                  background: dataSource === source.id ? colors.accentGreen : colors.bgSecondary,
+                  border: 'none',
+                  borderRadius: borderRadius.lg,
+                  fontSize: typography.fontSize.sm,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: dataSource === source.id ? '#000' : colors.textPrimary,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
                 }}
               >
-                {availableAssets.map(asset => (
-                  <option key={asset.id} value={asset.id}>{asset.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Platform Mode: Show Stream Control Panel */}
-          {dataSource === 'platform' && (
-            <div>
-              <label
-                className="block text-sm font-medium mb-2"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Stream Controls
-              </label>
-              <div
-                className="glass border rounded-lg p-4 space-y-3"
-                style={{ borderColor: 'var(--card-border)' }}
-              >
-                {/* Stream State Display */}
-                {streamState === STREAM_STATES.IDLE && (
-                  <div className="flex items-center gap-2 text-yellow-400">
-                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                    <span className="text-sm">Waiting for Chrome connection...</span>
-                  </div>
-                )}
-
-                {streamState === STREAM_STATES.READY && (
-                  <button
-                    onClick={handleDetectAsset}
-                    className="w-full px-4 py-2 rounded-lg font-medium transition-colors"
-                    style={{
-                      backgroundColor: 'var(--accent-purple)',
-                      color: 'var(--text-primary)'
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-blue)'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--accent-purple)'}
-                  >
-                    Detect Asset from PocketOption
-                  </button>
-                )}
-
-                {streamState === STREAM_STATES.DETECTING && (
-                  <div className="flex items-center justify-center gap-2 text-blue-400">
-                    <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm">Detecting asset...</span>
-                  </div>
-                )}
-
-                {streamState === STREAM_STATES.ASSET_DETECTED && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-green-400">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
-                      </svg>
-                      <span className="text-sm font-medium">Detected: {detectedAsset}</span>
-                    </div>
-                    <button
-                      onClick={handleStartStream}
-                      className="w-full px-4 py-2 rounded-lg font-medium transition-colors"
-                      style={{
-                        backgroundColor: 'var(--accent-green)',
-                        color: 'var(--text-primary)'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-blue)'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--accent-green)'}
-                    >
-                      Start Stream
-                    </button>
-                  </div>
-                )}
-
-                {streamState === STREAM_STATES.STREAMING && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-green-400">
-                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                      <span className="text-sm font-medium">Streaming: {detectedAsset}</span>
-                    </div>
-                    <button
-                      onClick={handleStopStream}
-                      className="w-full px-4 py-2 rounded-lg font-medium transition-colors"
-                      style={{
-                        backgroundColor: 'var(--accent-red)',
-                        color: 'var(--text-primary)'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-purple)'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--accent-red)'}
-                    >
-                      Stop Stream
-                    </button>
-                  </div>
-                )}
-
-                {streamState === STREAM_STATES.ERROR && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-red-400">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
-                      </svg>
-                      <span className="text-sm">{streamError}</span>
-                    </div>
-                    <button
-                      onClick={handleDetectAsset}
-                      className="w-full px-4 py-2 rounded-lg font-medium transition-colors"
-                      style={{
-                        backgroundColor: 'var(--accent-purple)',
-                        color: 'var(--text-primary)'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--accent-blue)'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--accent-purple)'}
-                    >
-                      Retry Detection
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+                {source.name}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {dataSource === 'csv' && (
+        {/* Asset Selector (CSV only) */}
+        {dataSource === 'csv' && (
+          <div style={cardStyle}>
+            <h3 style={{
+              margin: 0,
+              marginBottom: spacing.md,
+              fontSize: typography.fontSize.lg,
+              fontWeight: typography.fontWeight.semibold,
+              color: colors.textPrimary
+            }}>
+              Asset Selector
+            </h3>
+            <select
+              value={selectedAsset}
+              onChange={(e) => setSelectedAsset(e.target.value)}
+              style={{
+                width: '100%',
+                padding: spacing.md,
+                background: colors.bgSecondary,
+                border: `1px solid ${colors.cardBorder}`,
+                borderRadius: borderRadius.lg,
+                fontSize: typography.fontSize.base,
+                color: colors.textPrimary,
+                cursor: 'pointer'
+              }}
+            >
+              <option value="">Select Asset</option>
+              {availableAssets.map(asset => (
+                <option key={asset.id} value={asset.id}>{asset.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Platform Mode Controls */}
+        {dataSource === 'platform' && (
+          <div style={cardStyle}>
+            <h3 style={{
+              margin: 0,
+              marginBottom: spacing.md,
+              fontSize: typography.fontSize.lg,
+              fontWeight: typography.fontWeight.semibold,
+              color: colors.textPrimary
+            }}>
+              Platform Mode
+            </h3>
+            
+            {streamState === STREAM_STATES.IDLE && (
+              <div style={{
+                padding: spacing.md,
+                background: colors.accentRed,
+                borderRadius: borderRadius.lg,
+                fontSize: typography.fontSize.sm,
+                color: '#000',
+                fontWeight: typography.fontWeight.semibold,
+                textAlign: 'center'
+              }}>
+                Chrome not connected
+              </div>
+            )}
+            
+            {streamState === STREAM_STATES.READY && (
               <button
-                onClick={loadHistoricalData}
-                disabled={loading}
-                className="px-6 py-2 rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
+                onClick={handleDetectAsset}
                 style={{
-                  backgroundColor: loading ? 'var(--card-border)' : 'var(--accent-blue)',
-                  color: 'var(--text-primary)'
+                  width: '100%',
+                  padding: spacing.md,
+                  background: colors.accentGreen,
+                  border: 'none',
+                  borderRadius: borderRadius.lg,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.bold,
+                  color: '#000',
+                  cursor: 'pointer'
                 }}
-                onMouseEnter={(e) => !loading && (e.target.style.backgroundColor = 'var(--accent-purple)')}
-                onMouseLeave={(e) => !loading && (e.target.style.backgroundColor = 'var(--accent-blue)')}
               >
-                {loading ? 'Loading...' : 'Load CSV Data'}
+                Detect Asset
+              </button>
+            )}
+            
+            {streamState === STREAM_STATES.DETECTING && (
+              <div style={{
+                padding: spacing.md,
+                background: colors.accentBlue,
+                borderRadius: borderRadius.lg,
+                fontSize: typography.fontSize.sm,
+                color: '#000',
+                fontWeight: typography.fontWeight.semibold,
+                textAlign: 'center'
+              }}>
+                Detecting...
+              </div>
+            )}
+            
+            {streamState === STREAM_STATES.ASSET_DETECTED && detectedAsset && (
+              <div>
+                <div style={{
+                  padding: spacing.md,
+                  background: colors.bgSecondary,
+                  borderRadius: borderRadius.lg,
+                  marginBottom: spacing.sm,
+                  fontSize: typography.fontSize.sm,
+                  color: colors.textPrimary
+                }}>
+                  Detected: {detectedAsset.asset}
+                </div>
+                <button
+                  onClick={handleStartStream}
+                  style={{
+                    width: '100%',
+                    padding: spacing.md,
+                    background: colors.accentGreen,
+                    border: 'none',
+                    borderRadius: borderRadius.lg,
+                    fontSize: typography.fontSize.base,
+                    fontWeight: typography.fontWeight.bold,
+                    color: '#000',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Start Stream
+                </button>
+              </div>
+            )}
+            
+            {streamState === STREAM_STATES.STREAMING && (
+              <button
+                onClick={handleStopStream}
+                style={{
+                  width: '100%',
+                  padding: spacing.md,
+                  background: colors.accentRed,
+                  border: 'none',
+                  borderRadius: borderRadius.lg,
+                  fontSize: typography.fontSize.base,
+                  fontWeight: typography.fontWeight.bold,
+                  color: '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Stop Stream
               </button>
             )}
           </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{
-                  backgroundColor: isConnected ? 'var(--accent-green)' : isConnecting ? 'var(--accent-orange)' : 'var(--accent-red)'
-                }}
-              ></div>
-              <span
-                className="text-xs"
-                style={{ color: 'var(--text-muted)' }}
-              >Backend: {isConnected ? 'Connected' : isConnecting ? 'Connecting...' : 'Disconnected'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{
-                  backgroundColor: chromeConnected ? 'var(--accent-green)' : 'var(--accent-orange)'
-                }}
-              ></div>
-              <span
-                className="text-xs"
-                style={{ color: 'var(--text-muted)' }}
-              >Chrome: {chromeConnected ? 'Connected' : 'Not Connected'}</span>
-            </div>
-            {backendReconnected && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 border border-blue-500/50 rounded-md">
-                <svg className="w-3 h-3 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span className="text-xs text-blue-400 font-medium">Backend Reconnected</span>
-              </div>
-            )}
-            {chromeReconnected && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-green-500/20 border border-green-500/50 rounded-md">
-                <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
-                </svg>
-                <span className="text-xs text-green-400 font-medium">Chrome Reconnected</span>
-              </div>
-            )}
-          </div>
+        )}
 
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-3 h-3 rounded-full ${isLiveMode ? 'animate-pulse' : ''}`}
-              style={{
-                backgroundColor: isLiveMode ? 'var(--accent-green)' : 'var(--card-border)'
-              }}
-            />
-            <span
-              className="text-sm"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              {isLiveMode ? 'Live' : 'Historical'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Statistics Panel - CSV Mode Only */}
-      {statistics && dataSource === 'csv' && (
-        <div
-          className="glass rounded-xl p-6"
-          style={{ borderColor: 'var(--card-border)' }}
-        >
-          <h3
-            className="text-xl font-semibold mb-4"
-            style={{ color: 'var(--text-primary)' }}
-          >Statistics</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div
-              className="glass rounded-lg p-4"
-              style={{ borderColor: 'var(--card-border)' }}
-            >
-              <div
-                className="text-sm mb-1"
-                style={{ color: 'var(--text-muted)' }}
-              >Current Price</div>
-              <div
-                className="text-lg font-semibold"
-                style={{ color: 'var(--text-primary)' }}
-              >{statistics.latestPrice}</div>
-            </div>
-            <div
-              className="glass rounded-lg p-4"
-              style={{ borderColor: 'var(--card-border)' }}
-            >
-              <div
-                className="text-sm mb-1"
-                style={{ color: 'var(--text-muted)' }}
-              >Change</div>
-              <div
-                className="text-lg font-semibold"
+        {/* Timeframe Selector */}
+        <div style={cardStyle}>
+          <h3 style={{
+            margin: 0,
+            marginBottom: spacing.md,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.textPrimary
+          }}>
+            Timeframe
+          </h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.sm }}>
+            {timeframes.map(tf => (
+              <button
+                key={tf}
+                onClick={() => setTimeframe(tf)}
                 style={{
-                  color: parseFloat(statistics.priceChangePercent) >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'
+                  padding: `${spacing.sm} ${spacing.md}`,
+                  background: timeframe === tf ? colors.accentGreen : colors.bgSecondary,
+                  border: 'none',
+                  borderRadius: borderRadius.lg,
+                  fontSize: typography.fontSize.sm,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: timeframe === tf ? '#000' : colors.textPrimary,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
                 }}
               >
-                {statistics.priceChange} ({statistics.priceChangePercent}%)
-              </div>
-            </div>
-            <div
-              className="glass rounded-lg p-4"
-              style={{ borderColor: 'var(--card-border)' }}
-            >
-              <div
-                className="text-sm mb-1"
-                style={{ color: 'var(--text-muted)' }}
-              >High / Low</div>
-              <div
-                className="text-lg font-semibold"
-                style={{ color: 'var(--text-primary)' }}
-              >{statistics.high} / {statistics.low}</div>
-            </div>
-            <div
-              className="glass rounded-lg p-4"
-              style={{ borderColor: 'var(--card-border)' }}
-            >
-              <div
-                className="text-sm mb-1"
-                style={{ color: 'var(--text-muted)' }}
-              >Data Points</div>
-              <div
-                className="text-lg font-semibold"
-                style={{ color: 'var(--text-primary)' }}
-              >{statistics.dataPoints}</div>
-            </div>
+                {tf}
+              </button>
+            ))}
           </div>
         </div>
-      )}
 
-      {/* Stage 2: Dynamic Technical Indicators Panel */}
-      <div
-        className="glass rounded-xl p-6"
-        style={{ borderColor: 'var(--card-border)' }}
-      >
-        <h3
-          className="text-xl font-semibold mb-4"
-          style={{ color: 'var(--text-primary)' }}
-        >Technical Indicators</h3>
-
-        {/* Dynamic Indicator Configuration */}
-        <IndicatorManager
-          indicators={activeIndicators}
-          onChange={setActiveIndicators}
-        />
-
-        {indicatorError && (
-          <div className="mt-4 p-4 rounded-lg bg-red-500/10 border border-red-500/30">
-            <p className="text-sm text-red-400">{indicatorError}</p>
-          </div>
-        )}
-
-        {/* Indicator Results Display */}
-        {indicatorData && (
-          <div className="mt-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {Object.entries(indicatorData.indicators || {}).map(([key, data]) => (
-                <div key={key} className="glass rounded-lg p-4" style={{ borderColor: 'var(--card-border)' }}>
-                  <div className="text-sm mb-2" style={{ color: 'var(--text-muted)' }}>
-                    {key.toUpperCase()} {data.period && `(${data.period})`}
-                  </div>
-                  <div className="text-lg font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-                    {typeof data.value === 'number' ? data.value.toFixed(key === 'rsi' ? 2 : 5) : 
-                     data.upper_band ? (
-                      <div className="text-sm space-y-1">
-                        <div>Upper: {data.upper_band.toFixed(5)}</div>
-                        <div>Middle: {data.middle_band.toFixed(5)}</div>
-                        <div>Lower: {data.lower_band.toFixed(5)}</div>
-                      </div>
-                     ) : 'N/A'}
-                  </div>
-                  <div className={`text-sm font-medium ${
-                    data.signal === 'BUY' ? 'text-green-400' :
-                    data.signal === 'SELL' ? 'text-red-400' : 'text-yellow-400'
-                  }`}>
-                    {data.signal}
-                  </div>
+        {/* Indicator Manager */}
+        <div style={cardStyle}>
+          <h3 style={{
+            margin: 0,
+            marginBottom: spacing.md,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.textPrimary
+          }}>
+            Indicators
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+            {Object.entries(activeIndicators).map(([id, indicator]) => (
+              <div key={id} style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: spacing.sm,
+                background: colors.bgSecondary,
+                borderRadius: borderRadius.lg,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                  <div style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    background: indicator.color
+                  }}></div>
+                  <span style={{
+                    fontSize: typography.fontSize.sm,
+                    color: colors.textPrimary
+                  }}>
+                    {id}
+                  </span>
                 </div>
-              ))}
-            </div>
-
-            {/* Overall Signal */}
-            {indicatorData.signals?.overall && (
-              <div className="glass rounded-lg p-4" style={{ borderColor: 'var(--card-border)' }}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>Overall Signal</div>
-                    <div className={`text-2xl font-bold ${
-                      indicatorData.signals.overall.signal === 'BUY' ? 'text-green-400' :
-                      indicatorData.signals.overall.signal === 'SELL' ? 'text-red-400' : 'text-yellow-400'
-                    }`}>
-                      {indicatorData.signals.overall.signal}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>Confidence</div>
-                    <div className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                      {(indicatorData.signals.overall.confidence * 100).toFixed(0)}%
-                    </div>
-                  </div>
-                </div>
+                <button
+                  onClick={() => {
+                    const newIndicators = { ...activeIndicators };
+                    delete newIndicators[id];
+                    handleIndicatorUpdate(newIndicators);
+                  }}
+                  style={{
+                    padding: `${spacing.xs} ${spacing.sm}`,
+                    background: 'transparent',
+                    border: `1px solid ${colors.cardBorder}`,
+                    borderRadius: borderRadius.md,
+                    fontSize: typography.fontSize.xs,
+                    color: colors.textSecondary,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Remove
+                </button>
               </div>
-            )}
+            ))}
           </div>
-        )}
+          
+          <IndicatorManager 
+            activeIndicators={activeIndicators}
+            onIndicatorUpdate={handleIndicatorUpdate}
+          />
+        </div>
       </div>
 
-      <div
-        className="glass rounded-xl p-6"
-        style={{ borderColor: 'var(--card-border)' }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3
-            className="text-xl font-semibold"
-            style={{ color: 'var(--text-primary)' }}
-          >Chart</h3>
-          <span
-            className="text-xs px-2 py-1 rounded-full border"
-            style={{
-              backgroundColor: isLiveMode ? 'var(--accent-green)' : 'var(--card-bg)',
-              color: isLiveMode ? 'var(--text-primary)' : 'var(--text-secondary)',
-              borderColor: isLiveMode ? 'var(--accent-green)' : 'var(--card-border)'
-            }}
-          >
-            {isLiveMode
-              ? `Streaming • ${dataSource === 'platform' ? (streamAsset || selectedAsset || '') : (selectedAsset || '')}`
-              : `Historical • ${selectedAsset || ''}`}
-          </span>
+      {/* CENTER COLUMN - Chart */}
+      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: spacing.lg
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: spacing.md
+          }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: isLiveMode ? colors.accentGreen : colors.textSecondary
+            }}></div>
+            <h2 style={{
+              margin: 0,
+              fontSize: typography.fontSize.xl,
+              fontWeight: typography.fontWeight.bold,
+              color: colors.textPrimary
+            }}>
+              {streamAsset || selectedAsset || 'Select Asset'}
+            </h2>
+          </div>
+          <div style={{ display: 'flex', gap: spacing.sm }}>
+            {['⚙️', '📤', '⭐', '←', '↓', '↑', '→', '⊙', '⊚'].map((icon, idx) => (
+              <div key={idx} style={{
+                fontSize: typography.fontSize.sm,
+                color: colors.textSecondary,
+                cursor: 'pointer'
+              }}>
+                {icon}
+              </div>
+            ))}
+          </div>
         </div>
-        {loading && !isLiveMode ? (
-          <div className="flex items-center justify-center h-96">
-            <div className="text-center">
-              <div
-                className="mb-2"
-                style={{ color: 'var(--text-secondary)' }}
-              >{loadingStatus}</div>
-              <div
-                className="w-12 h-12 border-4 rounded-full animate-spin mx-auto"
-                style={{
-                  borderColor: 'var(--card-border)',
-                  borderTopColor: 'var(--accent-blue)'
-                }}
-              ></div>
+
+        <div style={{ flex: 1, minHeight: '500px' }}>
+          {chartData.length > 0 ? (
+            <MultiPaneChart 
+              data={chartData}
+              indicators={activeIndicators}
+              indicatorData={indicatorData}
+              height={500}
+            />
+          ) : (
+            <div style={{
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: colors.bgPrimary,
+              borderRadius: borderRadius.lg,
+              color: colors.textSecondary,
+              fontSize: typography.fontSize.base
+            }}>
+              {loading ? loadingStatus : 'Select asset to view chart'}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* RIGHT COLUMN - Stats & Readings */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.lg }}>
+        {/* Quick Stats */}
+        <div style={cardStyle}>
+          <h3 style={{
+            margin: 0,
+            marginBottom: spacing.lg,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.textPrimary
+          }}>
+            Quick Stats
+          </h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span style={{
+                fontSize: typography.fontSize.sm,
+                color: colors.textSecondary
+              }}>
+                Latest Price
+              </span>
+              <span style={{
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.semibold,
+                color: colors.textPrimary
+              }}>
+                {getLatestPrice()?.toFixed(5) || '--'}
+              </span>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span style={{
+                fontSize: typography.fontSize.sm,
+                color: colors.textSecondary
+              }}>
+                Change %
+              </span>
+              <span style={{
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.semibold,
+                color: getPriceChange() >= 0 ? colors.accentGreen : colors.accentRed
+              }}>
+                {getPriceChange() !== null ? `${getPriceChange()}%` : '--'}
+              </span>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span style={{
+                fontSize: typography.fontSize.sm,
+                color: colors.textSecondary
+              }}>
+                Avg Volume
+              </span>
+              <span style={{
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.semibold,
+                color: colors.textPrimary
+              }}>
+                {getVolume() || '--'}
+              </span>
             </div>
           </div>
-        ) : (
-          <MultiPaneChart 
-            data={chartData} 
-            height={600} 
-            backendIndicators={indicatorData}
-          />
-        )}
+        </div>
+
+        {/* Indicator Readings */}
+        <div style={cardStyle}>
+          <h3 style={{
+            margin: 0,
+            marginBottom: spacing.lg,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.textPrimary
+          }}>
+            Indicator Readings
+          </h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+            {['rsi', 'macd', 'bollinger'].map(type => {
+              const reading = getIndicatorReading(type);
+              const signalColor = reading?.signal === 'BUY' || reading?.signal === 'CALL' ? colors.accentGreen :
+                                  reading?.signal === 'SELL' || reading?.signal === 'PUT' ? colors.accentRed :
+                                  colors.textSecondary;
+              
+              return (
+                <div key={type} style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: spacing.sm
+                  }}>
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: signalColor
+                    }}></div>
+                    <span style={{
+                      fontSize: typography.fontSize.sm,
+                      color: colors.textPrimary
+                    }}>
+                      {type.toUpperCase()}: {reading?.value || '--'}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: typography.fontSize.sm,
+                    color: colors.textSecondary
+                  }}>
+                    {reading?.signal || '--'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
