@@ -137,6 +137,8 @@ export const components = {
     shadow: shadows.md,
   },
   button: {
+    borderRadius: borderRadius.lg,
+    borderColor: colors.cardBorder,
     primary: {
       bg: colors.accentGreen,
       hoverBg: '#059669',
