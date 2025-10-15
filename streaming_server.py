@@ -838,18 +838,36 @@ def handle_store_csv_candles(data):
 @socketio.on('calculate_indicators')
 def handle_calculate_indicators(data):
     """
-    Stage 2: Calculate technical indicators for given asset and configuration.
-    Exposes the existing apply_technical_indicators() method from data_streaming capability.
+    Calculate technical indicators for given asset and configuration.
+    Supports both instance-based and simple indicator configurations.
+    
+    Expected data format (instance-based):
+    {
+        'asset': 'EURUSD_OTC',
+        'instances': {
+            'SMA-20': {'type': 'sma', 'params': {'period': 20}},
+            'RSI-14': {'type': 'rsi', 'params': {'period': 14}},
+            'BB-20': {'type': 'bollinger', 'params': {'period': 20, 'std_dev': 2}}
+        }
+    }
+    
+    Legacy format (backward compatible):
+    {
+        'asset': 'EURUSD_OTC',
+        'indicators': {
+            'sma': {'period': 20},
+            'rsi': {'period': 14}
+        }
+    }
     """
     global data_streamer
     
     try:
         asset = data.get('asset')
-        indicators_config = data.get('indicators', {
-            'sma': {'period': 20},
-            'rsi': {'period': 14},
-            'bollinger': {'period': 20, 'std_dev': 2}
-        })
+        
+        # Support both instance-based and legacy formats
+        instances = data.get('instances')
+        legacy_indicators = data.get('indicators')
         
         if not asset:
             emit('indicators_error', {
@@ -858,7 +876,32 @@ def handle_calculate_indicators(data):
             })
             return
         
-        print(f"[Indicators] Calculating indicators for {asset} with config: {indicators_config}")
+        # Convert instance-based format to simple config for backend
+        if instances:
+            # Extract unique indicator types and merge parameters
+            indicators_config = {}
+            for instance_name, instance_config in instances.items():
+                indicator_type = instance_config.get('type')
+                params = instance_config.get('params', {})
+                
+                # For now, use the last instance of each type
+                # Future enhancement: support multiple instances per type
+                indicators_config[indicator_type] = params
+            
+            print(f"[Indicators] Processing {len(instances)} indicator instances for {asset}")
+        elif legacy_indicators:
+            indicators_config = legacy_indicators
+            print(f"[Indicators] Using legacy indicator config for {asset}")
+        else:
+            # Default indicators
+            indicators_config = {
+                'sma': {'period': 20},
+                'rsi': {'period': 14},
+                'bollinger': {'period': 20, 'std_dev': 2}
+            }
+            print(f"[Indicators] Using default indicators for {asset}")
+        
+        print(f"[Indicators] Config: {indicators_config}")
         
         # Call existing capability method
         indicators_result = data_streamer.apply_technical_indicators(asset, indicators_config)
@@ -867,6 +910,13 @@ def handle_calculate_indicators(data):
             print(f"[Indicators] Error: {indicators_result['error']}")
             emit('indicators_error', indicators_result)
         else:
+            # Include instance mapping in response if provided
+            if instances:
+                indicators_result['instance_mapping'] = {
+                    instance_name: instance_config.get('type')
+                    for instance_name, instance_config in instances.items()
+                }
+            
             print(f"[Indicators] Calculated {len(indicators_result.get('indicators', {}))} indicators for {asset}")
             emit('indicators_calculated', indicators_result)
             
