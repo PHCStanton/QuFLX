@@ -11,6 +11,44 @@ QuantumFlux is an automated trading platform designed for PocketOption. It integ
 
 ## Recent Changes
 
+### Bug Fixes - Performance & Stability Improvements (Completed - October 16, 2025)
+**Goal**: Fix bugs affecting app performance, user experience, and resource usage.
+
+**Bugs Fixed:**
+1. **Chrome Reconnection Loop**: Backend continuously attempted Chrome reconnection even when not needed (CSV mode)
+   - Added `chrome_reconnect_enabled` flag that activates only when Platform mode is used
+   - Modified `monitor_chrome_status()` to respect the flag before attempting reconnection
+   - Enabled in `handle_start_stream()` and `handle_detect_asset()` when Chrome is needed
+   
+2. **CSV Error Logging**: Error messages displayed as empty objects `{}`
+   - Updated error logging to properly extract `err.message` and `err.stack`
+   - Now shows meaningful error messages in console for debugging
+   
+3. **Missing Data Notification**: Users had no visibility when assets lack data
+   - Added visual error notification in Indicator Readings panel
+   - Shows user-friendly message: "⚠️ No data available for this asset"
+   - Red-bordered alert box for clear visibility
+   
+4. **WebSocket Cleanup Warnings**: Console showed "WebSocket closed before connection established"
+   - Enhanced cleanup logic to check connection state before disconnecting
+   - Uses `socket.io.engine.readyState` to determine proper cleanup action
+   - Calls `engine.close()` for 'opening' state to prevent zombie connections
+   - Calls `disconnect()` only for established connections
+
+**Impact**:
+- No more Chrome reconnection spam in backend logs ✅
+- Clear error messages for troubleshooting ✅
+- Better user experience with visible error notifications ✅
+- Cleaner console without WebSocket warnings ✅
+- No memory leaks from zombie connections ✅
+
+**Files Modified:**
+- `streaming_server.py` - Chrome reconnection control
+- `gui/Data-Visualizer-React/src/pages/DataAnalysis.jsx` - Error logging & UI notifications
+- `gui/Data-Visualizer-React/src/hooks/useWebSocket.js` - WebSocket cleanup improvements
+
+**Verification**: Logs verified ✅ | Visual confirmation ✅ | No regressions ✅
+
 ### Indicator Calculation Race Condition Fix (Completed - October 16, 2025)
 **Goal**: Fix bug where indicators failed to display in CSV mode due to WebSocket timing race condition.
 
