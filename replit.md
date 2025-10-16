@@ -11,6 +11,33 @@ QuantumFlux is an automated trading platform designed for PocketOption. It integ
 
 ## Recent Changes
 
+### CSV Chart Rendering Fix (Completed - October 16, 2025)
+**Goal**: Fix chart display issue where CSV data loaded correctly but displayed as thin bar.
+
+**Root Cause Identified:**
+- React StrictMode double-render caused chart to initialize twice
+- First init: Loaded all 101 candles correctly ✅
+- Cleanup removed chart but didn't reset `prevDataLengthRef`
+- Second init: Created new chart, saw prevDataLengthRef=101, only updated last candle ❌
+
+**Changes Implemented:**
+- **Chart State Reset (MultiPaneChart.jsx)**: Added `prevDataLengthRef.current = 0` in cleanup function
+  - Ensures re-initialization always loads full dataset
+  - Handles React StrictMode double-render correctly
+  - Prevents single-candle display bug
+- **File Selection Enhancement (fileUtils.js)**: Improved CSV file selection
+  - Filters out tick data files (incompatible format)
+  - Selects largest candle file per asset
+- **Debug Logging**: Added data processing logs for troubleshooting
+
+**Impact**: 
+- Charts now display full candlestick data correctly (101 candles)
+- Robust handling of React development mode double-renders
+- Better file selection prevents format mismatches
+- Improved debugging capabilities
+
+**Verification**: Architect-approved ✅ | Visual confirmation ✅ | No regressions ✅
+
 ### Bug Fixes & Code Quality (Completed - October 16, 2025)
 **Goal**: Fix identified bugs, improve performance consistency, and eliminate memory leaks.
 
