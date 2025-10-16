@@ -27,6 +27,9 @@ The platform employs a Capabilities-First Design with Dual Data Pipelines for hi
 - **Normalized Asset Naming**: Handles asset name variations for consistent data.
 - **Candle Timestamp Alignment**: Candles align to minute boundaries to match PocketOption timing.
 - **Dynamic Indicator System**: Frontend supports adding/removing indicators with full time-series data (SMA, EMA, RSI, MACD, Bollinger Bands, etc.).
+- **Multi-Instance Indicator Support**: Backend and frontend fully support multiple instances of same indicator type (e.g., SMA-20, SMA-50) with unique identifiers.
+- **Instance-Based Indicator Format**: Indicators transmitted using instance names as keys with type metadata, enabling distinct rendering of multiple overlays/oscillators.
+- **Clean Chart Initialization**: Charts start with no default indicators, providing blank canvas for user-customized analysis.
 - **Multi-Pane Chart Architecture**: Main chart for candlesticks with overlay indicators; separate, synchronized panes for oscillators (RSI, MACD).
 - **Memory-Safe Resource Management**: Proper cleanup of timers, event listeners, and chart instances.
 - **Solana-Inspired UI/UX**: Professional 3-page trading terminal with a cohesive design system and dark aesthetic.
@@ -44,6 +47,8 @@ The platform employs a Capabilities-First Design with Dual Data Pipelines for hi
 - **Oscillator Panes**: Separate synchronized panes for RSI and MACD.
 - **Time Synchronization**: Ensures alignment across all panes.
 - **Dynamic Indicators**: Modal-based configuration with multiple instances.
+- **Indicator Manager**: Positioned at bottom of chart for optimal UX and control accessibility.
+- **Dynamic Rendering**: Automatically detects indicator type (overlay/oscillator) and renders appropriately based on metadata.
 
 **Design System:**
 - **Color Palette**: Dark theme with base `#10141a`, card backgrounds `#1a1f2e`, borders `#2a2f3e`, and accents like green `#22c55e`.
