@@ -1,93 +1,143 @@
 // Trading data utilities and parsers
-export const parseTradingData = (csvText, symbol) => {
-  const lines = csvText.trim().split('\n');
-  const data = [];
-  
-  // Detect CSV format from header
-  let hasIndexColumn = false;
-  
-  if (lines.length > 0) {
-    const headerParts = lines[0].split(',');
-    
-    // Check if first column header is empty or suggests an index
-    const firstHeader = headerParts[0].toLowerCase().trim();
-    hasIndexColumn = firstHeader === '' || firstHeader === 'index' || firstHeader === 'id' || firstHeader === '#';
-  }
+export const parseTradingData = (input, symbol) => {
+  // Handle both string (CSV text) and array (parsed objects) inputs
+  let data = [];
 
-  // Skip header and parse data
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    
-    const parts = line.split(',');
-    
-    // Handle different CSV formats
-    let timestamp, open, close, high, low, volume = null;
-    
-    if (parts.length === 5) {
-      // Format: timestamp,open,close,high,low (OHLC)
-      [timestamp, open, close, high, low] = parts;
-    } else if (parts.length === 6) {
-      if (hasIndexColumn) {
-        // Format: index,timestamp,open,high,low,close
-        [, timestamp, open, high, low, close] = parts;
-      } else {
-        // Format: timestamp,open,close,high,low,volume (OHLCV)
-        [timestamp, open, close, high, low, volume] = parts;
-      }
-    } else if (parts.length === 7) {
-      // Format: index,timestamp,open,high,low,close,volume
-      [, timestamp, open, high, low, close, volume] = parts;
-    } else if (parts.length === 3) {
-      // Format: timestamp,asset,price (Tick data)
-      const [ts, asset, price] = parts;
-      timestamp = ts;
-      open = close = high = low = price;
-    } else {
-      continue;
+  if (typeof input === 'string') {
+    // Input is CSV text - parse it
+    const lines = input.trim().split('\n');
+
+    // Detect CSV format from header
+    let hasIndexColumn = false;
+
+    if (lines.length > 0) {
+      const headerParts = lines[0].split(',');
+
+      // Check if first column header is empty or suggests an index
+      const firstHeader = headerParts[0].toLowerCase().trim();
+      hasIndexColumn = firstHeader === '' || firstHeader === 'index' || firstHeader === 'id' || firstHeader === '#';
     }
-    
-    if (timestamp && open && close && high && low) {
-      // Parse timestamp - handle both Unix timestamp and ISO format
-      let timestampSec;
-      if (timestamp.includes('-') || timestamp.includes('T') || timestamp.includes(':')) {
-        // ISO format or time string
-        timestampSec = Math.floor(new Date(timestamp).getTime() / 1000);
+
+    // Skip header and parse data
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const parts = line.split(',');
+
+      // Handle different CSV formats
+      let timestamp, open, close, high, low, volume = null;
+
+      if (parts.length === 5) {
+        // Format: timestamp,open,close,high,low (OHLC)
+        [timestamp, open, close, high, low] = parts;
+      } else if (parts.length === 6) {
+        if (hasIndexColumn) {
+          // Format: index,timestamp,open,high,low,close
+          [, timestamp, open, high, low, close] = parts;
+        } else {
+          // Format: timestamp,open,close,high,low,volume (OHLCV)
+          [timestamp, open, close, high, low, volume] = parts;
+        }
+      } else if (parts.length === 7) {
+        // Format: index,timestamp,open,high,low,close,volume
+        [, timestamp, open, high, low, close, volume] = parts;
+      } else if (parts.length === 3) {
+        // Format: timestamp,asset,price (Tick data)
+        const [ts, asset, price] = parts;
+        timestamp = ts;
+        open = close = high = low = price;
       } else {
-        // Unix timestamp
-        timestampSec = Math.floor(parseFloat(timestamp));
+        continue;
       }
-      
-      // Skip invalid timestamps
-      if (isNaN(timestampSec)) continue;
-      
-      data.push({
-        timestamp: timestampSec,
-        date: new Date(timestampSec * 1000),
-        open: parseFloat(open),
-        close: parseFloat(close),
-        high: parseFloat(high),
-        low: parseFloat(low),
-        volume: volume !== null ? parseFloat(volume) || 0 : 0,
-        symbol: symbol
-      });
+
+      if (timestamp && open && close && high && low) {
+        // Parse timestamp - handle both Unix timestamp and ISO format
+        let timestampSec;
+        if (timestamp.includes('-') || timestamp.includes('T') || timestamp.includes(':')) {
+          // ISO format or time string
+          timestampSec = Math.floor(new Date(timestamp).getTime() / 1000);
+        } else {
+          // Unix timestamp
+          timestampSec = Math.floor(parseFloat(timestamp));
+        }
+
+        // Skip invalid timestamps
+        if (isNaN(timestampSec)) continue;
+
+        data.push({
+          timestamp: timestampSec,
+          date: new Date(timestampSec * 1000),
+          open: parseFloat(open),
+          close: parseFloat(close),
+          high: parseFloat(high),
+          low: parseFloat(low),
+          volume: volume !== null ? parseFloat(volume) || 0 : 0,
+          symbol: symbol
+        });
+      }
     }
+  } else if (Array.isArray(input)) {
+    // Input is already an array of parsed objects
+    for (const item of input) {
+      // Map common field names to standard format
+      const timestamp = item.timestamp || item.time || item.Date;
+      const open = item.open || item.Open;
+      const close = item.close || item.Close;
+      const high = item.high || item.High;
+      const low = item.low || item.Low;
+      const volume = item.volume || item.Volume || 0;
+
+      if (timestamp && open && close && high && low) {
+        // Parse timestamp - handle both Unix timestamp and ISO format
+        let timestampSec;
+        if (typeof timestamp === 'string') {
+          if (timestamp.includes('-') || timestamp.includes('T') || timestamp.includes(':')) {
+            // ISO format or time string
+            timestampSec = Math.floor(new Date(timestamp).getTime() / 1000);
+          } else {
+            // Unix timestamp string
+            timestampSec = Math.floor(parseFloat(timestamp));
+          }
+        } else {
+          // Numeric timestamp
+          timestampSec = Math.floor(parseFloat(timestamp));
+        }
+
+        // Skip invalid timestamps
+        if (isNaN(timestampSec)) continue;
+
+        data.push({
+          timestamp: timestampSec,
+          date: new Date(timestampSec * 1000),
+          open: parseFloat(open),
+          close: parseFloat(close),
+          high: parseFloat(high),
+          low: parseFloat(low),
+          volume: parseFloat(volume) || 0,
+          symbol: symbol
+        });
+      }
+    }
+  } else {
+    console.error('parseTradingData: Invalid input type. Expected string or array.');
+    return [];
   }
 
   // Sort by timestamp
   const sorted = data.sort((a, b) => a.timestamp - b.timestamp);
-  
+
   // Remove duplicates by keeping the last entry for each timestamp
   const deduped = [];
   const seen = new Set();
-  
+
   for (const item of sorted) {
     if (!seen.has(item.timestamp)) {
       seen.add(item.timestamp);
       deduped.push(item);
     }
   }
-  
+
   return deduped;
 };
 

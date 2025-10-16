@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import LightweightChart from './charts/LightweightChart';
+import ErrorBoundary from './ErrorBoundary';
 import { RealTimeDataStream } from '../utils/realTimeData';
 
 /**
@@ -154,14 +155,16 @@ const RealTimeChart = ({
       
       {/* Real-time Chart */}
       <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-4">
-        <LightweightChart
-          ref={chartRef}
-          data={data}
-          enabledIndicators={enabledIndicators}
-          height={height}
-          enableRealTime={true}
-          className="w-full"
-        />
+        <ErrorBoundary>
+          <LightweightChart
+            ref={chartRef}
+            data={data}
+            enabledIndicators={enabledIndicators}
+            height={height}
+            enableRealTime={true}
+            className="w-full"
+          />
+        </ErrorBoundary>
       </div>
     </div>
   );

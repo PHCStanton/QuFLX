@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MultiPaneChart from '../components/charts/MultiPaneChart';
+import ErrorBoundary from '../components/ErrorBoundary';
 import IndicatorManager from '../components/indicators/IndicatorManager';
 import { fetchCurrencyPairs } from '../utils/fileUtils';
 import { parseTradingData } from '../utils/tradingData';
@@ -19,6 +20,7 @@ const DataAnalysis = () => {
   const [dataSource, setDataSource] = useState('csv');
   const [timeframe, setTimeframe] = useState('1m');
   const [selectedAsset, setSelectedAsset] = useState('');
+  const [selectedAssetFile, setSelectedAssetFile] = useState('');
   const [availableAssets, setAvailableAssets] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -105,10 +107,12 @@ const DataAnalysis = () => {
       const isValidAsset = pairs.some(p => p.id === selectedAsset);
       if (!isValidAsset && pairs.length > 0) {
         setSelectedAsset(pairs[0].id);
+        setSelectedAssetFile(pairs[0].file);
       }
     } else if (dataSource === 'platform') {
       setAvailableAssets([]);
       setSelectedAsset('');
+      setSelectedAssetFile('');
     }
   }, [dataSource, timeframe, selectedAsset]);
 
@@ -123,18 +127,45 @@ const DataAnalysis = () => {
   }, [selectedAsset, timeframe, dataSource]);
 
   const loadCsvData = async (assetId, tf) => {
-    if (!assetId) return;
+    if (!assetId || !selectedAssetFile) return;
     
     setLoading(true);
     setLoadingStatus(`Loading ${assetId} (${tf})...`);
     setIsLiveMode(false);
     
     try {
-      const response = await fetch(`http://localhost:3001/api/csv/${assetId}?timeframe=${tf}`);
-      if (!response.ok) throw new Error('Failed to load CSV data');
+      // Use the filename to fetch CSV data from backend
+      const response = await fetch(`http://localhost:3001/api/csv-data/${selectedAssetFile}`);
+      if (!response.ok) throw new Error(`Failed to load CSV data: ${response.status}`);
       
-      const rawData = await response.json();
-      const parsedData = parseTradingData(rawData);
+      const text = await response.text();
+      if (!text || typeof text !== 'string') {
+        throw new Error('Invalid response: expected text data');
+      }
+
+      // Parse CSV text into array of objects
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) throw new Error('CSV file is empty');
+
+      const headers = lines[0].split(',').map(h => h.trim());
+      const rawData = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const obj = {};
+        headers.forEach((header, idx) => {
+          obj[header] = isNaN(values[idx]) ? values[idx] : parseFloat(values[idx]);
+        });
+        return obj;
+      });
+
+      if (!Array.isArray(rawData) || rawData.length === 0) {
+        throw new Error('No valid data rows found in CSV');
+      }
+
+      const parsedData = parseTradingData(rawData, assetId);
+      if (!Array.isArray(parsedData) || parsedData.length === 0) {
+        throw new Error('Failed to parse trading data');
+      }
+
       setChartData(parsedData);
       
       const config = Object.entries(activeIndicators).reduce((acc, [id, ind]) => {
@@ -142,7 +173,7 @@ const DataAnalysis = () => {
         return acc;
       }, {});
       
-      await storeCsvCandles(parsedData, assetId);
+      await storeCsvCandles(assetId, parsedData);
       await calculateIndicators(assetId, config);
       
       setLoadingStatus('Data loaded successfully');
@@ -241,10 +272,10 @@ const DataAnalysis = () => {
 
   useEffect(() => {
     if (historicalCandles && historicalCandles.length > 0) {
-      const parsedData = parseTradingData(historicalCandles);
+      const parsedData = parseTradingData(historicalCandles, streamAsset || selectedAsset);
       setChartData(parsedData);
     }
-  }, [historicalCandles]);
+  }, [historicalCandles, streamAsset, selectedAsset]);
 
   const handleDetectAsset = () => {
     setStreamState(STREAM_STATES.DETECTING);
@@ -413,7 +444,11 @@ const DataAnalysis = () => {
             </h3>
             <select
               value={selectedAsset}
-              onChange={(e) => setSelectedAsset(e.target.value)}
+              onChange={(e) => {
+                const asset = availableAssets.find(a => a.id === e.target.value);
+                setSelectedAsset(e.target.value);
+                setSelectedAssetFile(asset?.file || '');
+              }}
               style={{
                 width: '100%',
                 padding: spacing.md,
@@ -641,12 +676,14 @@ const DataAnalysis = () => {
 
         <div style={{ flex: 1, minHeight: '500px' }}>
           {chartData.length > 0 ? (
-            <MultiPaneChart
-              data={chartData}
-              indicators={activeIndicators}
-              indicatorData={indicatorData}
-              height={chartHeight}
-            />
+            <ErrorBoundary>
+              <MultiPaneChart
+                data={chartData}
+                indicators={activeIndicators}
+                backendIndicators={indicatorData}
+                height={chartHeight}
+              />
+            </ErrorBoundary>
           ) : (
             <div style={{
               height: '100%',

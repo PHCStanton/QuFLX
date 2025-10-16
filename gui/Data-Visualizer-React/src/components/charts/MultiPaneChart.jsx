@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { createChart } from 'lightweight-charts';
+import { createLogger } from '../../utils/logger';
+const log = createLogger('MultiPaneChart');
 
 const MultiPaneChart = forwardRef(({
   data = [],
@@ -23,14 +25,20 @@ const MultiPaneChart = forwardRef(({
   const rsiSeriesRef = useRef(null);
   const macdSeriesRef = useRef({});
 
-  const [hasRSI, setHasRSI] = useState(false);
-  const [hasMACD, setHasMACD] = useState(false);
+  const hasRSI = React.useMemo(() => {
+    const rsiData = backendIndicators?.series?.rsi;
+    return Array.isArray(rsiData) && rsiData.length > 0;
+  }, [backendIndicators]);
+  const hasMACD = React.useMemo(() => {
+    const macdData = backendIndicators?.series?.macd;
+    return !!(macdData?.macd && macdData.macd.length > 0);
+  }, [backendIndicators]);
 
   // Calculate heights based on which oscillators are active
   const mainHeight = height * (hasRSI && hasMACD ? 0.6 : hasRSI || hasMACD ? 0.7 : 1.0);
   const oscillatorHeight = height * (hasRSI && hasMACD ? 0.2 : 0.3);
 
-  const chartConfig = {
+  const chartConfig = React.useMemo(() => ({
     layout: {
       background: { color: theme === 'dark' ? '#1e293b' : '#ffffff' },
       textColor: theme === 'dark' ? '#94a3b8' : '#333333',
@@ -50,7 +58,7 @@ const MultiPaneChart = forwardRef(({
     },
     handleScroll: { mouseWheel: true, pressedMouseMove: true },
     handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
-  };
+  }), [theme]);
 
   // Process data
   const processedData = React.useMemo(() => {
@@ -74,20 +82,36 @@ const MultiPaneChart = forwardRef(({
   useEffect(() => {
     if (!mainContainerRef.current) return;
 
-    mainChartRef.current = createChart(mainContainerRef.current, {
-      ...chartConfig,
-      width: mainContainerRef.current.clientWidth,
-      height: mainHeight,
-    });
+    try {
+      const containerWidth = mainContainerRef.current.clientWidth;
+      const containerHeight = mainHeight;
+      
+      if (containerWidth <= 0 || containerHeight <= 0) {
+        log.warn(`[MultiPaneChart] Container has invalid dimensions: ${containerWidth}x${containerHeight}`);
+        return;
+      }
 
-    mainSeriesRef.current = mainChartRef.current.addCandlestickSeries({
-      upColor: '#10b981',
-      downColor: '#ef4444',
-      borderUpColor: '#10b981',
-      borderDownColor: '#ef4444',
-      wickUpColor: '#10b981',
-      wickDownColor: '#ef4444',
-    });
+      log.debug(`[MultiPaneChart] Initializing main chart with dimensions: ${containerWidth}x${containerHeight}`);
+
+      mainChartRef.current = createChart(mainContainerRef.current, {
+        ...chartConfig,
+        width: containerWidth,
+        height: containerHeight,
+      });
+
+      mainSeriesRef.current = mainChartRef.current.addCandlestickSeries({
+        upColor: '#10b981',
+        downColor: '#ef4444',
+        borderUpColor: '#10b981',
+        borderDownColor: '#ef4444',
+        wickUpColor: '#10b981',
+        wickDownColor: '#ef4444',
+      });
+
+      log.debug('[MultiPaneChart] Main chart initialized successfully');
+    } catch (error) {
+      log.error('[MultiPaneChart] Failed to initialize main chart:', error);
+    }
 
     return () => {
       if (mainChartRef.current) {
@@ -97,17 +121,28 @@ const MultiPaneChart = forwardRef(({
       mainSeriesRef.current = null;
       overlaySeriesRef.current = {};
     };
-  }, []);
+  }, [chartConfig, mainHeight]);
 
   // Initialize RSI chart
   useEffect(() => {
     if (!rsiContainerRef.current || !hasRSI) return;
 
-    rsiChartRef.current = createChart(rsiContainerRef.current, {
-      ...chartConfig,
-      width: rsiContainerRef.current.clientWidth,
-      height: oscillatorHeight,
-    });
+    try {
+      const containerWidth = rsiContainerRef.current.clientWidth;
+      const containerHeight = oscillatorHeight;
+      
+      if (containerWidth <= 0 || containerHeight <= 0) {
+        log.warn(`[MultiPaneChart] RSI container has invalid dimensions: ${containerWidth}x${containerHeight}`);
+        return;
+      }
+
+      log.debug(`[MultiPaneChart] Initializing RSI chart with dimensions: ${containerWidth}x${containerHeight}`);
+
+      rsiChartRef.current = createChart(rsiContainerRef.current, {
+        ...chartConfig,
+        width: containerWidth,
+        height: containerHeight,
+      });
 
     rsiSeriesRef.current = rsiChartRef.current.addLineSeries({
       color: '#ff6b6b',
@@ -146,6 +181,9 @@ const MultiPaneChart = forwardRef(({
       };
       mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
     }
+    } catch (error) {
+      log.error('[MultiPaneChart] Failed to initialize RSI chart:', error);
+    }
 
     return () => {
       if (timeRangeCallback && mainChartRef.current) {
@@ -163,11 +201,22 @@ const MultiPaneChart = forwardRef(({
   useEffect(() => {
     if (!macdContainerRef.current || !hasMACD) return;
 
-    macdChartRef.current = createChart(macdContainerRef.current, {
-      ...chartConfig,
-      width: macdContainerRef.current.clientWidth,
-      height: oscillatorHeight,
-    });
+    try {
+      const containerWidth = macdContainerRef.current.clientWidth;
+      const containerHeight = oscillatorHeight;
+      
+      if (containerWidth <= 0 || containerHeight <= 0) {
+        log.warn(`[MultiPaneChart] MACD container has invalid dimensions: ${containerWidth}x${containerHeight}`);
+        return;
+      }
+
+      log.debug(`[MultiPaneChart] Initializing MACD chart with dimensions: ${containerWidth}x${containerHeight}`);
+
+      macdChartRef.current = createChart(macdContainerRef.current, {
+        ...chartConfig,
+        width: containerWidth,
+        height: containerHeight,
+      });
 
     macdSeriesRef.current.macd = macdChartRef.current.addLineSeries({
       color: '#4ecdc4',
@@ -204,6 +253,9 @@ const MultiPaneChart = forwardRef(({
       };
       mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
     }
+    } catch (error) {
+      log.error('[MultiPaneChart] Failed to initialize MACD chart:', error);
+    }
 
     return () => {
       if (timeRangeCallback && mainChartRef.current) {
@@ -219,11 +271,20 @@ const MultiPaneChart = forwardRef(({
 
   // Update main chart data
   useEffect(() => {
-    if (!mainSeriesRef.current || processedData.length === 0) return;
+    if (!mainSeriesRef.current || processedData.length === 0) {
+      log.debug('[MultiPaneChart] Skipping data update: series not ready or no data');
+      return;
+    }
     
-    mainSeriesRef.current.setData(processedData);
-    if (mainChartRef.current) {
-      mainChartRef.current.timeScale().fitContent();
+    try {
+      log.debug(`[MultiPaneChart] Updating main chart with ${processedData.length} data points`);
+      mainSeriesRef.current.setData(processedData);
+      if (mainChartRef.current) {
+        mainChartRef.current.timeScale().fitContent();
+      }
+      log.debug('[MultiPaneChart] Main chart data updated successfully');
+    } catch (error) {
+      log.error('[MultiPaneChart] Failed to update main chart data:', error);
     }
   }, [processedData]);
 
@@ -299,34 +360,21 @@ const MultiPaneChart = forwardRef(({
       }
     }
 
-    console.log('[MultiPaneChart] Overlay indicators rendered on main chart');
+    log.debug('[MultiPaneChart] Overlay indicators rendered on main chart');
   }, [backendIndicators]);
 
-  // Determine if RSI should be shown
-  useEffect(() => {
-    const rsiData = backendIndicators?.series?.rsi;
-    const shouldShowRSI = rsiData && rsiData.length > 0;
-    setHasRSI(shouldShowRSI);
-  }, [backendIndicators]);
+  // hasRSI derived from backendIndicators via useMemo above
 
-  // Render RSI data when chart is ready
+  // Render oscillator data (RSI and MACD) when ready
   useEffect(() => {
+    // RSI
     const rsiData = backendIndicators?.series?.rsi;
     if (hasRSI && rsiData && rsiData.length > 0 && rsiSeriesRef.current) {
       rsiSeriesRef.current.setData(rsiData);
-      console.log(`[MultiPaneChart] RSI rendered in separate pane: ${rsiData.length} points`);
+      log.debug(`[MultiPaneChart] RSI rendered in separate pane: ${rsiData.length} points`);
     }
-  }, [backendIndicators, hasRSI]);
 
-  // Determine if MACD should be shown
-  useEffect(() => {
-    const macdData = backendIndicators?.series?.macd;
-    const shouldShowMACD = macdData?.macd && macdData.macd.length > 0;
-    setHasMACD(shouldShowMACD);
-  }, [backendIndicators]);
-
-  // Render MACD data when chart is ready
-  useEffect(() => {
+    // MACD
     const macdData = backendIndicators?.series?.macd;
     if (hasMACD && macdData?.macd && macdSeriesRef.current.macd) {
       macdSeriesRef.current.macd.setData(macdData.macd);
@@ -341,9 +389,9 @@ const MultiPaneChart = forwardRef(({
         }));
         macdSeriesRef.current.histogram.setData(histogramData);
       }
-      console.log('[MultiPaneChart] MACD rendered in separate pane');
+      log.debug('[MultiPaneChart] MACD rendered in separate pane');
     }
-  }, [backendIndicators, hasMACD]);
+  }, [backendIndicators, hasRSI, hasMACD]);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
