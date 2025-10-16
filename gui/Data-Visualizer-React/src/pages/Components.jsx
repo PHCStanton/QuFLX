@@ -273,17 +273,26 @@ const ButtonsTab = () => {
           </h4>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button style={{
-              ...designTokens.components.button.primary,
+              background: designTokens.components.button.primary.bg,
+              color: designTokens.components.button.primary.text,
+              border: 'none',
+              borderRadius: designTokens.components.button.primary.borderRadius,
               padding: '12px 24px',
               fontSize: '14px',
-              cursor: 'pointer'
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
             }}>
               Primary Button
             </button>
             <button style={{
-              ...designTokens.components.button.primary,
+              background: designTokens.components.button.primary.bg,
+              color: designTokens.components.button.primary.text,
+              border: 'none',
+              borderRadius: designTokens.components.button.primary.borderRadius,
               padding: '12px 24px',
               fontSize: '14px',
+              fontWeight: '500',
               opacity: 0.5,
               cursor: 'not-allowed'
             }}>
@@ -299,17 +308,26 @@ const ButtonsTab = () => {
           </h4>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button style={{
-              ...designTokens.components.button.secondary,
+              background: designTokens.components.button.secondary.bg,
+              color: designTokens.components.button.secondary.text,
+              border: `1px solid ${designTokens.colors.cardBorder}`,
+              borderRadius: designTokens.components.button.secondary.borderRadius,
               padding: '12px 24px',
               fontSize: '14px',
-              cursor: 'pointer'
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
             }}>
               Secondary Button
             </button>
             <button style={{
-              ...designTokens.components.button.secondary,
+              background: designTokens.components.button.secondary.bg,
+              color: designTokens.components.button.secondary.text,
+              border: `1px solid ${designTokens.colors.cardBorder}`,
+              borderRadius: designTokens.components.button.secondary.borderRadius,
               padding: '12px 24px',
               fontSize: '14px',
+              fontWeight: '500',
               opacity: 0.5,
               cursor: 'not-allowed'
             }}>
@@ -325,17 +343,26 @@ const ButtonsTab = () => {
           </h4>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button style={{
-              ...designTokens.components.button.danger,
+              background: designTokens.components.button.danger.bg,
+              color: designTokens.components.button.danger.text,
+              border: 'none',
+              borderRadius: designTokens.components.button.danger.borderRadius,
               padding: '12px 24px',
               fontSize: '14px',
-              cursor: 'pointer'
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
             }}>
               Danger Button
             </button>
             <button style={{
-              ...designTokens.components.button.danger,
+              background: designTokens.components.button.danger.bg,
+              color: designTokens.components.button.danger.text,
+              border: 'none',
+              borderRadius: designTokens.components.button.danger.borderRadius,
               padding: '12px 24px',
               fontSize: '14px',
+              fontWeight: '500',
               opacity: 0.5,
               cursor: 'not-allowed'
             }}>
@@ -351,26 +378,41 @@ const ButtonsTab = () => {
           </h4>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button style={{
-              ...designTokens.components.button.primary,
+              background: designTokens.components.button.primary.bg,
+              color: designTokens.components.button.primary.text,
+              border: 'none',
+              borderRadius: designTokens.components.button.primary.borderRadius,
               padding: '8px 16px',
               fontSize: '12px',
-              cursor: 'pointer'
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
             }}>
               Small
             </button>
             <button style={{
-              ...designTokens.components.button.primary,
+              background: designTokens.components.button.primary.bg,
+              color: designTokens.components.button.primary.text,
+              border: 'none',
+              borderRadius: designTokens.components.button.primary.borderRadius,
               padding: '12px 24px',
               fontSize: '14px',
-              cursor: 'pointer'
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
             }}>
               Medium
             </button>
             <button style={{
-              ...designTokens.components.button.primary,
+              background: designTokens.components.button.primary.bg,
+              color: designTokens.components.button.primary.text,
+              border: 'none',
+              borderRadius: designTokens.components.button.primary.borderRadius,
               padding: '16px 32px',
               fontSize: '16px',
-              cursor: 'pointer'
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
             }}>
               Large
             </button>
