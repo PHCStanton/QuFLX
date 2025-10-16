@@ -4,12 +4,12 @@
  */
 
 export const colors = {
-  // Primary Backgrounds (Mockup-matched: darker, more refined)
-  bgPrimary: '#0b0f19',           // Almost pure black (mockup background)
-  bgSecondary: '#131720',         // Slightly lighter
-  backgroundSecondary: '#131720', // Alias for bgSecondary (for consistency)
-  cardBg: '#1a1f2e',              // Card background (darker than before)
-  cardBorder: '#2a2f3e',          // Subtle borders (more muted)
+  // Primary Backgrounds (Mockup-matched: #10141a base)
+  bgPrimary: '#10141a',           // Main background (exact mockup color)
+  bgSecondary: '#181c24',         // Slightly lighter secondary background
+  backgroundSecondary: '#181c24', // Alias for bgSecondary (for consistency)
+  cardBg: '#1a1f2e',              // Card background (subtle elevation)
+  cardBorder: '#2a2f3e',          // Subtle borders (refined contrast)
   
   // Accents (Mockup-matched)
   accentGreen: '#22c55e',         // Brighter green (mockup green)

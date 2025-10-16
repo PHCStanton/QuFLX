@@ -165,21 +165,22 @@ select {
 
 /* Theme System with CSS Custom Properties */
 :root {
-  /* Original Theme (Default) */
-  --bg-primary: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 100%);
-  --card-bg: rgba(51, 65, 85, 0.6);
-  --card-border: rgba(71, 85, 105, 0.7);
-  --text-primary: #ffffff;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
+  /* Dark/Default Theme (Mockup-matched) */
+  --bg-primary: #10141a;
+  --bg-secondary: #181c24;
+  --card-bg: rgba(26, 31, 46, 0.8);
+  --card-border: rgba(42, 47, 62, 0.7);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
   --accent-blue: #3b82f6;
   --accent-purple: #8b5cf6;
-  --accent-green: #10b981;
+  --accent-green: #22c55e;
   --accent-red: #ef4444;
   --accent-orange: #f59e0b;
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: rgba(31, 38, 135, 0.37);
+  --glass-bg: rgba(26, 31, 46, 0.6);
+  --glass-border: rgba(42, 47, 62, 0.5);
+  --glass-shadow: rgba(0, 0, 0, 0.3);
 }
 
 /* New Theme: Cosmic Fire */

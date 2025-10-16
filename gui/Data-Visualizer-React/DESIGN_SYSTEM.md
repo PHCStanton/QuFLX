@@ -14,17 +14,17 @@ import { colors, spacing, typography, components } from './styles/designTokens';
 
 ### Color Palette
 
-#### Background Colors
+#### Background Colors (Dark/Default Theme)
 ```javascript
-colors.bgPrimary      // #0a0e1a - Deep space background
-colors.bgSecondary    // #141824 - Slightly lighter background
-colors.cardBg         // #1e293b - Card background
-colors.cardBorder     // #334155 - Subtle borders
+colors.bgPrimary      // #10141a - Main background (mockup-matched)
+colors.bgSecondary    // #181c24 - Slightly lighter secondary background
+colors.cardBg         // #1a1f2e - Card background (subtle elevation)
+colors.cardBorder     // #2a2f3e - Subtle borders (refined contrast)
 ```
 
 #### Accent Colors
 ```javascript
-colors.accentGreen    // #10b981 - Success, buy, CALL
+colors.accentGreen    // #22c55e - Success, buy, CALL (brighter green)
 colors.accentRed      // #ef4444 - Danger, sell, PUT
 colors.accentBlue     // #3b82f6 - Info/highlight
 colors.accentPurple   // #8b5cf6 - Secondary accent
@@ -40,9 +40,9 @@ colors.textTertiary   // #64748b - Very muted text
 
 #### Opacity Variants
 ```javascript
-colors.greenAlpha[10]  // rgba(16, 185, 129, 0.1)
-colors.greenAlpha[20]  // rgba(16, 185, 129, 0.2)
-colors.greenAlpha[30]  // rgba(16, 185, 129, 0.3)
+colors.greenAlpha[10]  // rgba(34, 197, 94, 0.1) - Updated for brighter green
+colors.greenAlpha[20]  // rgba(34, 197, 94, 0.2)
+colors.greenAlpha[30]  // rgba(34, 197, 94, 0.3)
 
 colors.redAlpha[10]    // rgba(239, 68, 68, 0.1)
 colors.redAlpha[20]    // rgba(239, 68, 68, 0.2)
