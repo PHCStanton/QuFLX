@@ -113,13 +113,17 @@ const DataAnalysis = () => {
   useEffect(() => {
     if (isConnected && chartData.length > 0 && dataSource === 'csv' && selectedAsset) {
       console.log('[CSV Mode] Socket connected - calculating indicators for existing chart data');
-      const config = Object.entries(activeIndicators).reduce((acc, [id, ind]) => {
-        acc[ind.type] = ind.params;
+      // Use instance-based format to support multiple indicators of same type
+      const instances = Object.entries(activeIndicators).reduce((acc, [instanceName, ind]) => {
+        acc[instanceName] = {
+          type: ind.type,
+          params: ind.params
+        };
         return acc;
       }, {});
       
       storeCsvCandles(selectedAsset, chartData);
-      calculateIndicators(selectedAsset, config);
+      calculateIndicators(selectedAsset, instances);
     }
   }, [isConnected, chartData, dataSource, selectedAsset, activeIndicators, storeCsvCandles, calculateIndicators]);
 
@@ -166,13 +170,17 @@ const DataAnalysis = () => {
 
       setChartData(parsedData);
       
-      const config = Object.entries(activeIndicators).reduce((acc, [id, ind]) => {
-        acc[ind.type] = ind.params;
+      // Use instance-based format to support multiple indicators of same type
+      const instances = Object.entries(activeIndicators).reduce((acc, [instanceName, ind]) => {
+        acc[instanceName] = {
+          type: ind.type,
+          params: ind.params
+        };
         return acc;
       }, {});
       
       await storeCsvCandles(assetId, parsedData);
-      await calculateIndicators(assetId, config);
+      await calculateIndicators(assetId, instances);
       
       setLoadingStatus('Data loaded successfully');
       setTimeout(() => setLoadingStatus(''), 2000);
@@ -288,13 +296,17 @@ const DataAnalysis = () => {
       setChartData([]);
       startStream(detectedAsset.asset);
       
-      const config = Object.entries(activeIndicators).reduce((acc, [id, ind]) => {
-        acc[ind.type] = ind.params;
+      // Use instance-based format to support multiple indicators of same type
+      const instances = Object.entries(activeIndicators).reduce((acc, [instanceName, ind]) => {
+        acc[instanceName] = {
+          type: ind.type,
+          params: ind.params
+        };
         return acc;
       }, {});
       
       setTimeout(() => {
-        calculateIndicators(detectedAsset.asset, config);
+        calculateIndicators(detectedAsset.asset, instances);
       }, 2000);
     }
   };
@@ -308,15 +320,19 @@ const DataAnalysis = () => {
   const handleIndicatorUpdate = async (indicators) => {
     setActiveIndicators(indicators);
     
-    const config = Object.entries(indicators).reduce((acc, [id, ind]) => {
-      acc[ind.type] = ind.params;
+    // Use instance-based format to support multiple indicators of same type
+    const instances = Object.entries(indicators).reduce((acc, [instanceName, ind]) => {
+      acc[instanceName] = {
+        type: ind.type,
+        params: ind.params
+      };
       return acc;
     }, {});
     
     if (dataSource === 'csv' && selectedAsset) {
-      await calculateIndicators(selectedAsset, config);
+      await calculateIndicators(selectedAsset, instances);
     } else if (dataSource === 'platform' && streamAsset) {
-      await calculateIndicators(streamAsset, config);
+      await calculateIndicators(streamAsset, instances);
     }
   };
 
