@@ -118,7 +118,7 @@ const DataAnalysis = () => {
 
   useEffect(() => {
     loadAvailableAssets();
-  }, [dataSource, timeframe]);
+  }, [loadAvailableAssets]);
 
   useEffect(() => {
     if (dataSource === 'csv' && selectedAsset && timeframe) {

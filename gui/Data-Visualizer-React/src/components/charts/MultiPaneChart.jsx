@@ -24,6 +24,9 @@ const MultiPaneChart = forwardRef(({
   const overlaySeriesRef = useRef({});
   const rsiSeriesRef = useRef(null);
   const macdSeriesRef = useRef({});
+  
+  // Track previous data length for performance optimization
+  const prevDataLengthRef = useRef(0);
 
   const hasRSI = React.useMemo(() => {
     const rsiData = backendIndicators?.series?.rsi;
@@ -127,6 +130,9 @@ const MultiPaneChart = forwardRef(({
   useEffect(() => {
     if (!rsiContainerRef.current || !hasRSI) return;
 
+    // Declare callback outside try block for proper cleanup scope
+    let timeRangeCallback = null;
+
     try {
       const containerWidth = rsiContainerRef.current.clientWidth;
       const containerHeight = oscillatorHeight;
@@ -144,50 +150,53 @@ const MultiPaneChart = forwardRef(({
         height: containerHeight,
       });
 
-    rsiSeriesRef.current = rsiChartRef.current.addLineSeries({
-      color: '#ff6b6b',
-      lineWidth: 2,
-      title: 'RSI(14)',
-    });
+      rsiSeriesRef.current = rsiChartRef.current.addLineSeries({
+        color: '#ff6b6b',
+        lineWidth: 2,
+        title: 'RSI(14)',
+      });
 
-    // Add overbought/oversold reference lines
-    const rsiUpperLine = rsiChartRef.current.addLineSeries({
-      color: 'rgba(239, 68, 68, 0.3)',
-      lineWidth: 1,
-      lineStyle: 2,
-      priceLineVisible: false,
-    });
-    const rsiLowerLine = rsiChartRef.current.addLineSeries({
-      color: 'rgba(16, 185, 129, 0.3)',
-      lineWidth: 1,
-      lineStyle: 2,
-      priceLineVisible: false,
-    });
+      // Add overbought/oversold reference lines
+      const rsiUpperLine = rsiChartRef.current.addLineSeries({
+        color: 'rgba(239, 68, 68, 0.3)',
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+      });
+      const rsiLowerLine = rsiChartRef.current.addLineSeries({
+        color: 'rgba(16, 185, 129, 0.3)',
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+      });
 
-    // Sync time scales using time-based synchronization
-    let timeRangeCallback = null;
-    if (mainChartRef.current) {
-      timeRangeCallback = (timeRange) => {
-        if (timeRange && rsiChartRef.current && rsiSeriesRef.current) {
-          try {
-            rsiChartRef.current.timeScale().setVisibleRange({
-              from: timeRange.from,
-              to: timeRange.to,
-            });
-          } catch (e) {
-            // Ignore errors when chart doesn't have data yet
+      // Sync time scales using time-based synchronization
+      if (mainChartRef.current) {
+        timeRangeCallback = (timeRange) => {
+          if (timeRange && rsiChartRef.current && rsiSeriesRef.current) {
+            try {
+              rsiChartRef.current.timeScale().setVisibleRange({
+                from: timeRange.from,
+                to: timeRange.to,
+              });
+            } catch (e) {
+              // Ignore errors when chart doesn't have data yet
+            }
           }
-        }
-      };
-      mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
-    }
+        };
+        mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
+      }
     } catch (error) {
       log.error('[MultiPaneChart] Failed to initialize RSI chart:', error);
     }
 
     return () => {
       if (timeRangeCallback && mainChartRef.current) {
-        mainChartRef.current.timeScale().unsubscribeVisibleTimeRangeChange(timeRangeCallback);
+        try {
+          mainChartRef.current.timeScale().unsubscribeVisibleTimeRangeChange(timeRangeCallback);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
       }
       if (rsiChartRef.current) {
         rsiChartRef.current.remove();
@@ -195,11 +204,14 @@ const MultiPaneChart = forwardRef(({
       }
       rsiSeriesRef.current = null;
     };
-  }, [hasRSI, oscillatorHeight]);
+  }, [hasRSI, oscillatorHeight, chartConfig]);
 
   // Initialize MACD chart
   useEffect(() => {
     if (!macdContainerRef.current || !hasMACD) return;
+
+    // Declare callback outside try block for proper cleanup scope
+    let timeRangeCallback = null;
 
     try {
       const containerWidth = macdContainerRef.current.clientWidth;
@@ -218,48 +230,51 @@ const MultiPaneChart = forwardRef(({
         height: containerHeight,
       });
 
-    macdSeriesRef.current.macd = macdChartRef.current.addLineSeries({
-      color: '#4ecdc4',
-      lineWidth: 2,
-      title: 'MACD',
-    });
+      macdSeriesRef.current.macd = macdChartRef.current.addLineSeries({
+        color: '#4ecdc4',
+        lineWidth: 2,
+        title: 'MACD',
+      });
 
-    macdSeriesRef.current.signal = macdChartRef.current.addLineSeries({
-      color: '#ff9f43',
-      lineWidth: 2,
-      title: 'Signal',
-    });
+      macdSeriesRef.current.signal = macdChartRef.current.addLineSeries({
+        color: '#ff9f43',
+        lineWidth: 2,
+        title: 'Signal',
+      });
 
-    macdSeriesRef.current.histogram = macdChartRef.current.addHistogramSeries({
-      color: '#667eea',
-      priceFormat: { type: 'volume' },
-      priceScaleId: '',
-    });
+      macdSeriesRef.current.histogram = macdChartRef.current.addHistogramSeries({
+        color: '#667eea',
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+      });
 
-    // Sync time scales using time-based synchronization
-    let timeRangeCallback = null;
-    if (mainChartRef.current) {
-      timeRangeCallback = (timeRange) => {
-        if (timeRange && macdChartRef.current && macdSeriesRef.current.macd) {
-          try {
-            macdChartRef.current.timeScale().setVisibleRange({
-              from: timeRange.from,
-              to: timeRange.to,
-            });
-          } catch (e) {
-            // Ignore errors when chart doesn't have data yet
+      // Sync time scales using time-based synchronization
+      if (mainChartRef.current) {
+        timeRangeCallback = (timeRange) => {
+          if (timeRange && macdChartRef.current && macdSeriesRef.current.macd) {
+            try {
+              macdChartRef.current.timeScale().setVisibleRange({
+                from: timeRange.from,
+                to: timeRange.to,
+              });
+            } catch (e) {
+              // Ignore errors when chart doesn't have data yet
+            }
           }
-        }
-      };
-      mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
-    }
+        };
+        mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
+      }
     } catch (error) {
       log.error('[MultiPaneChart] Failed to initialize MACD chart:', error);
     }
 
     return () => {
       if (timeRangeCallback && mainChartRef.current) {
-        mainChartRef.current.timeScale().unsubscribeVisibleTimeRangeChange(timeRangeCallback);
+        try {
+          mainChartRef.current.timeScale().unsubscribeVisibleTimeRangeChange(timeRangeCallback);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
       }
       if (macdChartRef.current) {
         macdChartRef.current.remove();
@@ -267,22 +282,50 @@ const MultiPaneChart = forwardRef(({
       }
       macdSeriesRef.current = {};
     };
-  }, [hasMACD, oscillatorHeight]);
+  }, [hasMACD, oscillatorHeight, chartConfig]);
 
-  // Update main chart data
+  // Update main chart data - OPTIMIZED: Use setData() for initial load, update() for incremental changes
   useEffect(() => {
-    if (!mainSeriesRef.current || processedData.length === 0) {
-      log.debug('[MultiPaneChart] Skipping data update: series not ready or no data');
+    if (!mainSeriesRef.current) {
+      log.debug('[MultiPaneChart] Skipping data update: series not ready');
       return;
     }
     
     try {
-      log.debug(`[MultiPaneChart] Updating main chart with ${processedData.length} data points`);
-      mainSeriesRef.current.setData(processedData);
-      if (mainChartRef.current) {
-        mainChartRef.current.timeScale().fitContent();
+      if (processedData.length === 0) {
+        mainSeriesRef.current.setData([]);
+        prevDataLengthRef.current = 0;
+        return;
       }
-      log.debug('[MultiPaneChart] Main chart data updated successfully');
+
+      const prevLength = prevDataLengthRef.current;
+      
+      // Initial load or complete data replacement (e.g., switching assets)
+      if (prevLength === 0 || processedData.length < prevLength) {
+        mainSeriesRef.current.setData(processedData);
+        if (mainChartRef.current) {
+          mainChartRef.current.timeScale().fitContent();
+        }
+        log.debug(`[MultiPaneChart] Initial load: ${processedData.length} data points`);
+        prevDataLengthRef.current = processedData.length;
+        return;
+      }
+
+      // Incremental update - use update() for performance (TradingView best practice)
+      if (processedData.length > prevLength) {
+        // New candle(s) added - update only the new ones
+        for (let i = prevLength; i < processedData.length; i++) {
+          mainSeriesRef.current.update(processedData[i]);
+        }
+        log.debug(`[MultiPaneChart] Added ${processedData.length - prevLength} new candle(s) via update()`);
+      } else if (processedData.length === prevLength && processedData.length > 0) {
+        // Same length - likely updating the last forming candle
+        const lastCandle = processedData[processedData.length - 1];
+        mainSeriesRef.current.update(lastCandle);
+        log.debug(`[MultiPaneChart] Updated last candle via update()`);
+      }
+      
+      prevDataLengthRef.current = processedData.length;
     } catch (error) {
       log.error('[MultiPaneChart] Failed to update main chart data:', error);
     }

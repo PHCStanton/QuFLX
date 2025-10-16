@@ -674,7 +674,7 @@ def handle_start_stream(data):
                         'high': float(row['high']),
                         'low': float(row['low']),
                         'close': float(row['close']),
-                        'volume': int(row.get('volume', 0)),
+                        'volume': int(row.get('volume', 0) or 0),  # Safely handle None values
                         'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
                     })
                 
