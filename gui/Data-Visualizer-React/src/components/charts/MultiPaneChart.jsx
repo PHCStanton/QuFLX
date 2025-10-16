@@ -14,20 +14,24 @@ import {
 
 const log = createLogger('MultiPaneChart');
 
-// Helper function to determine if indicator should render on main chart (overlay)
-const isOverlayIndicator = (indicatorType) => {
-  const definition = getIndicatorDefinition(indicatorType);
-  if (!definition) return false;
-  return definition.renderType === 'line' && definition.category === 'Trend' ||
-         definition.renderType === 'band';
-};
-
 // Helper function to determine if indicator is an oscillator (separate pane)
 const isOscillatorIndicator = (indicatorType) => {
   const definition = getIndicatorDefinition(indicatorType);
   if (!definition) return false;
   return definition.category === 'Momentum' || 
          (definition.renderType === 'histogram' && indicatorType !== 'volume');
+};
+
+// Helper function to determine if indicator should render on main chart (overlay)
+const isOverlayIndicator = (indicatorType) => {
+  const definition = getIndicatorDefinition(indicatorType);
+  if (!definition) return false;
+  
+  // Oscillators render in separate panes, not as overlays
+  if (isOscillatorIndicator(indicatorType)) return false;
+  
+  // Everything else that has line or band renderType is an overlay
+  return definition.renderType === 'line' || definition.renderType === 'band';
 };
 
 const MultiPaneChart = forwardRef(({
@@ -357,9 +361,16 @@ const MultiPaneChart = forwardRef(({
       if (definition.renderType === 'band' && typeof data === 'object' && !Array.isArray(data)) {
         const { upper, middle, lower } = data;
         
+        // Use band-specific colors if explicitly defined, otherwise use distinct defaults
+        const bandColors = definition.bandColors || {
+          upper: '#ef5350',   // Red for upper band
+          middle: '#ffc107',  // Yellow for middle band
+          lower: '#4caf50',   // Green for lower band
+        };
+        
         if (upper?.length > 0) {
           overlaySeriesRef.current[`${indicatorType}_upper`] = mainChartRef.current.addLineSeries({
-            color: definition.color || '#ef5350',
+            color: bandColors.upper,
             lineWidth: 1,
             title: `${definition.name} Upper`,
             priceLineVisible: false,
@@ -369,7 +380,7 @@ const MultiPaneChart = forwardRef(({
 
         if (middle?.length > 0) {
           overlaySeriesRef.current[`${indicatorType}_middle`] = mainChartRef.current.addLineSeries({
-            color: definition.color || '#ffc107',
+            color: bandColors.middle,
             lineWidth: 1,
             lineStyle: 2,
             title: `${definition.name} Middle`,
@@ -380,7 +391,7 @@ const MultiPaneChart = forwardRef(({
 
         if (lower?.length > 0) {
           overlaySeriesRef.current[`${indicatorType}_lower`] = mainChartRef.current.addLineSeries({
-            color: definition.color || '#4caf50',
+            color: bandColors.lower,
             lineWidth: 1,
             title: `${definition.name} Lower`,
             priceLineVisible: false,
