@@ -34,26 +34,8 @@ const DataAnalysis = () => {
   const [streamError, setStreamError] = useState(null);
   const [detectedAsset, setDetectedAsset] = useState(null);
   
-  const [activeIndicators, setActiveIndicators] = useState({
-    'SMA-20': { 
-      type: 'sma', 
-      params: { period: 20 },
-      color: '#22c55e',
-      definition: { name: 'Simple Moving Average (SMA)', renderType: 'line' }
-    },
-    'RSI-14': { 
-      type: 'rsi', 
-      params: { period: 14 },
-      color: '#f59e0b',
-      definition: { name: 'Relative Strength Index (RSI)', renderType: 'line' }
-    },
-    'BB-20': { 
-      type: 'bollinger', 
-      params: { period: 20, std_dev: 2 },
-      color: '#6366f1',
-      definition: { name: 'Bollinger Bands', renderType: 'band' }
-    }
-  });
+  // Start with clean slate - no default indicators
+  const [activeIndicators, setActiveIndicators] = useState({});
   
   const { 
     isConnected, 

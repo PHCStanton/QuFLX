@@ -322,6 +322,163 @@ React Components (Data Analysis, Strategy Lab, Trading Hub)
 
 ---
 
+### Phase 5.7: Indicator System Enhancement ⏳ **IN PROGRESS** (October 16, 2025)
+**Goal**: Optimize and enhance indicator integration and UX for intuitive, efficient chart analysis
+
+**Status**: In Progress - Systematic improvement of indicator system
+
+**User Requirements:**
+1. Remove default indicators (clean slate - no SMA-20, RSI-14, BB-20 on load)
+2. Optimize indicator visual rendering to lock to timeframe/candle timestamps
+3. Enable multiple Moving Averages (multiple SMA/EMA/WMA instances OR EMA CROSS 3/5 indicator)
+4. Fix missing indicator rendering (many dropdowns don't show on chart)
+5. Move Indicator Manager to bottom of chart (not in left column)
+
+#### Sub-Phase 5.7.1: Clean Slate & Dynamic Rendering Foundation ⏳ **IN PROGRESS**
+**Goal**: Remove defaults and create dynamic renderer for all indicator types
+
+**Tasks:**
+- [ ] **Remove Default Indicators**
+  - Remove hardcoded SMA-20, RSI-14, BB-20 from DataAnalysis.jsx state
+  - Start with empty activeIndicators object `{}`
+  - Clean slate chart on initial load
+
+- [ ] **Dynamic Indicator Renderer**
+  - Create universal renderer respecting `renderType` from indicator definitions
+  - Support: `line` (overlays), `band` (Bollinger), `histogram` (MACD, volume)
+  - Ensure proper timestamp alignment with candles
+
+- [ ] **Timeframe Synchronization**
+  - Lock indicator data to candlestick timestamps
+  - Ensure visual alignment across all timeframes (1m, 5m, 15m, 1h, 4h)
+  - Test with both CSV and Platform modes
+
+**Key Design Principle**: Foundation must support ALL indicator types dynamically
+
+---
+
+#### Sub-Phase 5.7.2: Multiple Moving Average Support 📅 **QUEUED**
+**Goal**: Enable multiple MA instances for crossover strategies
+
+**Tasks:**
+- [ ] **Option A: Multiple Instances via Unique Names**
+  - Allow: SMA-20, SMA-50, SMA-100 simultaneously
+  - Update IndicatorManager to generate unique instance names
+  - Backend API: Support multiple indicators of same type
+
+- [ ] **Option B: MA Cross Indicator**
+  - Create "EMA CROSS 3" indicator with 3 customizable EMAs
+  - Create "EMA CROSS 5" indicator with 5 customizable EMAs
+  - Modal configuration: Set periods for each line
+  - Visual rendering: Distinct colors for each MA line
+
+- [ ] **Backend Integration**
+  - Update indicator calculation endpoint
+  - Handle multiple MA parameters efficiently
+  - Return properly formatted time-series data
+
+**Key Design Principle**: Crossover strategies require multiple MAs of same type
+
+---
+
+#### Sub-Phase 5.7.3: Fix Missing Indicator Rendering 📅 **QUEUED**
+**Goal**: Ensure ALL dropdown indicators display correctly on chart
+
+**Current Issue**: Only SMA, EMA, Bollinger (overlay), RSI, MACD (oscillator) render. Missing:
+- WMA (Weighted Moving Average) - overlay
+- Stochastic Oscillator - oscillator pane
+- Williams %R - oscillator pane
+- ROC (Rate of Change) - oscillator pane
+- Schaff Trend Cycle - oscillator pane
+- DeMarker - oscillator pane
+- CCI (Commodity Channel Index) - oscillator pane
+- ATR (Average True Range) - overlay or separate pane
+- SuperTrend - overlay
+
+**Tasks:**
+- [ ] **Add WMA Rendering** (Overlay on main chart)
+  - Similar to SMA/EMA rendering logic
+  - Use definition color from indicatorDefinitions.js
+
+- [ ] **Add Oscillator Rendering** (Separate panes like RSI/MACD)
+  - Stochastic: %K and %D lines with 20/80 levels
+  - Williams %R: Single line with -20/-80 levels
+  - ROC: Single line with 0 centerline
+  - Schaff TC: Single line with 25/75 levels
+  - DeMarker: Single line with 0.3/0.7 levels
+  - CCI: Single line with -100/0/100 levels
+
+- [ ] **Add ATR & SuperTrend**
+  - ATR: Decide overlay vs separate pane
+  - SuperTrend: Overlay with trend direction coloring
+
+- [ ] **Test Each Indicator**
+  - Verify visual display
+  - Confirm data accuracy
+  - Check performance (no lag)
+
+**Key Design Principle**: If it's in the dropdown, it MUST render on chart
+
+---
+
+#### Sub-Phase 5.7.4: Layout Optimization 📅 **QUEUED**
+**Goal**: Move IndicatorManager to bottom of chart for better vertical space utilization
+
+**Current Layout** (DataAnalysis.jsx):
+```
+LEFT COLUMN: [Data Source, Asset, Timeframe, **Indicators**]
+CENTER: [Chart]
+RIGHT: [Stats, Readings]
+```
+
+**New Layout**:
+```
+LEFT COLUMN: [Data Source, Asset, Timeframe]
+CENTER: [Chart, **Indicators (below chart)**]
+RIGHT: [Stats, Readings]
+```
+
+**Tasks:**
+- [ ] **Move IndicatorManager Component**
+  - From left column to center column (below MultiPaneChart)
+  - Horizontal layout instead of vertical
+  - Compact design to minimize vertical space
+
+- [ ] **Adjust Chart Height**
+  - Calculate available height minus indicator panel
+  - Ensure chart remains primary visual focus
+  - Responsive height adjustments
+
+- [ ] **Visual Design**
+  - Horizontal indicator cards/pills
+  - Collapse/expand functionality (optional)
+  - Maintain design token consistency
+
+- [ ] **Test Responsiveness**
+  - Desktop (1280px+)
+  - Tablet (1024px-1279px)
+  - Verify no layout breaks
+
+**Key Design Principle**: Chart is primary focus, indicators secondary but accessible
+
+---
+
+#### Implementation Checklist
+- [ ] Remove default indicators (clean slate)
+- [ ] Create dynamic indicator renderer
+- [ ] Ensure timeframe synchronization
+- [ ] Enable multiple MA instances
+- [ ] Add WMA rendering
+- [ ] Add all oscillator renderings (Stochastic, Williams R, ROC, etc.)
+- [ ] Add ATR & SuperTrend rendering
+- [ ] Move IndicatorManager to chart bottom
+- [ ] Test all indicators display correctly
+- [ ] Verify layout optimization
+
+**Expected Outcome**: Intuitive, efficient indicator system with clean initial state, full rendering support, and optimized layout
+
+---
+
 ### Phase 5.5: Critical Bug Fixes ✅ **COMPLETE** (October 15, 2025)
 **Goal**: Fix critical runtime errors and frontend stability issues discovered during comprehensive bug audit
 

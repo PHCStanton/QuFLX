@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { createChart } from 'lightweight-charts';
 import { createLogger } from '../../utils/logger';
+import { getIndicatorDefinition } from '../../constants/indicatorDefinitions';
 import {
   createChartConfig,
   createCandlestickSeries,
@@ -12,6 +13,22 @@ import {
 } from '../../utils/chartUtils';
 
 const log = createLogger('MultiPaneChart');
+
+// Helper function to determine if indicator should render on main chart (overlay)
+const isOverlayIndicator = (indicatorType) => {
+  const definition = getIndicatorDefinition(indicatorType);
+  if (!definition) return false;
+  return definition.renderType === 'line' && definition.category === 'Trend' ||
+         definition.renderType === 'band';
+};
+
+// Helper function to determine if indicator is an oscillator (separate pane)
+const isOscillatorIndicator = (indicatorType) => {
+  const definition = getIndicatorDefinition(indicatorType);
+  if (!definition) return false;
+  return definition.category === 'Momentum' || 
+         (definition.renderType === 'histogram' && indicatorType !== 'volume');
+};
 
 const MultiPaneChart = forwardRef(({
   data = [],
@@ -313,7 +330,7 @@ const MultiPaneChart = forwardRef(({
     }
   }, [processedData]);
 
-  // Render overlay indicators (SMA, EMA, Bollinger) on main chart
+  // Dynamic overlay indicator rendering (SMA, EMA, WMA, Bollinger, SuperTrend, etc.)
   useEffect(() => {
     if (!mainChartRef.current || !backendIndicators?.series) return;
 
@@ -327,65 +344,64 @@ const MultiPaneChart = forwardRef(({
       }
     });
 
-    // SMA
-    if (series.sma && series.sma.length > 0) {
-      overlaySeriesRef.current.sma = mainChartRef.current.addLineSeries({
-        color: '#8b5cf6',
-        lineWidth: 2,
-        title: `SMA(${backendIndicators.indicators?.sma?.period || 20})`,
-        priceLineVisible: false,
-      });
-      overlaySeriesRef.current.sma.setData(series.sma);
-    }
-
-    // EMA
-    if (series.ema && series.ema.length > 0) {
-      overlaySeriesRef.current.ema = mainChartRef.current.addLineSeries({
-        color: '#06d6a0',
-        lineWidth: 2,
-        title: `EMA(${backendIndicators.indicators?.ema?.period || 20})`,
-        priceLineVisible: false,
-      });
-      overlaySeriesRef.current.ema.setData(series.ema);
-    }
-
-    // Bollinger Bands
-    if (series.bollinger) {
-      const { upper, middle, lower } = series.bollinger;
+    // Dynamically render all overlay indicators
+    Object.entries(series).forEach(([indicatorType, data]) => {
+      const definition = getIndicatorDefinition(indicatorType);
       
-      if (upper?.length > 0) {
-        overlaySeriesRef.current.bb_upper = mainChartRef.current.addLineSeries({
-          color: '#ef5350',
-          lineWidth: 1,
-          title: 'BB Upper',
+      // Skip if not overlay type or no definition
+      if (!definition || !isOverlayIndicator(indicatorType)) return;
+      
+      const params = backendIndicators.indicators?.[indicatorType] || {};
+      
+      // Handle band-type indicators (Bollinger Bands)
+      if (definition.renderType === 'band' && typeof data === 'object' && !Array.isArray(data)) {
+        const { upper, middle, lower } = data;
+        
+        if (upper?.length > 0) {
+          overlaySeriesRef.current[`${indicatorType}_upper`] = mainChartRef.current.addLineSeries({
+            color: definition.color || '#ef5350',
+            lineWidth: 1,
+            title: `${definition.name} Upper`,
+            priceLineVisible: false,
+          });
+          overlaySeriesRef.current[`${indicatorType}_upper`].setData(upper);
+        }
+
+        if (middle?.length > 0) {
+          overlaySeriesRef.current[`${indicatorType}_middle`] = mainChartRef.current.addLineSeries({
+            color: definition.color || '#ffc107',
+            lineWidth: 1,
+            lineStyle: 2,
+            title: `${definition.name} Middle`,
+            priceLineVisible: false,
+          });
+          overlaySeriesRef.current[`${indicatorType}_middle`].setData(middle);
+        }
+
+        if (lower?.length > 0) {
+          overlaySeriesRef.current[`${indicatorType}_lower`] = mainChartRef.current.addLineSeries({
+            color: definition.color || '#4caf50',
+            lineWidth: 1,
+            title: `${definition.name} Lower`,
+            priceLineVisible: false,
+          });
+          overlaySeriesRef.current[`${indicatorType}_lower`].setData(lower);
+        }
+      }
+      // Handle line-type indicators (SMA, EMA, WMA, SuperTrend, etc.)
+      else if (definition.renderType === 'line' && Array.isArray(data) && data.length > 0) {
+        const periodStr = params.period ? `(${params.period})` : '';
+        overlaySeriesRef.current[indicatorType] = mainChartRef.current.addLineSeries({
+          color: definition.color || '#8b5cf6',
+          lineWidth: 2,
+          title: `${definition.name}${periodStr}`,
           priceLineVisible: false,
         });
-        overlaySeriesRef.current.bb_upper.setData(upper);
+        overlaySeriesRef.current[indicatorType].setData(data);
       }
+    });
 
-      if (middle?.length > 0) {
-        overlaySeriesRef.current.bb_middle = mainChartRef.current.addLineSeries({
-          color: '#ffc107',
-          lineWidth: 1,
-          lineStyle: 2,
-          title: 'BB Middle',
-          priceLineVisible: false,
-        });
-        overlaySeriesRef.current.bb_middle.setData(middle);
-      }
-
-      if (lower?.length > 0) {
-        overlaySeriesRef.current.bb_lower = mainChartRef.current.addLineSeries({
-          color: '#4caf50',
-          lineWidth: 1,
-          title: 'BB Lower',
-          priceLineVisible: false,
-        });
-        overlaySeriesRef.current.bb_lower.setData(lower);
-      }
-    }
-
-    log.debug('[MultiPaneChart] Overlay indicators rendered on main chart');
+    log.debug('[MultiPaneChart] Dynamic overlay indicators rendered on main chart');
   }, [backendIndicators]);
 
   // hasRSI derived from backendIndicators via useMemo above
