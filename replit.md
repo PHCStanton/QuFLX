@@ -32,9 +32,11 @@ The platform employs a Capabilities-First Design with Dual Data Pipelines for hi
 - **Solana-Inspired UI/UX**: Professional 3-page trading terminal with a cohesive design system and dark aesthetic.
 
 **Frontend Architecture (Solana-Inspired Design):**
+- **Expandable Sidebar Navigation**: Retractable sidebar (240px expanded, 64px collapsed) with SVG icons for clean navigation.
 - **Data Analysis Page**: For strategy design, chart testing, and indicator configuration.
 - **Strategy Lab Page**: For strategy development, validation, and performance analysis.
 - **Trading Hub Page**: For real-time signal generation and trade execution.
+- **SidebarContext**: Global state management for sidebar expand/collapse state and responsive layout.
 
 **Chart System:**
 - **Main Chart**: Candlestick data with overlay indicators.
