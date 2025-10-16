@@ -376,6 +376,114 @@ React Components (Data Analysis, Strategy Lab, Trading Hub)
 
 ---
 
+### Phase 5.8: Modular Indicator Architecture Refactoring ⚙️ **IN PROGRESS** (October 16, 2025)
+**Goal**: Refactor backend to use dedicated indicator module for clean separation of concerns
+
+**Status**: Task list created, beginning implementation ⚙️
+
+**Architecture Decision:**
+Move from inline indicator calculations in `data_streaming.py` capability to using the existing professional-grade `TechnicalIndicatorsPipeline` from `strategies/technical_indicators.py`.
+
+**Current Architecture (Inefficient):**
+```
+Frontend → streaming_server.py → data_streaming.py.apply_technical_indicators()
+                                   ↓
+                            Manual inline calculations (only 5 indicators)
+```
+
+**New Architecture (Modular):**
+```
+Frontend → streaming_server.py → indicator_adapter.py → TechnicalIndicatorsPipeline
+                                                         ↓
+                                                  pandas-ta/talib (13+ indicators)
+```
+
+#### Key Design Principles
+1. ✅ **Functional Simplicity** - Clear, focused modules with single responsibility
+2. ✅ **Separation of Concerns** - Streaming handles WebSocket/candles, indicators module handles calculations
+3. ✅ **Code Integrity** - Backward compatible with frontend, no breaking changes
+4. ✅ **Zero Assumptions** - Explicit adapter layer for format conversion
+
+#### Implementation Plan
+
+**1. Create Indicator Adapter Module** (`strategies/indicator_adapter.py`)
+- [ ] Convert candle array format → pandas DataFrame
+- [ ] Invoke `TechnicalIndicatorsPipeline.calculate_indicators()`
+- [ ] Transform results → frontend format `{series: {}, indicators: {}, signals: {}}`
+- [ ] Support instance-based multi-indicator requests
+
+**2. Refactor Streaming Server** (`streaming_server.py`)
+- [ ] Import `TechnicalIndicatorsPipeline` and adapter
+- [ ] Replace `data_streamer.apply_technical_indicators()` calls
+- [ ] Use adapter for all indicator calculation requests
+- [ ] Maintain backward compatibility with frontend
+
+**3. Clean Up Data Streaming Capability** (`capabilities/data_streaming.py`)
+- [ ] Remove `apply_technical_indicators()` method entirely
+- [ ] Keep focused on WebSocket interception and candle formation
+- [ ] Update docstrings to reflect clean scope
+
+**4. Frontend Enhancements**
+- [ ] Add RSI reference lines (25/75) to oscillator pane rendering
+- [ ] Verify all indicator levels render (Stochastic 20/80, Williams %R -20/-80, etc.)
+- [ ] Test multi-instance support with new indicators
+
+**5. Testing & Verification**
+- [ ] Test each of 13 indicators individually
+- [ ] Verify multi-instance support (e.g., SMA-20 + SMA-50 + WMA-20)
+- [ ] Confirm oscillator panes render correctly
+- [ ] Check overlay indicators display properly
+- [ ] Validate backward compatibility with existing CSV/Platform modes
+
+**6. Documentation Updates**
+- [ ] Update `replit.md` with new architecture
+- [ ] Document indicator module separation of concerns
+- [ ] Update API flow diagrams
+
+#### Benefits of Modular Architecture
+
+**Immediate Wins:**
+- ✅ **All 13+ indicators available instantly** (WMA, Stochastic, Williams %R, ROC, Schaff TC, DeMarker, CCI, ATR, SuperTrend)
+- ✅ **Professional calculations** using industry-standard libraries (pandas-ta, talib)
+- ✅ **No code duplication** - single source of truth for indicators
+
+**Long-term Benefits:**
+- ✅ **Clean capability** - `data_streaming.py` focused on streaming only
+- ✅ **Easy to maintain** - indicator logic centralized in one module
+- ✅ **Easy to extend** - add new indicators in one place
+- ✅ **Testable** - indicator calculations can be unit tested separately
+- ✅ **Reusable** - same pipeline used for backtesting, live trading, analysis
+
+#### Available Indicators After Refactoring
+
+**Trend Indicators:**
+- SMA (Simple Moving Average)
+- EMA (Exponential Moving Average)
+- WMA (Weighted Moving Average) ✨ NEW
+- MACD (Moving Average Convergence Divergence)
+- Bollinger Bands
+
+**Momentum Indicators:**
+- RSI (Relative Strength Index)
+- Stochastic Oscillator ✨ NEW
+- Williams %R ✨ NEW
+- ROC (Rate of Change) ✨ NEW
+- Schaff Trend Cycle ✨ NEW
+- DeMarker ✨ NEW
+- CCI (Commodity Channel Index) ✨ NEW
+
+**Volatility Indicators:**
+- ATR (Average True Range) ✨ NEW
+- Bollinger Bands (also volatility)
+
+**Custom Indicators:**
+- SuperTrend ✨ NEW
+- Pivot Points
+
+**Total: 13+ indicators** (up from 5)
+
+---
+
 ### Phase 5.5: Critical Bug Fixes ✅ **COMPLETE** (October 15, 2025)
 **Goal**: Fix critical runtime errors and frontend stability issues discovered during comprehensive bug audit
 

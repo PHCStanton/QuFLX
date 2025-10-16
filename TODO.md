@@ -4,6 +4,36 @@
 
 ## 🚀 Current Development Focus
 
+### 🔧 Phase 5.8: Modular Indicator Architecture Refactoring (October 16, 2025) - **IN PROGRESS**
+**Refactor backend to use dedicated indicator module for all technical calculations**
+
+**Goal:** Implement true separation of concerns by using the existing professional-grade `TechnicalIndicatorsPipeline` from `strategies/technical_indicators.py` instead of inline calculations in the streaming capability.
+
+**Key Design Principles:**
+- ✅ **Functional Simplicity** - Clear, focused modules with single responsibility
+- ✅ **Separation of Concerns** - Streaming capability handles WebSocket/candles only, indicators module handles all calculations
+- ✅ **Code Integrity** - Backward compatible, no breaking changes to frontend
+- ✅ **Zero Assumptions** - Explicit adapter layer for format conversion
+
+**Tasks:**
+- [ ] Create indicator adapter module (`strategies/indicator_adapter.py`)
+- [ ] Refactor `streaming_server.py` to use `TechnicalIndicatorsPipeline`
+- [ ] Remove inline indicator calculations from `data_streaming.py`
+- [ ] Add RSI reference lines (25/75) to frontend rendering
+- [ ] Test all 13 indicators (WMA, Stochastic, Williams %R, ROC, Schaff TC, DeMarker, CCI, ATR, SuperTrend + existing)
+- [ ] Update architecture documentation
+
+**Benefits:**
+- ✅ All 13+ indicators immediately available (WMA, Stochastic, Williams %R, ROC, Schaff TC, DeMarker, CCI, ATR, SuperTrend)
+- ✅ Professional-grade calculations using pandas-ta and talib libraries
+- ✅ Clean streaming capability focused on WebSocket/candle formation
+- ✅ Single source of truth for indicator calculations
+- ✅ Easy to maintain and extend
+
+**Current Status:** Task list created, beginning implementation ⚙️
+
+---
+
 ### ✅ Phase 5.7: Indicator System Enhancement (October 16, 2025) - **COMPLETE**
 **Optimized indicator integration with clean initial state and multi-instance support**
 
