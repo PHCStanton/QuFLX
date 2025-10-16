@@ -11,6 +11,35 @@ QuantumFlux is an automated trading platform designed for PocketOption. It integ
 
 ## Recent Changes
 
+### Indicator Calculation Race Condition Fix (Completed - October 16, 2025)
+**Goal**: Fix bug where indicators failed to display in CSV mode due to WebSocket timing race condition.
+
+**Root Cause Identified:**
+- CSV data loaded before WebSocket connection established
+- `storeCsvCandles` and `calculateIndicators` checked React state `isConnected` which lagged behind actual socket state
+- Functions silently failed when `isConnected` was false but socket was actually connected
+- No error logging made debugging difficult
+
+**Changes Implemented:**
+- **Direct Socket State Check (useWebSocket.js)**: Modified `storeCsvCandles` and `calculateIndicators` to check `socketRef.current.connected` directly instead of relying on React state variable
+  - Eliminates false-negative readiness checks
+  - Prevents race condition between state updates and socket connection
+- **Automatic Retry Logic (DataAnalysis.jsx)**: Added useEffect that retries indicator calculation when socket connects
+  - Triggers when `isConnected` changes to true and chart data exists
+  - Resubmits cached candles and indicator calculation requests
+  - Ensures indicators display even when CSV loads before socket is ready
+- **Enhanced Error Logging**: Added detailed error messages to identify connection state issues
+  - Shows socket existence vs actual connection status
+  - Helps diagnose timing-related problems
+
+**Impact**: 
+- Indicators now display correctly in CSV mode: RSI, Bollinger Bands, SMA all working
+- Backend confirms successful calculation of all requested indicators
+- Robust handling of WebSocket timing variations
+- Improved debugging capabilities with better error messages
+
+**Verification**: Architect-approved ✅ | Visual confirmation ✅ | No regressions ✅
+
 ### CSV Chart Rendering Fix (Completed - October 16, 2025)
 **Goal**: Fix chart display issue where CSV data loaded correctly but displayed as thin bar.
 
