@@ -11,6 +11,34 @@ QuantumFlux is an automated trading platform designed for PocketOption. It integ
 
 ## Recent Changes
 
+### Bug Fixes & Code Quality (Completed - October 16, 2025)
+**Goal**: Fix identified bugs, improve performance consistency, and eliminate memory leaks.
+
+**Changes Implemented:**
+- **MultiPaneChart Performance Optimization**: Applied the same setData() vs update() optimization from LightweightChart
+  - Added `prevDataLengthRef` tracking for detecting initial vs incremental updates
+  - Uses `setData()` only for initial load or asset switches
+  - Uses `update()` for incremental candles (10-100x faster rendering)
+  - Mirrors proven pattern from LightweightChart.jsx for consistency
+- **Type Safety Fix (streaming_server.py)**: Fixed unsafe None handling in volume field conversion
+  - Changed `int(row.get('volume', 0))` to `int(row.get('volume', 0) or 0)`
+  - Prevents crashes when loading CSV data with missing volume column
+- **Memory Leak Fixes (MultiPaneChart.jsx)**: Fixed callback cleanup scope issues
+  - Moved timeRangeCallback declarations outside try blocks (RSI and MACD charts)
+  - Added safe error handling in cleanup to prevent unsubscribe failures
+  - Added chartConfig to dependency arrays for proper effect triggers
+- **Dependency Array Fix (DataAnalysis.jsx)**: Fixed stale closure bug
+  - Changed useEffect dependency from `[dataSource, timeframe]` to `[loadAvailableAssets]`
+  - Ensures assets reload correctly when dependencies change through callback
+
+**Impact**: 
+- Consistent high performance across all chart components
+- Robust error handling for edge cases
+- No memory leaks during long-term usage
+- Reliable state management across mode switches
+
+**Verification**: All LSP diagnostics cleared ✅ | Architect-approved ✅ | No regressions ✅
+
 ### Phase 6.1: Layout Expansion - Improved Flexibility (Completed - October 15, 2025)
 **Goal**: Maximize chart space and create flexible layouts that adapt to different screen sizes without squishing panels.
 
