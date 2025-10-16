@@ -613,24 +613,6 @@ const DataAnalysis = () => {
             ))}
           </div>
         </div>
-
-        {/* Indicator Manager */}
-        <div style={cardStyle}>
-          <h3 style={{
-            margin: 0,
-            marginBottom: spacing.md,
-            fontSize: typography.fontSize.lg,
-            fontWeight: typography.fontWeight.semibold,
-            color: colors.textPrimary
-          }}>
-            Indicators
-          </h3>
-          
-          <IndicatorManager 
-            indicators={activeIndicators}
-            onChange={handleIndicatorUpdate}
-          />
-        </div>
       </div>
 
       {/* CENTER COLUMN - Chart */}
@@ -698,6 +680,30 @@ const DataAnalysis = () => {
               {loading ? loadingStatus : 'Select asset to view chart'}
             </div>
           )}
+        </div>
+
+        {/* Indicator Manager - Positioned at bottom of chart */}
+        <div style={{ 
+          marginTop: spacing.lg,
+          padding: spacing.md,
+          background: colors.bgSecondary,
+          borderRadius: borderRadius.lg,
+          border: `1px solid ${colors.borderPrimary}`
+        }}>
+          <h3 style={{
+            margin: 0,
+            marginBottom: spacing.md,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.textPrimary
+          }}>
+            Indicators
+          </h3>
+          
+          <IndicatorManager 
+            indicators={activeIndicators}
+            onChange={handleIndicatorUpdate}
+          />
         </div>
       </div>
 
