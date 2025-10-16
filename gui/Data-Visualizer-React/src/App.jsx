@@ -7,6 +7,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import DataAnalysis from './pages/DataAnalysis';
 import StrategyBacktest from './pages/StrategyBacktest';
 import LiveTrading from './pages/LiveTrading';
+import Components from './pages/Components';
 
 const AppLayout = () => {
   const { sidebarWidth } = useSidebar();
@@ -27,6 +28,7 @@ const AppLayout = () => {
             <Route path="/" element={<DataAnalysis />} />
             <Route path="/backtest" element={<StrategyBacktest />} />
             <Route path="/live" element={<LiveTrading />} />
+            <Route path="/components" element={<Components />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ErrorBoundary>
