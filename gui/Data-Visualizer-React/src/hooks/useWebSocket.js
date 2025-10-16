@@ -238,7 +238,10 @@ export const useWebSocket = (url) => {
   }, []);
 
   const calculateIndicators = useCallback((asset, indicatorsConfig = null) => {
-    if (socketRef.current && isConnected) {
+    // Check actual socket connection state, not just the React state
+    const actuallyConnected = socketRef.current && socketRef.current.connected;
+    
+    if (actuallyConnected) {
       console.log('[Indicators] Requesting indicator calculation for:', asset);
       setIsCalculatingIndicators(true);
       setIndicatorError(null);
@@ -270,20 +273,26 @@ export const useWebSocket = (url) => {
         });
       }
     } else {
+      console.error(`[Indicators] Cannot calculate - socket not connected. Socket exists: ${!!socketRef.current}, Actually connected: ${actuallyConnected}`);
       setIndicatorError('Not connected to backend');
       setIsCalculatingIndicators(false);
     }
-  }, [isConnected]);
+  }, []);
 
   const storeCsvCandles = useCallback((asset, candles) => {
-    if (socketRef.current && isConnected) {
+    // Check actual socket connection state, not just the React state
+    const actuallyConnected = socketRef.current && socketRef.current.connected;
+    
+    if (actuallyConnected) {
       console.log(`[CSV Storage] Storing ${candles.length} candles for ${asset}`);
       socketRef.current.emit('store_csv_candles', {
         asset,
         candles
       });
+    } else {
+      console.error(`[CSV Storage] Cannot store candles - socket not connected. Socket exists: ${!!socketRef.current}, Actually connected: ${actuallyConnected}`);
     }
-  }, [isConnected]);
+  }, []);
 
   return {
     isConnected,

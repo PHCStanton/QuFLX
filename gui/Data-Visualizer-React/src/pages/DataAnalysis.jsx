@@ -126,6 +126,20 @@ const DataAnalysis = () => {
     }
   }, [selectedAsset, timeframe, dataSource]);
 
+  // Retry indicator calculation when socket connects (if we have chart data)
+  useEffect(() => {
+    if (isConnected && chartData.length > 0 && dataSource === 'csv' && selectedAsset) {
+      console.log('[CSV Mode] Socket connected - calculating indicators for existing chart data');
+      const config = Object.entries(activeIndicators).reduce((acc, [id, ind]) => {
+        acc[ind.type] = ind.params;
+        return acc;
+      }, {});
+      
+      storeCsvCandles(selectedAsset, chartData);
+      calculateIndicators(selectedAsset, config);
+    }
+  }, [isConnected, chartData.length]);
+
   const loadCsvData = async (assetId, tf) => {
     if (!assetId || !selectedAssetFile) return;
     
