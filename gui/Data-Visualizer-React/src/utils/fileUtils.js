@@ -44,17 +44,29 @@ export const fetchCurrencyPairs = async (timeframe = null) => {
     // Create currency pairs array with formatted names
     const pairs = Object.keys(pairGroups).map(assetId => {
       const files = pairGroups[assetId];
-      const firstFile = files[0];
+      
+      // Filter out tick data files - only keep candle files
+      const candleFiles = files.filter(f => !f.filename.includes('tick'));
+      const filesToConsider = candleFiles.length > 0 ? candleFiles : files;
+      
+      // Pick the largest file (most data) or newest file
+      const bestFile = filesToConsider.reduce((best, current) => {
+        // Prefer larger files (more candle data)
+        if (current.size > best.size) return current;
+        // If same size, prefer newer filename (by string comparison)
+        if (current.size === best.size && current.filename > best.filename) return current;
+        return best;
+      }, filesToConsider[0]);
 
-      const displayName = firstFile.filename.replace('.csv', '');
+      const displayName = bestFile.filename.replace('.csv', '');
 
       return {
         id: assetId,
         name: displayName,
-        file: firstFile.filename,
-        path: firstFile.path,
-        timeframe: firstFile.timeframe,
-        size: firstFile.size
+        file: bestFile.filename,
+        path: bestFile.path,
+        timeframe: bestFile.timeframe,
+        size: bestFile.size
       };
     });
 

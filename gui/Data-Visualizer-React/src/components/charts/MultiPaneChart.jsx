@@ -317,6 +317,10 @@ const MultiPaneChart = forwardRef(({
         for (let i = prevLength; i < processedData.length; i++) {
           mainSeriesRef.current.update(processedData[i]);
         }
+        // Fit content when adding many new candles (e.g., after hot reload)
+        if (processedData.length - prevLength > 10 && mainChartRef.current) {
+          mainChartRef.current.timeScale().fitContent();
+        }
         log.debug(`[MultiPaneChart] Added ${processedData.length - prevLength} new candle(s) via update()`);
       } else if (processedData.length === prevLength && processedData.length > 0) {
         // Same length - likely updating the last forming candle
