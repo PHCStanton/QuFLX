@@ -67,7 +67,7 @@ const MultiPaneChart = forwardRef(({
   const processedData = React.useMemo(() => {
     if (!Array.isArray(data) || data.length === 0) return [];
     
-    return data
+    const processed = data
       .filter(item => item && typeof item.timestamp === 'number' && 
               typeof item.close === 'number' && !isNaN(item.close))
       .map(item => ({
@@ -79,6 +79,15 @@ const MultiPaneChart = forwardRef(({
       }))
       .sort((a, b) => a.time - b.time)
       .filter((point, i, arr) => i === 0 || point.time > arr[i - 1].time);
+    
+    // Debug logging
+    if (processed.length > 0) {
+      log.debug(`[MultiPaneChart] Processed ${processed.length} candles. First: ${JSON.stringify(processed[0])}, Last: ${JSON.stringify(processed[processed.length - 1])}`);
+    } else if (data.length > 0) {
+      log.warn(`[MultiPaneChart] Had ${data.length} raw data points but 0 after processing. Sample: ${JSON.stringify(data[0])}`);
+    }
+    
+    return processed;
   }, [data]);
 
   // Initialize main chart
@@ -123,6 +132,7 @@ const MultiPaneChart = forwardRef(({
       }
       mainSeriesRef.current = null;
       overlaySeriesRef.current = {};
+      prevDataLengthRef.current = 0; // Reset to force setData() on re-initialization
     };
   }, [chartConfig, mainHeight]);
 
