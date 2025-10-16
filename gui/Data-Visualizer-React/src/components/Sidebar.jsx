@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { designTokens } from '../styles/designTokens';
+import designTokens from '../styles/designTokens';
 import { useSidebar } from '../contexts/SidebarContext';
 
 const ChartIcon = ({ className }) => (
@@ -52,8 +52,8 @@ const Sidebar = () => {
     top: 0,
     height: '100vh',
     width: isExpanded ? '240px' : '64px',
-    backgroundColor: designTokens.colors.card,
-    borderRight: `1px solid ${designTokens.colors.border}`,
+    backgroundColor: designTokens.colors.cardBg,
+    borderRight: `1px solid ${designTokens.colors.cardBorder}`,
     transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     zIndex: 1000,
     display: 'flex',
@@ -62,7 +62,7 @@ const Sidebar = () => {
 
   const headerStyle = {
     padding: isExpanded ? '20px' : '20px 16px',
-    borderBottom: `1px solid ${designTokens.colors.border}`,
+    borderBottom: `1px solid ${designTokens.colors.cardBorder}`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -79,7 +79,7 @@ const Sidebar = () => {
   const logoStyle = {
     width: '32px',
     height: '32px',
-    background: `linear-gradient(135deg, ${designTokens.colors.accent} 0%, ${designTokens.colors.accentHover} 100%)`,
+    background: `linear-gradient(135deg, ${designTokens.colors.accentGreen} 0%, ${designTokens.colors.brandHover} 100%)`,
     borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
@@ -90,13 +90,13 @@ const Sidebar = () => {
   const logoTextStyle = {
     fontSize: '20px',
     fontWeight: '700',
-    color: designTokens.colors.text.primary,
+    color: designTokens.colors.textPrimary,
   };
 
   const brandTextStyle = {
     fontSize: '18px',
     fontWeight: '600',
-    color: designTokens.colors.text.primary,
+    color: designTokens.colors.textPrimary,
     whiteSpace: 'nowrap',
     opacity: isExpanded ? 1 : 0,
     transition: 'opacity 0.2s',
@@ -107,8 +107,8 @@ const Sidebar = () => {
     height: '32px',
     borderRadius: '6px',
     backgroundColor: 'transparent',
-    border: `1px solid ${designTokens.colors.border}`,
-    color: designTokens.colors.text.secondary,
+    border: `1px solid ${designTokens.colors.cardBorder}`,
+    color: designTokens.colors.textSecondary,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -134,9 +134,9 @@ const Sidebar = () => {
     padding: isExpanded ? '12px 16px' : '12px',
     borderRadius: '8px',
     textDecoration: 'none',
-    color: isActive ? designTokens.colors.text.primary : designTokens.colors.text.secondary,
-    backgroundColor: isActive ? `${designTokens.colors.accent}15` : 'transparent',
-    border: isActive ? `1px solid ${designTokens.colors.accent}40` : '1px solid transparent',
+    color: isActive ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
+    backgroundColor: isActive ? `${designTokens.colors.accentGreen}15` : 'transparent',
+    border: isActive ? `1px solid ${designTokens.colors.accentGreen}40` : '1px solid transparent',
     transition: 'all 0.2s',
     cursor: 'pointer',
     position: 'relative',
@@ -164,7 +164,7 @@ const Sidebar = () => {
     transform: 'translateY(-50%)',
     width: '3px',
     height: '20px',
-    backgroundColor: designTokens.colors.accent,
+    backgroundColor: designTokens.colors.accentGreen,
     borderRadius: '0 2px 2px 0',
   };
 
@@ -181,12 +181,12 @@ const Sidebar = () => {
           style={toggleButtonStyle}
           onClick={toggleSidebar}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = designTokens.colors.border;
-            e.currentTarget.style.color = designTokens.colors.text.primary;
+            e.currentTarget.style.backgroundColor = designTokens.colors.cardBorder;
+            e.currentTarget.style.color = designTokens.colors.textPrimary;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = designTokens.colors.text.secondary;
+            e.currentTarget.style.color = designTokens.colors.textSecondary;
           }}
         >
           {isExpanded ? <ChevronLeftIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
@@ -205,7 +205,7 @@ const Sidebar = () => {
               style={getMenuItemStyle(isActive)}
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  e.currentTarget.style.backgroundColor = `${designTokens.colors.border}80`;
+                  e.currentTarget.style.backgroundColor = `${designTokens.colors.cardBorder}80`;
                 }
               }}
               onMouseLeave={(e) => {
