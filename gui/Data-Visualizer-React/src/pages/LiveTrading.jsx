@@ -1,26 +1,14 @@
 import React, { useState } from 'react';
 import { colors, typography, spacing, borderRadius } from '../styles/designTokens';
+import { useResponsiveGrid } from '../hooks/useResponsiveGrid';
+import PositionList from '../components/PositionList';
+import SignalList from '../components/SignalList';
 
 const LiveTrading = () => {
   const [mode, setMode] = useState('signals');
   const [isRunning, setIsRunning] = useState(false);
 
-  const getResponsiveColumns = () => {
-    if (typeof window === 'undefined') return 'clamp(240px, 20vw, 320px) 1fr clamp(220px, 14vw, 300px)';
-    const width = window.innerWidth;
-    if (width >= 1600) return 'clamp(260px, 18vw, 360px) 1fr clamp(220px, 14vw, 320px)';
-    if (width >= 1280) return 'clamp(240px, 20vw, 320px) 1fr clamp(220px, 14vw, 300px)';
-    if (width >= 1024) return 'clamp(220px, 22vw, 300px) 1fr clamp(220px, 16vw, 280px)';
-    return 'minmax(200px, 220px) 1fr minmax(220px, 260px)';
-  };
-
-  const [gridColumns, setGridColumns] = React.useState(getResponsiveColumns());
-
-  React.useEffect(() => {
-    const handleResize = () => setGridColumns(getResponsiveColumns());
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const gridColumns = useResponsiveGrid();
 
   const cardStyle = {
     background: colors.cardBg,
@@ -68,59 +56,12 @@ const LiveTrading = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
-            {/* Position items */}
-            {[
-              { label: 'Open 196', value: '29007', percentage: '90%', color: colors.accentGreen },
-              { label: 'Open 141', value: '6922', percentage: '9/1', color: colors.accentRed },
-              { label: 'Open 181', value: '4904', percentage: 'L04', color: colors.accentRed },
-              { label: 'Open rollit', value: '4903', percentage: '9/ES', color: colors.accentRed }
-            ].map((position, idx) => (
-              <div key={idx} style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: spacing.sm,
-                background: colors.bgSecondary,
-                borderRadius: borderRadius.lg,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                  <div style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: position.color
-                  }}></div>
-                  <span style={{
-                    fontSize: typography.fontSize.sm,
-                    color: colors.textPrimary
-                  }}>
-                    {position.label}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-                  <span style={{
-                    fontSize: typography.fontSize.sm,
-                    color: colors.textSecondary
-                  }}>
-                    {position.value}
-                  </span>
-                  <div style={{
-                    padding: `${spacing.xs} ${spacing.sm}`,
-                    background: position.color,
-                    borderRadius: borderRadius.md,
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.semibold,
-                    color: '#000',
-                    minWidth: '45px',
-                    textAlign: 'center'
-                  }}>
-                    {position.percentage}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <PositionList positions={[
+            { label: 'Open 196', value: '29007', percentage: '90%', color: colors.accentGreen },
+            { label: 'Open 141', value: '6922', percentage: '9/1', color: colors.accentRed },
+            { label: 'Open 181', value: '4904', percentage: 'L04', color: colors.accentRed },
+            { label: 'Open rollit', value: '4903', percentage: '9/ES', color: colors.accentRed }
+          ]} />
         </div>
 
         {/* Signal Monitor */}
@@ -145,53 +86,14 @@ const LiveTrading = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
-            {/* Signal items with mini charts */}
-            {[
-              { label: 'Pgilen Trader', chart: true, percentage: '9/6', color: colors.accentGreen },
-              { label: 'Trien klepoit', chart: true, percentage: '9/6', color: colors.accentGreen },
-              { label: 'L:erd BeIS', chart: true, percentage: '3/S', color: colors.accentGreen },
-              { label: 'Opaerted', chart: true, percentage: '0/5', color: colors.accentRed },
-              { label: 'L:ail:1.26', chart: true, percentage: '1/5', color: colors.accentRed },
-              { label: 'Open 9,4', chart: true, percentage: '0/5', color: colors.accentGreen }
-            ].map((signal, idx) => (
-              <div key={idx} style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: spacing.sm,
-                background: colors.bgSecondary,
-                borderRadius: borderRadius.lg,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, flex: 1 }}>
-                  <div style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: signal.color
-                  }}></div>
-                  <span style={{
-                    fontSize: typography.fontSize.xs,
-                    color: colors.textPrimary
-                  }}>
-                    {signal.label}
-                  </span>
-                </div>
-                <div style={{
-                  padding: `${spacing.xs} ${spacing.sm}`,
-                  background: signal.color,
-                  borderRadius: borderRadius.md,
-                  fontSize: typography.fontSize.xs,
-                  fontWeight: typography.fontWeight.semibold,
-                  color: '#000',
-                  minWidth: '40px',
-                  textAlign: 'center'
-                }}>
-                  {signal.percentage}
-                </div>
-              </div>
-            ))}
-          </div>
+          <SignalList signals={[
+            { label: 'Pgilen Trader', chart: true, percentage: '9/6', color: colors.accentGreen },
+            { label: 'Trien klepoit', chart: true, percentage: '9/6', color: colors.accentGreen },
+            { label: 'L:erd BeIS', chart: true, percentage: '3/S', color: colors.accentGreen },
+            { label: 'Opaerted', chart: true, percentage: '0/5', color: colors.accentRed },
+            { label: 'L:ail:1.26', chart: true, percentage: '1/5', color: colors.accentRed },
+            { label: 'Open 9,4', chart: true, percentage: '0/5', color: colors.accentGreen }
+          ]} />
 
           {/* Mini candlestick chart placeholder */}
           <div style={{

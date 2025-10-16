@@ -1,6 +1,16 @@
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { createChart } from 'lightweight-charts';
 import { createLogger } from '../../utils/logger';
+import {
+  createChartConfig,
+  createCandlestickSeries,
+  createLineSeries,
+  createHistogramSeries,
+  syncTimeScale,
+  cleanupChart,
+  validateContainerDimensions
+} from '../../utils/chartUtils';
+
 const log = createLogger('MultiPaneChart');
 
 const MultiPaneChart = forwardRef(({
@@ -41,27 +51,7 @@ const MultiPaneChart = forwardRef(({
   const mainHeight = height * (hasRSI && hasMACD ? 0.6 : hasRSI || hasMACD ? 0.7 : 1.0);
   const oscillatorHeight = height * (hasRSI && hasMACD ? 0.2 : 0.3);
 
-  const chartConfig = React.useMemo(() => ({
-    layout: {
-      background: { color: theme === 'dark' ? '#1e293b' : '#ffffff' },
-      textColor: theme === 'dark' ? '#94a3b8' : '#333333',
-    },
-    grid: {
-      vertLines: { color: theme === 'dark' ? '#334155' : '#e5e7eb' },
-      horzLines: { color: theme === 'dark' ? '#334155' : '#e5e7eb' },
-    },
-    crosshair: { mode: 1 },
-    timeScale: {
-      borderColor: theme === 'dark' ? '#475569' : '#d1d5db',
-      timeVisible: true,
-      secondsVisible: false,
-    },
-    rightPriceScale: {
-      borderColor: theme === 'dark' ? '#475569' : '#d1d5db',
-    },
-    handleScroll: { mouseWheel: true, pressedMouseMove: true },
-    handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
-  }), [theme]);
+  const chartConfig = React.useMemo(() => createChartConfig(theme), [theme]);
 
   // Process data
   const processedData = React.useMemo(() => {
@@ -94,113 +84,98 @@ const MultiPaneChart = forwardRef(({
   useEffect(() => {
     if (!mainContainerRef.current) return;
 
-    try {
-      const containerWidth = mainContainerRef.current.clientWidth;
-      const containerHeight = mainHeight;
-      
-      if (containerWidth <= 0 || containerHeight <= 0) {
-        log.warn(`[MultiPaneChart] Container has invalid dimensions: ${containerWidth}x${containerHeight}`);
-        return;
+    const initializeChart = () => {
+      try {
+        const containerWidth = mainContainerRef.current.clientWidth;
+        const containerHeight = mainHeight;
+
+        if (containerWidth <= 0 || containerHeight <= 0) {
+          log.warn(`[MultiPaneChart] Container has invalid dimensions: ${containerWidth}x${containerHeight}`);
+          return;
+        }
+
+        log.debug(`[MultiPaneChart] Initializing main chart with dimensions: ${containerWidth}x${containerHeight}`);
+
+        mainChartRef.current = createChart(mainContainerRef.current, {
+          ...chartConfig,
+          width: containerWidth,
+          height: containerHeight,
+        });
+
+        mainSeriesRef.current = createCandlestickSeries(mainChartRef.current);
+
+        log.debug('[MultiPaneChart] Main chart initialized successfully');
+      } catch (error) {
+        log.error('[MultiPaneChart] Failed to initialize main chart:', error);
       }
+    };
 
-      log.debug(`[MultiPaneChart] Initializing main chart with dimensions: ${containerWidth}x${containerHeight}`);
-
-      mainChartRef.current = createChart(mainContainerRef.current, {
-        ...chartConfig,
-        width: containerWidth,
-        height: containerHeight,
-      });
-
-      mainSeriesRef.current = mainChartRef.current.addCandlestickSeries({
-        upColor: '#10b981',
-        downColor: '#ef4444',
-        borderUpColor: '#10b981',
-        borderDownColor: '#ef4444',
-        wickUpColor: '#10b981',
-        wickDownColor: '#ef4444',
-      });
-
-      log.debug('[MultiPaneChart] Main chart initialized successfully');
-    } catch (error) {
-      log.error('[MultiPaneChart] Failed to initialize main chart:', error);
-    }
-
-    return () => {
+    const cleanup = () => {
       if (mainChartRef.current) {
         mainChartRef.current.remove();
         mainChartRef.current = null;
       }
       mainSeriesRef.current = null;
       overlaySeriesRef.current = {};
-      prevDataLengthRef.current = 0; // Reset to force setData() on re-initialization
+      prevDataLengthRef.current = 0;
     };
+
+    initializeChart();
+    return cleanup;
   }, [chartConfig, mainHeight]);
 
   // Initialize RSI chart
   useEffect(() => {
     if (!rsiContainerRef.current || !hasRSI) return;
 
-    // Declare callback outside try block for proper cleanup scope
     let timeRangeCallback = null;
 
-    try {
-      const containerWidth = rsiContainerRef.current.clientWidth;
-      const containerHeight = oscillatorHeight;
-      
-      if (containerWidth <= 0 || containerHeight <= 0) {
-        log.warn(`[MultiPaneChart] RSI container has invalid dimensions: ${containerWidth}x${containerHeight}`);
-        return;
-      }
+    const initializeRSI = () => {
+      try {
+        const containerWidth = rsiContainerRef.current.clientWidth;
+        const containerHeight = oscillatorHeight;
 
-      log.debug(`[MultiPaneChart] Initializing RSI chart with dimensions: ${containerWidth}x${containerHeight}`);
+        if (containerWidth <= 0 || containerHeight <= 0) {
+          log.warn(`[MultiPaneChart] RSI container has invalid dimensions: ${containerWidth}x${containerHeight}`);
+          return;
+        }
 
-      rsiChartRef.current = createChart(rsiContainerRef.current, {
-        ...chartConfig,
-        width: containerWidth,
-        height: containerHeight,
-      });
+        log.debug(`[MultiPaneChart] Initializing RSI chart with dimensions: ${containerWidth}x${containerHeight}`);
 
-      rsiSeriesRef.current = rsiChartRef.current.addLineSeries({
-        color: '#ff6b6b',
-        lineWidth: 2,
-        title: 'RSI(14)',
-      });
+        rsiChartRef.current = createChart(rsiContainerRef.current, {
+          ...chartConfig,
+          width: containerWidth,
+          height: containerHeight,
+        });
 
-      // Add overbought/oversold reference lines
-      const rsiUpperLine = rsiChartRef.current.addLineSeries({
-        color: 'rgba(239, 68, 68, 0.3)',
-        lineWidth: 1,
-        lineStyle: 2,
-        priceLineVisible: false,
-      });
-      const rsiLowerLine = rsiChartRef.current.addLineSeries({
-        color: 'rgba(16, 185, 129, 0.3)',
-        lineWidth: 1,
-        lineStyle: 2,
-        priceLineVisible: false,
-      });
+        rsiSeriesRef.current = createLineSeries(rsiChartRef.current, '#ff6b6b', 2, 'RSI(14)');
 
-      // Sync time scales using time-based synchronization
-      if (mainChartRef.current) {
-        timeRangeCallback = (timeRange) => {
-          if (timeRange && rsiChartRef.current && rsiSeriesRef.current) {
-            try {
-              rsiChartRef.current.timeScale().setVisibleRange({
-                from: timeRange.from,
-                to: timeRange.to,
-              });
-            } catch (e) {
-              // Ignore errors when chart doesn't have data yet
+        // Add overbought/oversold reference lines
+        createLineSeries(rsiChartRef.current, 'rgba(239, 68, 68, 0.3)', 1);
+        createLineSeries(rsiChartRef.current, 'rgba(16, 185, 129, 0.3)', 1);
+
+        // Sync time scales
+        if (mainChartRef.current) {
+          timeRangeCallback = (timeRange) => {
+            if (timeRange && rsiChartRef.current && rsiSeriesRef.current) {
+              try {
+                rsiChartRef.current.timeScale().setVisibleRange({
+                  from: timeRange.from,
+                  to: timeRange.to,
+                });
+              } catch (e) {
+                // Ignore errors when chart doesn't have data yet
+              }
             }
-          }
-        };
-        mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
+          };
+          mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
+        }
+      } catch (error) {
+        log.error('[MultiPaneChart] Failed to initialize RSI chart:', error);
       }
-    } catch (error) {
-      log.error('[MultiPaneChart] Failed to initialize RSI chart:', error);
-    }
+    };
 
-    return () => {
+    const cleanup = () => {
       if (timeRangeCallback && mainChartRef.current) {
         try {
           mainChartRef.current.timeScale().unsubscribeVisibleTimeRangeChange(timeRangeCallback);
@@ -214,71 +189,61 @@ const MultiPaneChart = forwardRef(({
       }
       rsiSeriesRef.current = null;
     };
+
+    initializeRSI();
+    return cleanup;
   }, [hasRSI, oscillatorHeight, chartConfig]);
 
   // Initialize MACD chart
   useEffect(() => {
     if (!macdContainerRef.current || !hasMACD) return;
 
-    // Declare callback outside try block for proper cleanup scope
     let timeRangeCallback = null;
 
-    try {
-      const containerWidth = macdContainerRef.current.clientWidth;
-      const containerHeight = oscillatorHeight;
-      
-      if (containerWidth <= 0 || containerHeight <= 0) {
-        log.warn(`[MultiPaneChart] MACD container has invalid dimensions: ${containerWidth}x${containerHeight}`);
-        return;
-      }
+    const initializeMACD = () => {
+      try {
+        const containerWidth = macdContainerRef.current.clientWidth;
+        const containerHeight = oscillatorHeight;
 
-      log.debug(`[MultiPaneChart] Initializing MACD chart with dimensions: ${containerWidth}x${containerHeight}`);
+        if (containerWidth <= 0 || containerHeight <= 0) {
+          log.warn(`[MultiPaneChart] MACD container has invalid dimensions: ${containerWidth}x${containerHeight}`);
+          return;
+        }
 
-      macdChartRef.current = createChart(macdContainerRef.current, {
-        ...chartConfig,
-        width: containerWidth,
-        height: containerHeight,
-      });
+        log.debug(`[MultiPaneChart] Initializing MACD chart with dimensions: ${containerWidth}x${containerHeight}`);
 
-      macdSeriesRef.current.macd = macdChartRef.current.addLineSeries({
-        color: '#4ecdc4',
-        lineWidth: 2,
-        title: 'MACD',
-      });
+        macdChartRef.current = createChart(macdContainerRef.current, {
+          ...chartConfig,
+          width: containerWidth,
+          height: containerHeight,
+        });
 
-      macdSeriesRef.current.signal = macdChartRef.current.addLineSeries({
-        color: '#ff9f43',
-        lineWidth: 2,
-        title: 'Signal',
-      });
+        macdSeriesRef.current.macd = createLineSeries(macdChartRef.current, '#4ecdc4', 2, 'MACD');
+        macdSeriesRef.current.signal = createLineSeries(macdChartRef.current, '#ff9f43', 2, 'Signal');
+        macdSeriesRef.current.histogram = createHistogramSeries(macdChartRef.current, '#667eea');
 
-      macdSeriesRef.current.histogram = macdChartRef.current.addHistogramSeries({
-        color: '#667eea',
-        priceFormat: { type: 'volume' },
-        priceScaleId: '',
-      });
-
-      // Sync time scales using time-based synchronization
-      if (mainChartRef.current) {
-        timeRangeCallback = (timeRange) => {
-          if (timeRange && macdChartRef.current && macdSeriesRef.current.macd) {
-            try {
-              macdChartRef.current.timeScale().setVisibleRange({
-                from: timeRange.from,
-                to: timeRange.to,
-              });
-            } catch (e) {
-              // Ignore errors when chart doesn't have data yet
+        // Sync time scales
+        if (mainChartRef.current) {
+          timeRangeCallback = (timeRange) => {
+            if (timeRange && macdChartRef.current && macdSeriesRef.current.macd) {
+              try {
+                macdChartRef.current.timeScale().setVisibleRange({
+                  from: timeRange.from,
+                  to: timeRange.to,
+                });
+              } catch (e) {
+                // Ignore errors when chart doesn't have data yet
+              }
             }
-          }
-        };
-        mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
+          };
+          mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(timeRangeCallback);
+        }
+      } catch (error) {
+        log.error('[MultiPaneChart] Failed to initialize MACD chart:', error);
       }
-    } catch (error) {
-      log.error('[MultiPaneChart] Failed to initialize MACD chart:', error);
-    }
+    };
 
-    return () => {
+    const cleanup = () => {
       if (timeRangeCallback && mainChartRef.current) {
         try {
           mainChartRef.current.timeScale().unsubscribeVisibleTimeRangeChange(timeRangeCallback);
@@ -292,6 +257,9 @@ const MultiPaneChart = forwardRef(({
       }
       macdSeriesRef.current = {};
     };
+
+    initializeMACD();
+    return cleanup;
   }, [hasMACD, oscillatorHeight, chartConfig]);
 
   // Update main chart data - OPTIMIZED: Use setData() for initial load, update() for incremental changes

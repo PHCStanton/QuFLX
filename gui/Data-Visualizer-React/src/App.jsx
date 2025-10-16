@@ -1,11 +1,19 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Header from './components/Header';
+import Navigation from './components/Navigation';
 import DataAnalysis from './pages/DataAnalysis';
 import StrategyBacktest from './pages/StrategyBacktest';
 import LiveTrading from './pages/LiveTrading';
 import ComponentShowcase from './pages/ComponentShowcase';
+
+const navigationItems = [
+  { to: '/', icon: '📊', label: 'Data Analysis' },
+  { to: '/strategy', icon: '🎯', label: 'Strategy & Backtest' },
+  { to: '/live', icon: '🚀', label: 'Live Trading' },
+  { to: '/components', icon: '🎨', label: 'Components' }
+];
 
 function App() {
   return (
@@ -13,63 +21,7 @@ function App() {
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
           <Header />
-          <nav
-            className="glass text-slate-100 px-6 py-4 shadow-lg"
-            style={{ borderColor: 'var(--card-border)' }}
-          >
-            <div className="w-full">
-              <ul className="flex gap-8">
-                <li>
-                  <Link
-                    to="/"
-                    className="flex items-center gap-2 transition-colors font-medium"
-                    style={{ color: 'var(--text-primary)' }}
-                    onMouseEnter={(e) => e.target.style.color = 'var(--accent-blue)'}
-                    onMouseLeave={(e) => e.target.style.color = 'var(--text-primary)'}
-                  >
-                    <span>📊</span>
-                    <span>Data Analysis</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/strategy"
-                    className="flex items-center gap-2 transition-colors font-medium"
-                    style={{ color: 'var(--text-primary)' }}
-                    onMouseEnter={(e) => e.target.style.color = 'var(--accent-blue)'}
-                    onMouseLeave={(e) => e.target.style.color = 'var(--text-primary)'}
-                  >
-                    <span>🎯</span>
-                    <span>Strategy & Backtest</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/live"
-                    className="flex items-center gap-2 transition-colors font-medium"
-                    style={{ color: 'var(--text-primary)' }}
-                    onMouseEnter={(e) => e.target.style.color = 'var(--accent-blue)'}
-                    onMouseLeave={(e) => e.target.style.color = 'var(--text-primary)'}
-                  >
-                    <span>🚀</span>
-                    <span>Live Trading</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/components"
-                    className="flex items-center gap-2 transition-colors font-medium"
-                    style={{ color: 'var(--text-primary)' }}
-                    onMouseEnter={(e) => e.target.style.color = 'var(--accent-blue)'}
-                    onMouseLeave={(e) => e.target.style.color = 'var(--text-primary)'}
-                  >
-                    <span>🎨</span>
-                    <span>Components</span>
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </nav>
+          <Navigation items={navigationItems} />
 
           <div className="w-full p-6">
             <Routes>

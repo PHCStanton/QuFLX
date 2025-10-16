@@ -22,23 +22,59 @@ const detectSocketUrl = () => {
   }
 };
 
+const useWebSocketState = () => {
+  const [connectionState, setConnectionState] = useState({
+    isConnected: false,
+    isConnecting: false,
+    error: null,
+    chromeStatus: 'not connected'
+  });
+
+  const [streamState, setStreamState] = useState({
+    active: false,
+    asset: null,
+    backendReconnected: false,
+    chromeReconnected: false
+  });
+
+  const [assetState, setAssetState] = useState({
+    detectedAsset: null,
+    detectionError: null,
+    isDetecting: false
+  });
+
+  const [dataState, setDataState] = useState({
+    lastMessage: null,
+    historicalCandles: null,
+    indicatorData: null,
+    indicatorError: null,
+    isCalculatingIndicators: false
+  });
+
+  return {
+    connectionState,
+    setConnectionState,
+    streamState,
+    setStreamState,
+    assetState,
+    setAssetState,
+    dataState,
+    setDataState
+  };
+};
+
 export const useWebSocket = (url) => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState(null);
-  const [error, setError] = useState(null);
-  const [chromeStatus, setChromeStatus] = useState('not connected');
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [streamActive, setStreamActive] = useState(false);
-  const [streamAsset, setStreamAsset] = useState(null);
-  const [backendReconnected, setBackendReconnected] = useState(false);
-  const [chromeReconnected, setChromeReconnected] = useState(false);
-  const [detectedAsset, setDetectedAsset] = useState(null);
-  const [detectionError, setDetectionError] = useState(null);
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [historicalCandles, setHistoricalCandles] = useState(null);
-  const [indicatorData, setIndicatorData] = useState(null);
-  const [indicatorError, setIndicatorError] = useState(null);
-  const [isCalculatingIndicators, setIsCalculatingIndicators] = useState(false);
+  const {
+    connectionState,
+    setConnectionState,
+    streamState,
+    setStreamState,
+    assetState,
+    setAssetState,
+    dataState,
+    setDataState
+  } = useWebSocketState();
+
   const socketRef = useRef(null);
   const reconnectionCallbackRef = useRef(null);
 
@@ -60,22 +96,31 @@ export const useWebSocket = (url) => {
 
     socket.on('connect', () => {
       console.log('WebSocket connected with session:', socket.id);
-      setIsConnected(true);
-      setIsConnecting(false);
-      setError(null);
+      setConnectionState(prev => ({
+        ...prev,
+        isConnected: true,
+        isConnecting: false,
+        error: null
+      }));
     });
 
     socket.on('disconnect', (reason) => {
       console.log('WebSocket disconnected:', reason);
-      setIsConnected(false);
-      setIsConnecting(false);
+      setConnectionState(prev => ({
+        ...prev,
+        isConnected: false,
+        isConnecting: false
+      }));
     });
 
     socket.on('connect_error', (err) => {
       console.error('WebSocket connection error:', err);
-      setError(err.message);
-      setIsConnected(false);
-      setIsConnecting(false);
+      setConnectionState(prev => ({
+        ...prev,
+        isConnected: false,
+        isConnecting: false,
+        error: err.message
+      }));
     });
     
     socket.on('reconnect_error', (err) => {
@@ -105,86 +150,101 @@ export const useWebSocket = (url) => {
     });
 
     socket.on('candle_update', (data) => {
-      setLastMessage(data);
+      setDataState(prev => ({ ...prev, lastMessage: data }));
     });
 
     socket.on('stream_started', (data) => {
       console.log('Stream started:', data);
-      setStreamActive(true);
-      if (data?.asset) setStreamAsset(data.asset);
+      setStreamState(prev => ({
+        ...prev,
+        active: true,
+        asset: data?.asset || prev.asset
+      }));
     });
 
     socket.on('stream_stopped', (data) => {
       console.log('Stream stopped:', data);
-      setStreamActive(false);
+      setStreamState(prev => ({ ...prev, active: false }));
     });
 
     socket.on('asset_changed', (data) => {
       console.log('Asset changed:', data);
-      if (data?.asset) setStreamAsset(data.asset);
+      setStreamState(prev => ({ ...prev, asset: data?.asset || prev.asset }));
     });
 
     socket.on('connection_status', (data) => {
       console.log('Connection status:', data);
-      setChromeStatus(data.chrome || 'not connected');
+      setConnectionState(prev => ({ ...prev, chromeStatus: data.chrome || 'not connected' }));
     });
 
     socket.on('backend_reconnected', (data) => {
       console.log('[Reconnection] Backend reconnected:', data);
-      setBackendReconnected(true);
-      
+      setStreamState(prev => ({ ...prev, backendReconnected: true }));
+
       // Trigger reconnection callback to clear state
       if (reconnectionCallbackRef.current) {
         console.log('[Reconnection] Backend reconnected - clearing state and reloading data');
         reconnectionCallbackRef.current();
       }
-      
+
       // Reset flag after a short delay
-      setTimeout(() => setBackendReconnected(false), 3000);
+      setTimeout(() => setStreamState(prev => ({ ...prev, backendReconnected: false })), 3000);
     });
 
     socket.on('chrome_reconnected', (data) => {
       console.log('[Reconnection] Chrome reconnected:', data);
-      setChromeReconnected(true);
-      
+      setStreamState(prev => ({ ...prev, chromeReconnected: true }));
+
       // Reset flag after a short delay
-      setTimeout(() => setChromeReconnected(false), 3000);
+      setTimeout(() => setStreamState(prev => ({ ...prev, chromeReconnected: false })), 3000);
     });
 
     socket.on('asset_detected', (data) => {
       console.log('[AssetDetection] Asset detected:', data);
-      setDetectedAsset(data.asset);
-      setDetectionError(null);
-      setIsDetecting(false);
+      setAssetState(prev => ({
+        ...prev,
+        detectedAsset: data.asset,
+        detectionError: null,
+        isDetecting: false
+      }));
     });
 
     socket.on('asset_detection_failed', (data) => {
       console.error('[AssetDetection] Detection failed:', data);
-      setDetectionError(data.error);
-      setDetectedAsset(null);
-      setIsDetecting(false);
+      setAssetState(prev => ({
+        ...prev,
+        detectionError: data.error,
+        detectedAsset: null,
+        isDetecting: false
+      }));
     });
 
     // Stage 1: Listen for historical candles loaded event
     socket.on('historical_candles_loaded', (data) => {
       console.log(`[HistoricalData] Received ${data.count} historical candles for ${data.asset}`);
-      setHistoricalCandles(data);
+      setDataState(prev => ({ ...prev, historicalCandles: data }));
     });
 
     // Stage 2: Listen for indicator calculation results
     socket.on('indicators_calculated', (data) => {
       console.log(`[Indicators] Received full data for ${data.asset}:`, data);
       console.log(`[Indicators] Has series data:`, !!data.series, data.series ? Object.keys(data.series) : 'none');
-      setIndicatorData(data);
-      setIndicatorError(null);
-      setIsCalculatingIndicators(false);
+      setDataState(prev => ({
+        ...prev,
+        indicatorData: data,
+        indicatorError: null,
+        isCalculatingIndicators: false
+      }));
     });
 
     socket.on('indicators_error', (data) => {
       console.error('[Indicators] Calculation error:', data.error);
-      setIndicatorError(data.error);
-      setIndicatorData(null);
-      setIsCalculatingIndicators(false);
+      setDataState(prev => ({
+        ...prev,
+        indicatorError: data.error,
+        indicatorData: null,
+        isCalculatingIndicators: false
+      }));
     });
 
     socket.on('csv_storage_success', (data) => {
@@ -235,16 +295,14 @@ export const useWebSocket = (url) => {
   }, [isConnected]);
 
   const detectAsset = useCallback(() => {
-    if (socketRef.current && isConnected) {
+    if (socketRef.current && connectionState.isConnected) {
       console.log('[AssetDetection] Requesting asset detection...');
-      setIsDetecting(true);
-      setDetectionError(null);
+      setAssetState(prev => ({ ...prev, isDetecting: true, detectionError: null }));
       socketRef.current.emit('detect_asset');
     } else {
-      setDetectionError('Not connected to backend');
-      setIsDetecting(false);
+      setAssetState(prev => ({ ...prev, detectionError: 'Not connected to backend', isDetecting: false }));
     }
-  }, [isConnected]);
+  }, [connectionState.isConnected]);
 
   const setReconnectionCallback = useCallback((callback) => {
     reconnectionCallbackRef.current = callback;
@@ -253,23 +311,22 @@ export const useWebSocket = (url) => {
   const calculateIndicators = useCallback((asset, indicatorsConfig = null) => {
     // Check actual socket connection state, not just the React state
     const actuallyConnected = socketRef.current && socketRef.current.connected;
-    
+
     if (actuallyConnected) {
       console.log('[Indicators] Requesting indicator calculation for:', asset);
-      setIsCalculatingIndicators(true);
-      setIndicatorError(null);
-      
+      setDataState(prev => ({ ...prev, isCalculatingIndicators: true, indicatorError: null }));
+
       const defaultConfig = {
         sma: { period: 20 },
         rsi: { period: 14 },
         bollinger: { period: 20, std_dev: 2 }
       };
-      
+
       const config = indicatorsConfig || defaultConfig;
-      
+
       // Check if config is instance-based (has 'type' and 'params' fields)
       const isInstanceBased = Object.values(config).some(val => val?.type && val?.params);
-      
+
       if (isInstanceBased) {
         // New instance-based format
         console.log('[Indicators] Using instance-based format with', Object.keys(config).length, 'instances');
@@ -287,8 +344,7 @@ export const useWebSocket = (url) => {
       }
     } else {
       console.error(`[Indicators] Cannot calculate - socket not connected. Socket exists: ${!!socketRef.current}, Actually connected: ${actuallyConnected}`);
-      setIndicatorError('Not connected to backend');
-      setIsCalculatingIndicators(false);
+      setDataState(prev => ({ ...prev, indicatorError: 'Not connected to backend', isCalculatingIndicators: false }));
     }
   }, []);
 
@@ -308,23 +364,31 @@ export const useWebSocket = (url) => {
   }, []);
 
   return {
-    isConnected,
-    isConnecting,
-    lastMessage,
-    error,
-    chromeStatus,
-    streamActive,
-    streamAsset,
-    backendReconnected,
-    chromeReconnected,
-    detectedAsset,
-    detectionError,
-    isDetecting,
-    historicalCandles,
-    indicatorData,
-    indicatorError,
-    isCalculatingIndicators,
-    // Expose the socketRef so pages can access the raw socket when needed
+    // Connection state
+    isConnected: connectionState.isConnected,
+    isConnecting: connectionState.isConnecting,
+    error: connectionState.error,
+    chromeStatus: connectionState.chromeStatus,
+
+    // Stream state
+    streamActive: streamState.active,
+    streamAsset: streamState.asset,
+    backendReconnected: streamState.backendReconnected,
+    chromeReconnected: streamState.chromeReconnected,
+
+    // Asset detection state
+    detectedAsset: assetState.detectedAsset,
+    detectionError: assetState.detectionError,
+    isDetecting: assetState.isDetecting,
+
+    // Data state
+    lastMessage: dataState.lastMessage,
+    historicalCandles: dataState.historicalCandles,
+    indicatorData: dataState.indicatorData,
+    indicatorError: dataState.indicatorError,
+    isCalculatingIndicators: dataState.isCalculatingIndicators,
+
+    // Socket reference and methods
     socketRef,
     startStream,
     stopStream,

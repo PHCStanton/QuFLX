@@ -142,93 +142,70 @@ export const parseTradingData = (input, symbol) => {
 };
 
 // Technical indicators calculations
-export const calculateSMA = (data, period = 20) => {
-  const sma = [];
+const calculateMovingAverage = (data, period, type = 'sma') => {
+  const result = [];
+
   for (let i = 0; i < data.length; i++) {
-    if (i >= period - 1) {
-      const sum = data.slice(i - period + 1, i + 1).reduce((acc, item) => acc + item.close, 0);
-      sma.push({
-        ...data[i],
-        sma: sum / period
-      });
-    } else {
-      sma.push({
-        ...data[i],
-        sma: null
-      });
+    if (i < period - 1) {
+      result.push({ ...data[i], [type]: null });
+      continue;
     }
+
+    let value;
+    if (type === 'sma') {
+      const sum = data.slice(i - period + 1, i + 1).reduce((acc, item) => acc + item.close, 0);
+      value = sum / period;
+    } else if (type === 'ema') {
+      const multiplier = 2 / (period + 1);
+      if (i === 0) {
+        value = data[i].close;
+      } else {
+        value = (data[i].close * multiplier) + (result[i-1][type] * (1 - multiplier));
+      }
+    }
+
+    result.push({ ...data[i], [type]: value });
   }
-  return sma;
+
+  return result;
 };
 
-export const calculateEMA = (data, period = 20) => {
-  const multiplier = 2 / (period + 1);
-  const ema = [];
-  
-  for (let i = 0; i < data.length; i++) {
-    if (i === 0) {
-      ema.push({
-        ...data[i],
-        ema: data[i].close
-      });
-    } else {
-      const emaValue = (data[i].close * multiplier) + (ema[i-1].ema * (1 - multiplier));
-      ema.push({
-        ...data[i],
-        ema: emaValue
-      });
-    }
-  }
-  return ema;
+export const calculateSMA = (data, period = 20) => calculateMovingAverage(data, period, 'sma');
+export const calculateEMA = (data, period = 20) => calculateMovingAverage(data, period, 'ema');
+
+const calculatePriceChanges = (data) => {
+  return data.map((item, i) => {
+    if (i === 0) return { ...item, change: 0, gain: 0, loss: 0 };
+    const change = item.close - data[i-1].close;
+    return {
+      ...item,
+      change,
+      gain: change > 0 ? change : 0,
+      loss: change < 0 ? Math.abs(change) : 0
+    };
+  });
 };
 
 export const calculateRSI = (data, period = 14) => {
+  const withChanges = calculatePriceChanges(data);
   const rsi = [];
-  let gains = 0;
-  let losses = 0;
-  
-  for (let i = 0; i < data.length; i++) {
-    if (i === 0) {
-      rsi.push({
-        ...data[i],
-        rsi: 50
-      });
-      continue;
-    }
-    
-    const change = data[i].close - data[i-1].close;
-    const gain = change > 0 ? change : 0;
-    const loss = change < 0 ? Math.abs(change) : 0;
-    
+
+  for (let i = 0; i < withChanges.length; i++) {
+    const item = withChanges[i];
+
     if (i < period) {
-      gains += gain;
-      losses += loss;
-      rsi.push({
-        ...data[i],
-        rsi: 50
-      });
-    } else if (i === period) {
-      const avgGain = gains / period;
-      const avgLoss = losses / period;
-      const rs = avgGain / avgLoss;
-      const rsiValue = 100 - (100 / (1 + rs));
-      rsi.push({
-        ...data[i],
-        rsi: rsiValue
-      });
+      rsi.push({ ...item, rsi: 50 });
     } else {
-      const prevAvgGain = (rsi[i-1].avgGain * (period - 1) + gain) / period;
-      const prevAvgLoss = (rsi[i-1].avgLoss * (period - 1) + loss) / period;
-      const rs = prevAvgGain / prevAvgLoss;
+      const slice = withChanges.slice(i - period + 1, i + 1);
+      const avgGain = slice.reduce((sum, d) => sum + d.gain, 0) / period;
+      const avgLoss = slice.reduce((sum, d) => sum + d.loss, 0) / period;
+      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
       const rsiValue = 100 - (100 / (1 + rs));
-      rsi.push({
-        ...data[i],
-        rsi: rsiValue,
-        avgGain: prevAvgGain,
-        avgLoss: prevAvgLoss
-      });
+
+      rsi.push({ ...item, rsi: rsiValue });
     }
   }
+
   return rsi;
 };
 
