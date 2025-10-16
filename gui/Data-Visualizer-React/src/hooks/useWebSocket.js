@@ -197,9 +197,22 @@ export const useWebSocket = (url) => {
 
     return () => {
       console.log('Cleaning up WebSocket connection');
-      socket.removeAllListeners();
-      socket.disconnect();
-      socket.close();
+      
+      // Only cleanup if socket is in a valid state
+      if (socket) {
+        socket.removeAllListeners();
+        
+        // Handle cleanup based on connection state to prevent warnings and memory leaks
+        const engineState = socket.io?.engine?.readyState;
+        
+        if (socket.connected || engineState === 'open') {
+          // Socket is established - normal disconnect
+          socket.disconnect();
+        } else if (engineState === 'opening') {
+          // Socket is still connecting - abort to prevent zombie connection
+          socket.io.engine?.close?.();
+        }
+      }
     };
   }, [url]);
 

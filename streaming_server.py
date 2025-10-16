@@ -72,6 +72,7 @@ last_closed_candle_index: Dict[str, int] = {}  # Track last written closed candl
 chrome_reconnection_attempts = 0
 last_reconnection_time = None
 backend_initialized = False  # Track if backend has been initialized with first client
+chrome_reconnect_enabled = False  # Only reconnect when clients need Chrome (Platform mode)
 
 # ========================================
 # Chrome Connection Functions
@@ -195,9 +196,9 @@ def reset_backend_state():
 def monitor_chrome_status():
     """
     Background thread to monitor Chrome connection status and emit updates to clients.
-    Also attempts automatic reconnection when Chrome becomes available.
+    Only attempts automatic reconnection when chrome_reconnect_enabled is True (Platform mode active).
     """
-    global chrome_driver, chrome_reconnection_attempts, last_reconnection_time
+    global chrome_driver, chrome_reconnection_attempts, last_reconnection_time, chrome_reconnect_enabled
     last_status = None
     
     while True:
@@ -214,10 +215,10 @@ def monitor_chrome_status():
                     current_status = "not connected"
                     chrome_driver = None
             
-            # Attempt Chrome reconnection if disconnected (max 3 attempts per minute)
+            # Attempt Chrome reconnection ONLY if enabled (max 3 attempts per minute)
             backoff_delay = 5  # Default monitoring interval
             
-            if not chrome_driver:
+            if not chrome_driver and chrome_reconnect_enabled:
                 should_reconnect = False
                 
                 if last_reconnection_time is None:
@@ -610,7 +611,10 @@ def handle_disconnect():
 @socketio.on('start_stream')
 def handle_start_stream(data):
     """Start streaming real-time data"""
-    global current_asset, streaming_active, data_streamer
+    global current_asset, streaming_active, data_streamer, chrome_reconnect_enabled
+    
+    # Enable Chrome reconnection since Platform mode is active
+    chrome_reconnect_enabled = True
     
     # Check if Chrome is connected
     if not chrome_driver:
@@ -752,7 +756,10 @@ def handle_change_asset(data):
 @socketio.on('detect_asset')
 def handle_detect_asset():
     """Detect current asset from PocketOption via capability"""
-    global chrome_driver, data_streamer
+    global chrome_driver, data_streamer, chrome_reconnect_enabled
+    
+    # Enable Chrome reconnection since Platform mode is active
+    chrome_reconnect_enabled = True
     
     if not chrome_driver:
         print("[DetectAsset] Chrome not connected")

@@ -193,8 +193,9 @@ const DataAnalysis = () => {
       setLoadingStatus('Data loaded successfully');
       setTimeout(() => setLoadingStatus(''), 2000);
     } catch (err) {
-      console.error('[CSV] Load error:', err);
-      setLoadingStatus(`Error: ${err.message}`);
+      console.error('[CSV] Load error:', err.message || err);
+      console.error('[CSV] Stack trace:', err.stack);
+      setLoadingStatus(`Error: ${err.message || 'Failed to load CSV data'}`);
     } finally {
       setLoading(false);
     }
@@ -803,6 +804,23 @@ const DataAnalysis = () => {
           }}>
             Indicator Readings
           </h3>
+          
+          {/* Show error message if indicators failed to load */}
+          {indicatorError && (
+            <div style={{
+              marginBottom: spacing.md,
+              padding: spacing.sm,
+              background: `${colors.accentRed}20`,
+              borderLeft: `3px solid ${colors.accentRed}`,
+              borderRadius: borderRadius.md,
+              fontSize: typography.fontSize.sm,
+              color: colors.textSecondary
+            }}>
+              ⚠️ {indicatorError.includes('No candle data') 
+                ? 'No data available for this asset' 
+                : indicatorError}
+            </div>
+          )}
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
             {['rsi', 'macd', 'bollinger'].map(type => {
