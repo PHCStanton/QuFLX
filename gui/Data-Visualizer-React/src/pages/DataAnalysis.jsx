@@ -5,6 +5,8 @@ import IndicatorManager from '../components/indicators/IndicatorManager';
 import { fetchCurrencyPairs } from '../utils/fileUtils';
 import { parseTradingData } from '../utils/tradingData';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useResponsiveGrid } from '../hooks/useResponsiveGrid';
+import { detectBackendUrl } from '../utils/urlHelper';
 import { colors, typography, spacing, borderRadius } from '../styles/designTokens';
 
 const STREAM_STATES = {
@@ -112,7 +114,6 @@ const DataAnalysis = () => {
     } else if (dataSource === 'platform') {
       setAvailableAssets([]);
       setSelectedAsset('');
-      setSelectedAssetFile('');
     }
   }, [dataSource, timeframe, selectedAsset]);
 
@@ -138,7 +139,7 @@ const DataAnalysis = () => {
       storeCsvCandles(selectedAsset, chartData);
       calculateIndicators(selectedAsset, config);
     }
-  }, [isConnected, chartData.length]);
+  }, [isConnected, chartData, dataSource, selectedAsset, activeIndicators, storeCsvCandles, calculateIndicators]);
 
   const loadCsvData = async (assetId, tf) => {
     if (!assetId || !selectedAssetFile) return;
@@ -149,7 +150,8 @@ const DataAnalysis = () => {
     
     try {
       // Use the filename to fetch CSV data from backend
-      const response = await fetch(`http://localhost:3001/api/csv-data/${selectedAssetFile}`);
+      const baseUrl = detectBackendUrl();
+      const response = await fetch(`${baseUrl}/api/csv-data/${selectedAssetFile}`);
       if (!response.ok) throw new Error(`Failed to load CSV data: ${response.status}`);
       
       const text = await response.text();
@@ -377,22 +379,7 @@ const DataAnalysis = () => {
     padding: spacing.lg,
   };
 
-  const getResponsiveColumns = () => {
-    if (typeof window === 'undefined') return 'clamp(240px, 20vw, 320px) 1fr clamp(260px, 16vw, 340px)';
-    const width = window.innerWidth;
-    if (width >= 1600) return 'clamp(260px, 18vw, 360px) 1fr clamp(280px, 16vw, 380px)';
-    if (width >= 1280) return 'clamp(240px, 20vw, 320px) 1fr clamp(260px, 16vw, 340px)';
-    if (width >= 1024) return 'clamp(220px, 22vw, 300px) 1fr clamp(240px, 18vw, 320px)';
-    return 'minmax(200px, 220px) 1fr minmax(220px, 240px)';
-  };
-
-  const [gridColumns, setGridColumns] = useState(getResponsiveColumns());
-
-  useEffect(() => {
-    const handleResize = () => setGridColumns(getResponsiveColumns());
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const gridColumns = useResponsiveGrid();
 
   const containerStyle = {
     display: 'grid',

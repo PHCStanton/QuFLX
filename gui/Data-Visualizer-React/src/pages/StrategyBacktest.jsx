@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { strategyService } from '../services/StrategyService';
 import { colors, typography, spacing, borderRadius, components } from '../styles/designTokens';
+import { useResponsiveGrid } from '../hooks/useResponsiveGrid';
 
 const StrategyBacktest = () => {
   const [strategies, setStrategies] = useState([]);
@@ -14,22 +15,7 @@ const StrategyBacktest = () => {
     positionSize: 1
   });
 
-  const getResponsiveColumns = () => {
-    if (typeof window === 'undefined') return 'clamp(240px, 20vw, 320px) 1fr clamp(260px, 16vw, 340px)';
-    const width = window.innerWidth;
-    if (width >= 1600) return 'clamp(260px, 18vw, 360px) 1fr clamp(280px, 16vw, 380px)';
-    if (width >= 1280) return 'clamp(240px, 20vw, 320px) 1fr clamp(260px, 16vw, 340px)';
-    if (width >= 1024) return 'clamp(220px, 22vw, 300px) 1fr clamp(240px, 18vw, 320px)';
-    return 'minmax(180px, 200px) 1fr minmax(220px, 240px)';
-  };
-
-  const [gridColumns, setGridColumns] = useState(getResponsiveColumns());
-
-  useEffect(() => {
-    const handleResize = () => setGridColumns(getResponsiveColumns());
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const gridColumns = useResponsiveGrid();
 
   useEffect(() => {
     strategyService.initializeSocket();

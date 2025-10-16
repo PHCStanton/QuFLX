@@ -41,8 +41,8 @@ const SignalItem = ({ signal }) => (
 
 const SignalList = ({ signals }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
-    {signals.map((signal, idx) => (
-      <SignalItem key={idx} signal={signal} />
+    {(signals || []).map((signal, idx) => (
+      <SignalItem key={signal.label || idx} signal={signal} />
     ))}
   </div>
 );

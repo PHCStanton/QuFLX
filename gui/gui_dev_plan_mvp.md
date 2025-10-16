@@ -1,6 +1,6 @@
 # QuantumFlux GUI Development Plan - Professional Trading Platform
 
-**Last Updated**: October 15, 2025
+**Last Updated**: October 16, 2025
 
 ## 🎯 Vision: Professional Trading Platform ✅ **ACHIEVED**
 
@@ -284,7 +284,98 @@ React Components (Data Analysis, Strategy Lab, Trading Hub)
 - [x] Add EXECUTE TRADE button (prominent green)
 - [x] Apply design tokens consistently
 
-### Phase 6: Chart Optimization & Enhancement 🎯 **CURRENT PRIORITY**
+### Phase 5.5: Critical Bug Fixes 🚨 **URGENT - CURRENT PRIORITY**
+**Goal**: Fix critical runtime errors and frontend stability issues discovered during comprehensive bug audit
+
+**Status**: 10 Critical/High priority bugs identified, 0 fixed
+**Reference**: `dev_docs/Heiku4.5_bug_finding.md` - Comprehensive bug audit report
+
+#### Critical Runtime Errors (App Breaking) ❌
+**These bugs are currently causing the app to crash and must be fixed immediately**
+
+1. **React Hooks Rules Violation - DataAnalysis.jsx**
+   - **Evidence**: Browser console shows "React has detected a change in the order of Hooks"
+   - **Impact**: App crashes when navigating to Data Analysis page
+   - **Root Cause**: Hooks order changing conditionally
+   - **Fix**: Review all hook calls, ensure no conditional hooks, fix dependency arrays
+   - **Priority**: CRITICAL
+
+2. **Missing Error Boundary in App.jsx**
+   - **Issue**: ErrorBoundary component exists but NOT wrapping routes
+   - **Impact**: Single component error crashes entire application
+   - **Fix**: Wrap `<Routes>` with `<ErrorBoundary>` component
+   - **Priority**: CRITICAL
+
+3. **Unsafe Array Operations - PositionList & SignalList**
+   - **Location**: `PositionList.jsx` line 52, `SignalList.jsx` line 44
+   - **Issue**: No null/undefined checks before `.map()` operations
+   - **Impact**: App crashes if props are undefined
+   - **Fix**: Add default empty arrays: `{(positions || []).map(...)}`
+   - **Priority**: HIGH
+
+4. **Stale Closure Bug - RealTimeChart.jsx**
+   - **Location**: Line 42 in subscription callback
+   - **Issue**: `isStreaming` captured in stale closure, doesn't update
+   - **Impact**: Streaming controls don't work correctly
+   - **Fix**: Use ref instead of state, or restructure logic
+   - **Priority**: HIGH
+
+#### High Priority Data Issues ⚠️
+
+5. **Invalid Percentage Data - LiveTrading.jsx**
+   - **Location**: Lines 61-62, 90-95
+   - **Issue**: Invalid formats like '9/1', 'L04', '3/S', '0/5', '1/5'
+   - **Impact**: Display errors and calculation failures
+   - **Fix**: Replace with valid numeric percentages like '90%', '91%'
+   - **Priority**: HIGH
+
+6. **Network Fetch Error - DataAnalysis.jsx**
+   - **Location**: Line 152
+   - **Evidence**: Browser logs show "Failed to fetch"
+   - **Issue**: Hardcoded `http://localhost:3001` breaks in production
+   - **Fix**: Use dynamic URL with `window.location.hostname`
+   - **Priority**: HIGH
+
+#### Code Quality Issues 🟡
+
+7. **Duplicate Grid Layout Logic**
+   - **Location**: DataAnalysis.jsx (380-387), StrategyBacktest.jsx (17-24)
+   - **Issue**: `getResponsiveColumns()` duplicated in both files
+   - **Fix**: Use existing `useResponsiveGrid` hook (like LiveTrading.jsx)
+   - **Priority**: MEDIUM
+
+8. **Inconsistent Logger Usage**
+   - **Issue**: Mix of `console.log()` and logger utility (10+ files)
+   - **Fix**: Replace all `console.log()` with logger utility calls
+   - **Priority**: MEDIUM
+
+9. **Missing useEffect Dependency**
+   - **Location**: DataAnalysis.jsx line 141
+   - **Issue**: Depends on `chartData.length` instead of `chartData`
+   - **Fix**: Change to `[isConnected, chartData]`
+   - **Priority**: MEDIUM
+
+10. **Unused State Variables**
+    - **Location**: LiveTrading.jsx lines 8-9
+    - **Issue**: `mode` and `isRunning` declared but never used
+    - **Fix**: Remove unused variables
+    - **Priority**: LOW
+
+#### Implementation Checklist
+- [ ] Fix React Hooks violation in DataAnalysis.jsx
+- [ ] Add Error Boundary wrapper in App.jsx
+- [ ] Add null checks to PositionList.jsx and SignalList.jsx
+- [ ] Fix stale closure in RealTimeChart.jsx
+- [ ] Fix invalid percentage data in LiveTrading.jsx
+- [ ] Replace hardcoded localhost with dynamic URL
+- [ ] Consolidate duplicate grid layout logic
+- [ ] Replace console.log with logger utility
+- [ ] Fix useEffect dependency arrays
+- [ ] Remove unused state variables
+
+---
+
+### Phase 6: Chart Optimization & Enhancement 📅 **QUEUED** (After bug fixes)
 **Goal**: Optimize chart layout and add professional trading features inspired by TradingView Lightweight Charts library and Solana-UI design.
 
 **Reference Materials:**

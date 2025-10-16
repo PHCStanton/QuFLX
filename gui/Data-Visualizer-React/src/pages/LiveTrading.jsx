@@ -5,9 +5,6 @@ import PositionList from '../components/PositionList';
 import SignalList from '../components/SignalList';
 
 const LiveTrading = () => {
-  const [mode, setMode] = useState('signals');
-  const [isRunning, setIsRunning] = useState(false);
-
   const gridColumns = useResponsiveGrid();
 
   const cardStyle = {
@@ -58,9 +55,9 @@ const LiveTrading = () => {
 
           <PositionList positions={[
             { label: 'Open 196', value: '29007', percentage: '90%', color: colors.accentGreen },
-            { label: 'Open 141', value: '6922', percentage: '9/1', color: colors.accentRed },
-            { label: 'Open 181', value: '4904', percentage: 'L04', color: colors.accentRed },
-            { label: 'Open rollit', value: '4903', percentage: '9/ES', color: colors.accentRed }
+            { label: 'Open 141', value: '6922', percentage: '91%', color: colors.accentRed },
+            { label: 'Open 181', value: '4904', percentage: '104%', color: colors.accentRed },
+            { label: 'Open rollit', value: '4903', percentage: '95%', color: colors.accentRed }
           ]} />
         </div>
 
@@ -87,12 +84,12 @@ const LiveTrading = () => {
           </div>
 
           <SignalList signals={[
-            { label: 'Pgilen Trader', chart: true, percentage: '9/6', color: colors.accentGreen },
-            { label: 'Trien klepoit', chart: true, percentage: '9/6', color: colors.accentGreen },
-            { label: 'L:erd BeIS', chart: true, percentage: '3/S', color: colors.accentGreen },
-            { label: 'Opaerted', chart: true, percentage: '0/5', color: colors.accentRed },
-            { label: 'L:ail:1.26', chart: true, percentage: '1/5', color: colors.accentRed },
-            { label: 'Open 9,4', chart: true, percentage: '0/5', color: colors.accentGreen }
+            { label: 'Pgilen Trader', chart: true, percentage: '96%', color: colors.accentGreen },
+            { label: 'Trien klepoit', chart: true, percentage: '96%', color: colors.accentGreen },
+            { label: 'L:erd BeIS', chart: true, percentage: '35%', color: colors.accentGreen },
+            { label: 'Opaerted', chart: true, percentage: '5%', color: colors.accentRed },
+            { label: 'L:ail:1.26', chart: true, percentage: '15%', color: colors.accentRed },
+            { label: 'Open 9,4', chart: true, percentage: '5%', color: colors.accentGreen }
           ]} />
 
           {/* Mini candlestick chart placeholder */}

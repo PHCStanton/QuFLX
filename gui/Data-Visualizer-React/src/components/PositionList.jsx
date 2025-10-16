@@ -49,8 +49,8 @@ const PositionItem = ({ position }) => (
 
 const PositionList = ({ positions }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
-    {positions.map((position, idx) => (
-      <PositionItem key={idx} position={position} />
+    {(positions || []).map((position, idx) => (
+      <PositionItem key={position.label || idx} position={position} />
     ))}
   </div>
 );
