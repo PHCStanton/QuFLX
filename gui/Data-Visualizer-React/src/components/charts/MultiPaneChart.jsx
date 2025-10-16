@@ -60,12 +60,20 @@ const MultiPaneChart = forwardRef(({
   const prevDataLengthRef = useRef(0);
 
   const hasRSI = React.useMemo(() => {
-    const rsiData = backendIndicators?.series?.rsi;
-    return Array.isArray(rsiData) && rsiData.length > 0;
+    if (!backendIndicators?.series) return false;
+    // Check for any RSI instance (e.g., 'RSI-14')
+    return Object.entries(backendIndicators.series).some(([instanceName, data]) => {
+      const type = backendIndicators.indicators?.[instanceName]?.type || instanceName;
+      return type.toLowerCase() === 'rsi' && Array.isArray(data) && data.length > 0;
+    });
   }, [backendIndicators]);
   const hasMACD = React.useMemo(() => {
-    const macdData = backendIndicators?.series?.macd;
-    return !!(macdData?.macd && macdData.macd.length > 0);
+    if (!backendIndicators?.series) return false;
+    // Check for any MACD instance
+    return Object.entries(backendIndicators.series).some(([instanceName, data]) => {
+      const type = backendIndicators.indicators?.[instanceName]?.type || instanceName;
+      return type.toLowerCase() === 'macd' && data?.macd && data.macd.length > 0;
+    });
   }, [backendIndicators]);
 
   // Calculate heights based on which oscillators are active
@@ -349,13 +357,15 @@ const MultiPaneChart = forwardRef(({
     });
 
     // Dynamically render all overlay indicators
-    Object.entries(series).forEach(([indicatorType, data]) => {
+    Object.entries(series).forEach(([instanceName, data]) => {
+      // Extract indicator type from metadata (backend now sends instance names as keys)
+      const indicatorType = backendIndicators.indicators?.[instanceName]?.type || instanceName;
       const definition = getIndicatorDefinition(indicatorType);
       
       // Skip if not overlay type or no definition
       if (!definition || !isOverlayIndicator(indicatorType)) return;
       
-      const params = backendIndicators.indicators?.[indicatorType] || {};
+      const params = backendIndicators.indicators?.[instanceName] || {};
       
       // Handle band-type indicators (Bollinger Bands)
       if (definition.renderType === 'band' && typeof data === 'object' && !Array.isArray(data)) {
@@ -369,46 +379,45 @@ const MultiPaneChart = forwardRef(({
         };
         
         if (upper?.length > 0) {
-          overlaySeriesRef.current[`${indicatorType}_upper`] = mainChartRef.current.addLineSeries({
+          overlaySeriesRef.current[`${instanceName}_upper`] = mainChartRef.current.addLineSeries({
             color: bandColors.upper,
             lineWidth: 1,
-            title: `${definition.name} Upper`,
+            title: `${instanceName} Upper`,
             priceLineVisible: false,
           });
-          overlaySeriesRef.current[`${indicatorType}_upper`].setData(upper);
+          overlaySeriesRef.current[`${instanceName}_upper`].setData(upper);
         }
 
         if (middle?.length > 0) {
-          overlaySeriesRef.current[`${indicatorType}_middle`] = mainChartRef.current.addLineSeries({
+          overlaySeriesRef.current[`${instanceName}_middle`] = mainChartRef.current.addLineSeries({
             color: bandColors.middle,
             lineWidth: 1,
             lineStyle: 2,
-            title: `${definition.name} Middle`,
+            title: `${instanceName} Middle`,
             priceLineVisible: false,
           });
-          overlaySeriesRef.current[`${indicatorType}_middle`].setData(middle);
+          overlaySeriesRef.current[`${instanceName}_middle`].setData(middle);
         }
 
         if (lower?.length > 0) {
-          overlaySeriesRef.current[`${indicatorType}_lower`] = mainChartRef.current.addLineSeries({
+          overlaySeriesRef.current[`${instanceName}_lower`] = mainChartRef.current.addLineSeries({
             color: bandColors.lower,
             lineWidth: 1,
-            title: `${definition.name} Lower`,
+            title: `${instanceName} Lower`,
             priceLineVisible: false,
           });
-          overlaySeriesRef.current[`${indicatorType}_lower`].setData(lower);
+          overlaySeriesRef.current[`${instanceName}_lower`].setData(lower);
         }
       }
       // Handle line-type indicators (SMA, EMA, WMA, SuperTrend, etc.)
       else if (definition.renderType === 'line' && Array.isArray(data) && data.length > 0) {
-        const periodStr = params.period ? `(${params.period})` : '';
-        overlaySeriesRef.current[indicatorType] = mainChartRef.current.addLineSeries({
+        overlaySeriesRef.current[instanceName] = mainChartRef.current.addLineSeries({
           color: definition.color || '#8b5cf6',
           lineWidth: 2,
-          title: `${definition.name}${periodStr}`,
+          title: instanceName,
           priceLineVisible: false,
         });
-        overlaySeriesRef.current[indicatorType].setData(data);
+        overlaySeriesRef.current[instanceName].setData(data);
       }
     });
 
@@ -419,15 +428,25 @@ const MultiPaneChart = forwardRef(({
 
   // Render oscillator data (RSI and MACD) when ready
   useEffect(() => {
-    // RSI
-    const rsiData = backendIndicators?.series?.rsi;
+    // Find RSI instance data (e.g., 'RSI-14')
+    const rsiInstance = backendIndicators?.series && Object.entries(backendIndicators.series).find(([instanceName, data]) => {
+      const type = backendIndicators.indicators?.[instanceName]?.type || instanceName;
+      return type.toLowerCase() === 'rsi';
+    });
+    const rsiData = rsiInstance?.[1];
+    
     if (hasRSI && rsiData && rsiData.length > 0 && rsiSeriesRef.current) {
       rsiSeriesRef.current.setData(rsiData);
       log.debug(`[MultiPaneChart] RSI rendered in separate pane: ${rsiData.length} points`);
     }
 
-    // MACD
-    const macdData = backendIndicators?.series?.macd;
+    // Find MACD instance data
+    const macdInstance = backendIndicators?.series && Object.entries(backendIndicators.series).find(([instanceName, data]) => {
+      const type = backendIndicators.indicators?.[instanceName]?.type || instanceName;
+      return type.toLowerCase() === 'macd';
+    });
+    const macdData = macdInstance?.[1];
+    
     if (hasMACD && macdData?.macd && macdSeriesRef.current.macd) {
       macdSeriesRef.current.macd.setData(macdData.macd);
       if (macdData.signal) {

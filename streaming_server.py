@@ -883,49 +883,73 @@ def handle_calculate_indicators(data):
             })
             return
         
-        # Convert instance-based format to simple config for backend
+        # Handle instance-based format with full multi-instance support
         if instances:
-            # Extract unique indicator types and merge parameters
-            indicators_config = {}
+            print(f"[Indicators] Processing {len(instances)} indicator instances for {asset}")
+            
+            # Merged result to collect all instances
+            merged_result = {
+                "asset": asset,
+                "indicators": {},
+                "series": {},
+                "signals": {},
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Calculate each instance separately
             for instance_name, instance_config in instances.items():
                 indicator_type = instance_config.get('type')
                 params = instance_config.get('params', {})
                 
-                # For now, use the last instance of each type
-                # Future enhancement: support multiple instances per type
-                indicators_config[indicator_type] = params
+                # Create single-indicator config for this instance
+                single_config = {indicator_type: params}
+                
+                # Calculate this instance
+                instance_result = data_streamer.apply_technical_indicators(asset, single_config)
+                
+                if 'error' in instance_result:
+                    print(f"[Indicators] Error calculating {instance_name}: {instance_result['error']}")
+                    emit('indicators_error', instance_result)
+                    return
+                
+                # Merge this instance's results using instance name as key
+                if indicator_type in instance_result.get('indicators', {}):
+                    merged_result['indicators'][instance_name] = instance_result['indicators'][indicator_type]
+                    merged_result['indicators'][instance_name]['type'] = indicator_type
+                
+                if indicator_type in instance_result.get('series', {}):
+                    merged_result['series'][instance_name] = instance_result['series'][indicator_type]
+                
+                if indicator_type in instance_result.get('signals', {}):
+                    merged_result['signals'][instance_name] = instance_result['signals'][indicator_type]
             
-            print(f"[Indicators] Processing {len(instances)} indicator instances for {asset}")
+            print(f"[Indicators] Calculated {len(merged_result.get('indicators', {}))} indicator instances for {asset}")
+            emit('indicators_calculated', merged_result)
+            
         elif legacy_indicators:
             indicators_config = legacy_indicators
             print(f"[Indicators] Using legacy indicator config for {asset}")
-        else:
-            # Default indicators
-            indicators_config = {
-                'sma': {'period': 20},
-                'rsi': {'period': 14},
-                'bollinger': {'period': 20, 'std_dev': 2}
-            }
-            print(f"[Indicators] Using default indicators for {asset}")
-        
-        print(f"[Indicators] Config: {indicators_config}")
-        
-        # Call existing capability method
-        indicators_result = data_streamer.apply_technical_indicators(asset, indicators_config)
-        
-        if 'error' in indicators_result:
-            print(f"[Indicators] Error: {indicators_result['error']}")
-            emit('indicators_error', indicators_result)
-        else:
-            # Include instance mapping in response if provided
-            if instances:
-                indicators_result['instance_mapping'] = {
-                    instance_name: instance_config.get('type')
-                    for instance_name, instance_config in instances.items()
-                }
             
-            print(f"[Indicators] Calculated {len(indicators_result.get('indicators', {}))} indicators for {asset}")
-            emit('indicators_calculated', indicators_result)
+            # Call existing capability method
+            indicators_result = data_streamer.apply_technical_indicators(asset, indicators_config)
+            
+            if 'error' in indicators_result:
+                print(f"[Indicators] Error: {indicators_result['error']}")
+                emit('indicators_error', indicators_result)
+            else:
+                print(f"[Indicators] Calculated {len(indicators_result.get('indicators', {}))} indicators for {asset}")
+                emit('indicators_calculated', indicators_result)
+        else:
+            # No indicators - send empty result
+            empty_result = {
+                "asset": asset,
+                "indicators": {},
+                "series": {},
+                "signals": {},
+                "timestamp": datetime.now().isoformat()
+            }
+            print(f"[Indicators] No indicators specified for {asset} - sending empty result")
+            emit('indicators_calculated', empty_result)
             
     except Exception as e:
         print(f"[Indicators] Exception: {e}")
