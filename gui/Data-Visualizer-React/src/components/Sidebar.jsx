@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import designTokens from '../styles/designTokens';
 import { useSidebar } from '../contexts/SidebarContext';
+import logoImage from '../assets/logo.jpg';
 
 const ChartIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -76,21 +77,12 @@ const Sidebar = () => {
     overflow: 'hidden',
   };
 
-  const logoStyle = {
+  const logoImgStyle = {
     width: '32px',
     height: '32px',
-    background: `linear-gradient(135deg, ${designTokens.colors.accentGreen} 0%, ${designTokens.colors.brandHover} 100%)`,
     borderRadius: '8px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    objectFit: 'cover',
     flexShrink: 0,
-  };
-
-  const logoTextStyle = {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: designTokens.colors.textPrimary,
   };
 
   const brandTextStyle = {
@@ -172,9 +164,7 @@ const Sidebar = () => {
     <div style={sidebarStyle}>
       <div style={headerStyle}>
         <div style={brandStyle}>
-          <div style={logoStyle}>
-            <span style={logoTextStyle}>Q</span>
-          </div>
+          <img src={logoImage} alt="QuantumFlux Logo" style={logoImgStyle} />
           <span style={brandTextStyle}>QuantumFlux</span>
         </div>
         <button
