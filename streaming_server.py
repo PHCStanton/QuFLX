@@ -46,6 +46,9 @@ from stream_persistence import StreamPersistenceManager  # type: ignore
 # Import indicator adapter for modular indicator calculations
 from strategies.indicator_adapter import get_indicator_adapter  # type: ignore
 
+# Import simulated streaming capability
+from simulated_streaming import SimulatedStreamingCapability  # type: ignore
+
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(
@@ -56,14 +59,37 @@ socketio = SocketIO(
     ping_interval=10
 )
 
+# ================================================================================
+# GLOBAL STREAMING MODE TOGGLE
+# ================================================================================
+# Set to True to use SIMULATED data (for testing indicators without real connection)
+# Set to False to use REAL data (requires Chrome connection to PocketOption)
+# 
+# IMPORTANT: NO automatic fallback - mode must be explicitly selected
+# ================================================================================
+USE_SIMULATED_DATA = False  # Change to True for simulated mode
+# ================================================================================
+
 # Global state for Chrome session and streaming
 chrome_driver = None
 streaming_active = False
 current_asset = "EURUSD_OTC"
 
-# Create data streaming capability instance to reuse its Chrome interception logic
-data_streamer = RealtimeDataStreaming()
-capability_ctx = None  # Will be initialized when Chrome connects
+# Create data streaming capability instance based on mode
+if USE_SIMULATED_DATA:
+    print("\n" + "="*80)
+    print("⚠️  SIMULATED DATA MODE ENABLED")
+    print("   Using simulated data stream for testing - NO real market connection")
+    print("="*80 + "\n")
+    data_streamer = SimulatedStreamingCapability(period_seconds=60)
+else:
+    print("\n" + "="*80)
+    print("✅ REAL DATA MODE ENABLED")
+    print("   Using real market data - requires Chrome connection to PocketOption")
+    print("="*80 + "\n")
+    data_streamer = RealtimeDataStreaming()
+
+capability_ctx = None  # Will be initialized when Chrome connects (real mode only)
 period = 60  # 1 minute candles by default
 
 # Data persistence (optional, configured via --collect-stream argument)
@@ -85,7 +111,15 @@ def attach_to_chrome(verbose=True):
     """
     Attach to existing Chrome instance started with --remote-debugging-port=9222.
     Returns a selenium webdriver.Chrome instance or None on failure.
+    
+    NOTE: Skipped when USE_SIMULATED_DATA=True
     """
+    # Skip Chrome connection in simulated mode
+    if USE_SIMULATED_DATA:
+        if verbose:
+            print("[Chrome] Skipped - using simulated data mode")
+        return None
+    
     import socket
     
     # Quick check if port 9222 is listening
@@ -273,27 +307,47 @@ def monitor_chrome_status():
 def stream_from_chrome():
     """
     Background thread to capture WebSocket data from Chrome.
-    Fully delegates to RealtimeDataStreaming capability's logic.
+    In simulated mode, generates synthetic candles instead.
     """
     global chrome_driver, streaming_active, data_streamer, capability_ctx, current_asset
     
-    if not chrome_driver:
-        print("[Stream] Chrome not connected. Attempting to connect...")
-        chrome_driver = attach_to_chrome()
+    # Skip Chrome connection check in simulated mode
+    if not USE_SIMULATED_DATA:
         if not chrome_driver:
-            print("[Stream] Failed to connect to Chrome. Streaming disabled.")
-            return
+            print("[Stream] Chrome not connected. Attempting to connect...")
+            chrome_driver = attach_to_chrome()
+            if not chrome_driver:
+                print("[Stream] Failed to connect to Chrome. Streaming disabled.")
+                return
     
-    # Initialize capability context
-    capability_ctx = Ctx(driver=chrome_driver, artifacts_root=None, debug=False, dry_run=False, verbose=True)
+    # Initialize capability context (real mode only)
+    if not USE_SIMULATED_DATA:
+        capability_ctx = Ctx(driver=chrome_driver, artifacts_root=None, debug=False, dry_run=False, verbose=True)
+        print("[Stream] Starting WebSocket capture from Chrome...")
+    else:
+        print("[Stream] Starting SIMULATED data streaming...")
     
-    print("[Stream] Starting WebSocket capture from Chrome...")
     processed_messages = set()
     
     while True:
         if streaming_active:
             try:
-                # Check if Chrome is still connected before accessing logs
+                # SIMULATED MODE: Generate synthetic candles
+                if USE_SIMULATED_DATA:
+                    candle = data_streamer.get_current_candle(current_asset)
+                    if candle:
+                        # Emit candle update to frontend
+                        socketio.emit('candle_update', {
+                            'asset': current_asset,
+                            'candle': candle,
+                            'timestamp': datetime.now().isoformat()
+                        })
+                    
+                    # Sleep for period duration (simulating real-time streaming)
+                    time.sleep(period / 10.0)  # Emit updates 10 times per period for smooth visualization
+                    continue
+                
+                # REAL MODE: Check if Chrome is still connected before accessing logs
                 if not chrome_driver:
                     print("[Stream] Chrome disconnected during streaming - stopping stream")
                     streaming_active = False
