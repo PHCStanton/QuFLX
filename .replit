@@ -43,15 +43,12 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "uv run python streaming_server.py"
+args = "python streaming_server.py"
+waitForPort = 3001
 
 [[ports]]
 localPort = 3001
 externalPort = 3001
-
-[[ports]]
-localPort = 5000
-externalPort = 80
 
 [[ports]]
 localPort = 5001
@@ -60,6 +57,10 @@ externalPort = 3000
 [[ports]]
 localPort = 5173
 externalPort = 5173
+
+[[ports]]
+localPort = 35341
+externalPort = 80
 
 [[ports]]
 localPort = 38167

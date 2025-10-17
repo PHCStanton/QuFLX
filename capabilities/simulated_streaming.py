@@ -237,3 +237,73 @@ class SimulatedStreamingCapability:
             List of [timestamp, open, close, high, low] candles
         """
         return self.get_historical_candles(asset, limit)
+    
+    def get_latest_candle(self, asset: str) -> Optional[List]:
+        """
+        Get the latest candle for an asset.
+        
+        Args:
+            asset: Asset symbol
+            
+        Returns:
+            [timestamp, open, close, high, low] or None
+        """
+        if asset not in self.generators:
+            return None
+        
+        return self.generators[asset].generate_candle(self.PERIOD)
+    
+    def get_all_candles(self, asset: str) -> List[List]:
+        """
+        Get all candles for an asset (returns historical for simulated mode).
+        
+        Args:
+            asset: Asset symbol
+            
+        Returns:
+            List of [timestamp, open, close, high, low] candles
+        """
+        return self.get_historical_candles(asset, count=200)
+    
+    def _reset_stream_state(self, inputs: Optional[Dict] = None):
+        """
+        Reset streaming state (compatibility method for real-mode interface).
+        In simulated mode, this reinitializes generators.
+        
+        Args:
+            inputs: Configuration dict (optional)
+        """
+        print("[SIMULATED MODE] Resetting stream state")
+        # Reinitialize generators
+        for asset in list(self.generators.keys()):
+            config = self.asset_configs.get(asset, {'base_price': 1.0, 'volatility': 0.001})
+            self.generators[asset] = SimulatedDataGenerator(
+                base_price=config['base_price'],
+                volatility=config['volatility']
+            )
+    
+    def get_current_asset(self) -> Optional[str]:
+        """
+        Get the currently focused asset.
+        
+        Returns:
+            Asset symbol or None
+        """
+        return self.active_assets[0] if self.active_assets else None
+    
+    def set_asset_focus(self, asset: str):
+        """Set the focused asset for streaming (compatibility method)."""
+        if asset not in self.active_assets:
+            self.active_assets.append(asset)
+    
+    def release_asset_focus(self):
+        """Release asset focus (compatibility method)."""
+        self.active_assets.clear()
+    
+    def set_timeframe(self, minutes: int = 1, lock: bool = False):
+        """Set the timeframe for candles (compatibility method)."""
+        self.PERIOD = minutes * 60
+    
+    def unlock_timeframe(self):
+        """Unlock the timeframe (compatibility method)."""
+        pass  # No-op for simulated mode

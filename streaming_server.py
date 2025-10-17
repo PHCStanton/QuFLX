@@ -225,8 +225,11 @@ def reset_backend_state():
     # Clear candle tracking for persistence
     last_closed_candle_index.clear()
     
-    # Reset capability state (clear candle buffers, asset tracking, etc.)
-    data_streamer._reset_stream_state(inputs={'period': period})
+    # Reset capability state (both real and simulated modes support this)
+    if USE_SIMULATED_DATA:
+        data_streamer._reset_stream_state(inputs={'period': data_streamer.PERIOD})
+    else:
+        data_streamer._reset_stream_state(inputs={'period': period})
     
     print("[Reconnection] ✓ Backend state reset complete")
 
@@ -344,7 +347,8 @@ def stream_from_chrome():
                         })
                     
                     # Sleep for period duration (simulating real-time streaming)
-                    time.sleep(period / 10.0)  # Emit updates 10 times per period for smooth visualization
+                    candle_period = data_streamer.PERIOD if hasattr(data_streamer, 'PERIOD') else 60
+                    time.sleep(candle_period / 10.0)  # Emit updates 10 times per period for smooth visualization
                     continue
                 
                 # REAL MODE: Check if Chrome is still connected before accessing logs
@@ -667,25 +671,33 @@ def handle_disconnect():
 
 @socketio.on('start_stream')
 def handle_start_stream(data):
-    """Start streaming real-time data"""
+    """Start streaming real-time data (real or simulated based on mode)"""
     global current_asset, streaming_active, data_streamer, chrome_reconnect_enabled
     
-    # Enable Chrome reconnection since Platform mode is active
-    chrome_reconnect_enabled = True
-    
-    # Check if Chrome is connected
-    if not chrome_driver:
-        emit('stream_error', {
-            'error': 'Chrome not connected',
-            'timestamp': datetime.now().isoformat()
-        })
-        return
-    
-    if data and 'asset' in data:
-        current_asset = data['asset']
-        # Use capability API methods instead of direct state manipulation
-        data_streamer.set_asset_focus(current_asset)
-        data_streamer.set_timeframe(minutes=1, lock=True)
+    # Handle based on streaming mode
+    if USE_SIMULATED_DATA:
+        # SIMULATED MODE: No Chrome required
+        print(f"[Socket.IO] Starting SIMULATED stream")
+        if data and 'asset' in data:
+            current_asset = data['asset']
+            data_streamer.start_streaming([current_asset])
+    else:
+        # REAL MODE: Enable Chrome reconnection since Platform mode is active
+        chrome_reconnect_enabled = True
+        
+        # Check if Chrome is connected
+        if not chrome_driver:
+            emit('stream_error', {
+                'error': 'Chrome not connected',
+                'timestamp': datetime.now().isoformat()
+            })
+            return
+        
+        if data and 'asset' in data:
+            current_asset = data['asset']
+            # Use capability API methods instead of direct state manipulation
+            data_streamer.set_asset_focus(current_asset)
+            data_streamer.set_timeframe(minutes=1, lock=True)
     
     streaming_active = True
     
@@ -695,10 +707,37 @@ def handle_start_stream(data):
         'timestamp': datetime.now().isoformat()
     })
     
-    # Stage 1: Seed chart with historical CSV data FIRST, then start live stream
+    # Stage 1: Seed chart with historical data FIRST, then start live stream
     # This provides context for seamless transition from history to real-time
     
-    # Try to load historical candles from CSV files first
+    # SIMULATED MODE: Generate historical candles
+    if USE_SIMULATED_DATA:
+        simulated_candles = data_streamer.get_historical_candles(current_asset, count=200)
+        historical_candles_sim = []
+        for candle in simulated_candles:
+            timestamp, open_price, close_price, high_price, low_price = candle
+            historical_candles_sim.append({
+                'asset': current_asset,
+                'timestamp': timestamp,
+                'open': open_price,
+                'high': high_price,
+                'low': low_price,
+                'close': close_price,
+                'volume': 0,
+                'date': datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).isoformat()
+            })
+        
+        print(f"[Stream] Generated {len(historical_candles_sim)} SIMULATED historical candles")
+        emit('historical_candles_loaded', {
+            'asset': current_asset,
+            'candles': historical_candles_sim,
+            'count': len(historical_candles_sim),
+            'source': 'simulated',
+            'timestamp': datetime.now().isoformat()
+        })
+        return  # Skip CSV/WebSocket loading in simulated mode
+    
+    # REAL MODE: Try to load historical candles from CSV files first
     historical_candles_csv = []
     try:
         import pandas as pd
@@ -784,15 +823,20 @@ def handle_start_stream(data):
 
 @socketio.on('stop_stream')
 def handle_stop_stream():
-    """Stop streaming data"""
+    """Stop streaming data (real or simulated)"""
     global streaming_active
 
     streaming_active = False
     print(f"[Stream] Stopped")
     emit('stream_stopped', {'timestamp': datetime.now().isoformat()})
-    # Release asset focus when stream stops using API method
-    data_streamer.release_asset_focus()
-    data_streamer.unlock_timeframe()
+    
+    # Release resources based on mode
+    if USE_SIMULATED_DATA:
+        data_streamer.stop_streaming(current_asset)
+    else:
+        # Release asset focus when stream stops using API method
+        data_streamer.release_asset_focus()
+        data_streamer.unlock_timeframe()
 
 @socketio.on('change_asset')
 def handle_change_asset(data):
@@ -1095,24 +1139,33 @@ if __name__ == '__main__':
     else:
         print("\n[Persistence] Stream collection disabled (use --collect-stream to enable)")
     
-    # Try to connect to Chrome on startup
-    print("\n[Startup] Attempting to connect to Chrome...")
-    chrome_driver = attach_to_chrome(verbose=True)
-    
-    # Start Chrome status monitor thread (always running)
-    monitor_thread = threading.Thread(target=monitor_chrome_status, daemon=True)
-    monitor_thread.start()
-    print("[Startup] ✓ Chrome status monitor started")
-    
-    if chrome_driver:
-        print("[Startup] ✓ Chrome connected successfully")
-        # Start background streaming thread
+    # Startup mode handling
+    if USE_SIMULATED_DATA:
+        print("\n[Startup] 🎲 SIMULATED MODE - skipping Chrome connection")
+        print("[Startup] Simulated data will be generated for testing")
+        # Start simulated streaming thread
         stream_thread = threading.Thread(target=stream_from_chrome, daemon=True)
         stream_thread.start()
-        print("[Startup] ✓ WebSocket streaming thread started")
+        print("[Startup] ✓ Simulated streaming thread started")
     else:
-        print("[Startup] ⚠️ Chrome not connected. Live streaming will be unavailable.")
-        print("[Startup] To enable: Start Chrome with --remote-debugging-port=9222")
+        # Try to connect to Chrome on startup
+        print("\n[Startup] Attempting to connect to Chrome...")
+        chrome_driver = attach_to_chrome(verbose=True)
+        
+        # Start Chrome status monitor thread (always running in real mode)
+        monitor_thread = threading.Thread(target=monitor_chrome_status, daemon=True)
+        monitor_thread.start()
+        print("[Startup] ✓ Chrome status monitor started")
+        
+        if chrome_driver:
+            print("[Startup] ✓ Chrome connected successfully")
+            # Start background streaming thread
+            stream_thread = threading.Thread(target=stream_from_chrome, daemon=True)
+            stream_thread.start()
+            print("[Startup] ✓ WebSocket streaming thread started")
+        else:
+            print("[Startup] ⚠️ Chrome not connected. Live streaming will be unavailable.")
+            print("[Startup] To enable: Start Chrome with --remote-debugging-port=9222")
     
     print(f"\n[Startup] Starting server on http://0.0.0.0:3001")
     print("=" * 60)
