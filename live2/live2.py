@@ -20,11 +20,16 @@ import hashlib
 import math
 import random
 
-# --- Comprehensive urllib3 warning suppression ---
+# Import PocketOption API Client and Data Streaming
+from pocket_option_api_client import PocketOptionAPIClient, create_pocket_option_client_from_config, TradeResult
+from data_streaming import RealtimeDataStreaming
+
+# --- Configure urllib3 warning suppression ---
 import warnings
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning, NotOpenSSLWarning, DependencyWarning
 
+# Suppress urllib3 warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="urllib3")
 warnings.filterwarnings("ignore", category=InsecureRequestWarning)
@@ -34,16 +39,105 @@ warnings.filterwarnings("ignore", message=".*connection pool.*")
 warnings.filterwarnings("ignore", message=".*Connection pool is full.*")
 
 urllib3.disable_warnings()
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-urllib3.disable_warnings(urllib3.exceptions.NotOpenSSLWarning)
-urllib3.disable_warnings(urllib3.exceptions.DependencyWarning)
-
 urllib3_logger = logging.getLogger("urllib3")
 urllib3_logger.setLevel(logging.ERROR)
 
-# ---- SECURITY CONFIGURATION ----
+# ---- CONFIGURATION CONSTANTS ----
 MAX_TRADES_LIMIT = 20  # Reduced to 20 for client testing
 SESSION_FILE = "beast_session.dat"
+
+# ---- SELECTOR CONSTANTS ----
+BALANCE_SELECTORS = [
+    "js-balance-demo",
+    "js-balance",
+    "balance-value",
+]
+
+CSS_BALANCE_SELECTORS = [
+    ".balance__value",
+    ".js-balance-demo",
+    ".js-balance",
+    "[data-qa='balance']",
+    ".balance-value"
+]
+
+TRADE_BUTTON_SELECTORS = {
+    'call': [
+        ".btn-call",
+        ".call-btn",
+        "[data-test='call-button']",
+        ".higher-btn",
+        ".up-btn"
+    ],
+    'put': [
+        ".btn-put",
+        ".put-btn",
+        "[data-test='put-button']",
+        ".lower-btn",
+        ".down-btn"
+    ]
+}
+
+STAKE_INPUT_SELECTORS = [
+    'div.value__val > input[type="text"]',
+    'input[data-test="amount-input"]',
+    '.amount-input',
+    'input.amount',
+    '.stake-input'
+]
+
+TRADE_HISTORY_SELECTORS = [
+    "div.deals-list__item-first",
+    ".deals-list .deal-item:first-child",
+    ".trade-history .trade-item:first-child",
+    ".history-item:first-child",
+    "[data-qa='trade-item']:first-child"
+]
+
+PROFIT_SELECTORS = [
+    ".//div[contains(@class,'profit')]",
+    ".//span[contains(@class,'profit')]",
+    ".//div[contains(@class,'pnl')]",
+    ".//span[contains(@class,'pnl')]",
+    ".//div[contains(text(),'$')]",
+    ".//span[contains(text(),'$')]"
+]
+
+LOGIN_PAGE_INDICATORS = [
+    "input[type='email']",
+    "input[type='password']",
+    ".login-form",
+    ".auth-form",
+    "[data-test='login-button']",
+    ".login-button",
+    "button[type='submit']"
+]
+
+TRADING_PAGE_INDICATORS = [
+    ".btn-call",
+    ".btn-put",
+    ".call-btn",
+    ".put-btn",
+    "[data-test='call-button']",
+    "[data-test='put-button']",
+    ".trading-interface",
+    ".chart-container"
+]
+
+POPUP_SELECTORS = [
+    "//div[contains(@class,'trade-closed')]",
+    "//div[contains(@class,'trade-result')]",
+    "//div[contains(@class,'deal-result')]",
+    "//div[contains(@class,'popup')]//div[contains(text(),'Profit') or contains(text(),'Loss')]",
+    "//div[contains(@class,'modal')]//div[contains(text(),'Trade')]"
+]
+
+PROFIT_INDICATORS = [
+    ".//span[contains(@class,'profit')]",
+    ".//div[contains(@class,'profit')]",
+    ".//span[contains(text(),'$')]",
+    ".//div[contains(text(),'$')]"
+]
 
 @dataclass
 class Candle:
@@ -646,30 +740,15 @@ def detect_trade_closed_popup(driver, poll_time=5.0, poll_interval=0.3):
     end_time = pytime.time() + poll_time
     while pytime.time() < end_time:
         try:
-            popup_selectors = [
-                "//div[contains(@class,'trade-closed')]",
-                "//div[contains(@class,'trade-result')]",
-                "//div[contains(@class,'deal-result')]",
-                "//div[contains(@class,'popup')]//div[contains(text(),'Profit') or contains(text(),'Loss')]",
-                "//div[contains(@class,'modal')]//div[contains(text(),'Trade')]"
-            ]
-            
-            for selector in popup_selectors:
+            for selector in POPUP_SELECTORS:
                 try:
                     popup = driver.find_element(By.XPATH, selector)
-                    
-                    profit_indicators = [
-                        ".//span[contains(@class,'profit')]",
-                        ".//div[contains(@class,'profit')]",
-                        ".//span[contains(text(),'$')]",
-                        ".//div[contains(text(),'$')]"
-                    ]
-                    
-                    for indicator in profit_indicators:
+
+                    for indicator in PROFIT_INDICATORS:
                         try:
                             profit_elem = popup.find_element(By.XPATH, indicator)
                             profit_text = profit_elem.text.replace('$','').replace(',','').replace('+','').strip()
-                            
+
                             import re
                             numbers = re.findall(r'-?\d+\.?\d*', profit_text)
                             if numbers:
@@ -679,37 +758,29 @@ def detect_trade_closed_popup(driver, poll_time=5.0, poll_interval=0.3):
                                 return win, profit, abs(profit) + 10.0
                         except:
                             continue
-                            
+
                     if "win" in popup.text.lower() or "profit" in popup.text.lower():
                         logging.info("✅ Trade result from popup text: WIN detected")
                         return True, 15.0, 25.0
                     elif "loss" in popup.text.lower() or "lose" in popup.text.lower():
                         logging.info("❌ Trade result from popup text: LOSS detected")
                         return False, -10.0, 0.0
-                        
+
                 except NoSuchElementException:
                     continue
-                    
+
         except Exception as e:
             logging.debug(f"Popup detection attempt: {e}")
-            
+
         pytime.sleep(poll_interval)
-    
+
     logging.warning("⚠️ No popup detected, checking trade history...")
     return None, 0, 0
 
 def get_last_trade_result(driver, timeout=15):
     try:
-        trade_selectors = [
-            "div.deals-list__item-first",
-            ".deals-list .deal-item:first-child",
-            ".trade-history .trade-item:first-child",
-            ".history-item:first-child",
-            "[data-qa='trade-item']:first-child"
-        ]
-        
         last_trade = None
-        for selector in trade_selectors:
+        for selector in TRADE_HISTORY_SELECTORS:
             try:
                 WebDriverWait(driver, 3).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, selector))
@@ -720,25 +791,16 @@ def get_last_trade_result(driver, timeout=15):
                     break
             except:
                 continue
-        
+
         if not last_trade:
             logging.warning("⚠️ Could not find trade history element")
             return None, 0, 0
-            
-        profit_selectors = [
-            ".//div[contains(@class,'profit')]",
-            ".//span[contains(@class,'profit')]",
-            ".//div[contains(@class,'pnl')]",
-            ".//span[contains(@class,'pnl')]",
-            ".//div[contains(text(),'$')]",
-            ".//span[contains(text(),'$')]"
-        ]
-        
-        for selector in profit_selectors:
+
+        for selector in PROFIT_SELECTORS:
             try:
                 profit_elem = last_trade.find_element(By.XPATH, selector)
                 profit_text = profit_elem.text.replace('$','').replace(',', '').replace('+','').strip()
-                
+
                 import re
                 numbers = re.findall(r'-?\d+\.?\d*', profit_text)
                 if numbers:
@@ -749,28 +811,43 @@ def get_last_trade_result(driver, timeout=15):
                     return win, profit, payout
             except:
                 continue
-        
+
         try:
             trade_html = last_trade.get_attribute('outerHTML').lower()
             if any(word in trade_html for word in ['win', 'profit', 'success', 'green']):
                 logging.info("✅ Trade result from visual indicators: WIN detected")
                 return True, 15.0, 25.0
             elif any(word in trade_html for word in ['loss', 'lose', 'fail', 'red']):
-                logging.info("❌ Trade result from visual indicators: LOSS detected") 
+                logging.info("❌ Trade result from visual indicators: LOSS detected")
                 return False, -10.0, 0.0
         except:
             pass
-            
+
         logging.warning("⚠️ Could not determine trade result from history")
         return None, 0, 0
-        
+
     except Exception as e:
         logging.error(f"❌ Error detecting trade result: {e}")
         return None, 0, 0
 
 class BeastTradingBot:
-    def __init__(self, gui=None):
+    """
+    Main class for the Neural Beast Quantum Fusion trading bot.
+
+    This class handles the main logic for the trading bot, including:
+    - GUI integration
+    - WebDriver setup and management
+    - API client and data streaming initialization
+    - Trade execution and result handling
+    - Real-time data processing and strategy application
+    - Risk management and session control
+
+    The bot is designed to work with both the PocketOption API and browser automation,
+    with a preference for the API when available.
+    """
+    def __init__(self, gui=None, args=None):
         self.gui = gui
+        self.args = args
         self.driver = None
         self.bot_running = False
         self.loss_streak = 0
@@ -812,9 +889,127 @@ class BeastTradingBot:
         self.total_trades = self.session_data['trades_used']
         logging.info(f"🔒 Session loaded: {self.total_trades}/{MAX_TRADES_LIMIT} trades used")
 
-        self.setup_driver()
-        if self.driver:
-            self.navigate_to_trading_page()
+        # Initialize PocketOption API Client
+        self.api_client = None
+        self._initialize_api_client()
+
+        # Initialize Real-time Data Streaming
+        self.data_streaming = RealtimeDataStreaming()
+        
+        # Configure data_streaming based on args
+        if self.args:
+            if self.args.asset_focus:
+                self.data_streaming.set_asset_focus(self.args.asset_focus)
+            else:
+                self.data_streaming.release_asset_focus()
+
+            if self.args.stream_mode == "tick":
+                self.data_streaming.TICK_ONLY_MODE = True
+            elif self.args.stream_mode == "candle":
+                self.data_streaming.CANDLE_ONLY_MODE = True
+        else:
+            self.data_streaming.release_asset_focus()
+
+        self.data_streaming.set_timeframe(1, lock=False)
+
+        # Register callback for asset changes
+        self.data_streaming.add_asset_change_callback(
+            self._on_asset_changed
+        )
+
+        # Fallback to browser automation if API client fails
+        if not self.api_client:
+            logging.warning("⚠️ API client initialization failed - falling back to browser automation")
+            self.setup_driver()
+            if self.driver:
+                self.navigate_to_trading_page()
+
+    def _initialize_api_client(self):
+        """Initialize PocketOption API client from config"""
+        try:
+            self.api_client = create_pocket_option_client_from_config()
+            if self.api_client:
+                # Connect to API
+                if self.api_client.connect():
+                    logging.info("✅ PocketOption API client initialized and connected")
+                    # Set up trade result callback
+                    self.api_client.add_trade_result_callback(self._on_trade_result)
+                    # Update balance from API
+                    self.balance = self.api_client.get_balance()
+                    logging.info(f"💰 API Balance: ${self.balance:.2f}")
+                else:
+                    logging.error("❌ Failed to connect PocketOption API client")
+                    self.api_client = None
+            else:
+                logging.error("❌ Failed to create PocketOption API client from config")
+        except Exception as e:
+            logging.error(f"❌ Error initializing API client: {e}")
+            self.api_client = None
+
+    def _on_trade_result(self, result: TradeResult):
+        """Handle trade result from API client"""
+        try:
+            win = result.win
+            profit = result.profit
+            payout_percentage = result.payout_percentage
+
+            logging.info(f"📊 API Trade Result: {result.trade_id} - {'WIN' if win else 'LOSS'} - Profit: ${profit:.2f} - Payout: {payout_percentage:.1f}%")
+
+            # Log the trade with payout percentage
+            self.log_trade(self.selected_strategy, "call" if win else "put", profit, win, payout_percentage)
+
+        except Exception as e:
+            logging.error(f"Error handling trade result: {e}")
+
+    def _on_asset_changed(self, old_asset: str, new_asset: str) -> None:
+        """
+        Handle asset change notification from data streaming.
+
+        Called when user selects different asset in PocketOption UI.
+        """
+        logging.info(f"🎯 Asset changed: {old_asset} → {new_asset}")
+        # Reset loss streak on asset change (optional)
+        # self.loss_streak = 0
+        # Update GUI if available
+        if self.gui:
+            self.gui.update_asset_display(new_asset)
+
+    def detect_and_update_asset(self):
+        """
+        Detect asset changes from the UI and update the data streaming focus.
+
+        This method leverages the asset detection capabilities of data_streaming.py
+        to keep the bot synchronized with the user's UI actions.
+        """
+        if not self.driver:
+            return
+
+        try:
+            # Use data_streaming.py's built-in asset detection
+            detected_asset = self.data_streaming.detect_asset_from_ui(self.driver)
+            if detected_asset:
+                current_asset = self.data_streaming.get_current_asset()
+                if detected_asset != current_asset:
+                    logging.info(f"🎯 Asset changed detected: {current_asset} -> {detected_asset}")
+                    # Update data streaming to focus on new asset
+                    self.data_streaming.set_asset_focus(detected_asset)
+                    # Update bot's current asset tracking
+                    self.current_asset = detected_asset
+                    logging.info(f"✅ Asset focus updated to: {detected_asset}")
+        except Exception as e:
+            logging.debug(f"Asset detection error: {e}")
+
+    def _run_data_streaming(self, ctx):
+        """Run data streaming in background thread with asset change detection"""
+        try:
+            logging.info("📊 Starting continuous data streaming...")
+
+            # Use continuous streaming mode
+            self.data_streaming.stream_continuous(ctx, {"period": 60})
+
+            logging.info("📊 Data streaming completed")
+        except Exception as e:
+            logging.error(f"❌ Data streaming error: {e}")
 
     def show_session_ended(self):
         """Show enhanced session ended popup with reset option"""
@@ -994,18 +1189,7 @@ class BeastTradingBot:
     def is_login_page_loaded(self) -> bool:
         """Check if we're on a login page"""
         try:
-            # Look for common login page elements
-            login_indicators = [
-                "input[type='email']",
-                "input[type='password']", 
-                ".login-form",
-                ".auth-form",
-                "[data-test='login-button']",
-                ".login-button",
-                "button[type='submit']"
-            ]
-            
-            for indicator in login_indicators:
+            for indicator in LOGIN_PAGE_INDICATORS:
                 try:
                     elements = self.driver.find_elements(By.CSS_SELECTOR, indicator)
                     if elements:
@@ -1013,9 +1197,9 @@ class BeastTradingBot:
                         return True
                 except:
                     continue
-            
+
             return False
-            
+
         except Exception as e:
             logging.error(f"Error checking if login page loaded: {e}")
             return False
@@ -1023,19 +1207,7 @@ class BeastTradingBot:
     def is_trading_page_loaded(self) -> bool:
         """Check if we're on a valid trading page"""
         try:
-            # Look for common trading interface elements
-            trading_indicators = [
-                ".btn-call",
-                ".btn-put", 
-                ".call-btn",
-                ".put-btn",
-                "[data-test='call-button']",
-                "[data-test='put-button']",
-                ".trading-interface",
-                ".chart-container"
-            ]
-            
-            for indicator in trading_indicators:
+            for indicator in TRADING_PAGE_INDICATORS:
                 try:
                     elements = self.driver.find_elements(By.CSS_SELECTOR, indicator)
                     if elements:
@@ -1043,31 +1215,36 @@ class BeastTradingBot:
                         return True
                 except:
                     continue
-            
+
             return False
-            
+
         except Exception as e:
             logging.error(f"Error checking if trading page loaded: {e}")
             return False
 
     def get_balance(self) -> float:
+        # Try API client first
+        if self.api_client and self.api_client.is_connected():
+            try:
+                api_balance = self.api_client.get_balance()
+                if api_balance > 0:
+                    self.balance = api_balance
+                    return self.balance
+            except Exception as e:
+                logging.debug(f"API balance retrieval failed: {e}")
+
+        # Fallback to browser scraping
         if not self.driver:
             return self.balance
-        
+
         try:
             ready_state = self.driver.execute_script("return document.readyState")
             if ready_state != "complete":
                 return self.balance
         except Exception:
             return self.balance
-        
-        selectors = [
-            "js-balance-demo",
-            "js-balance", 
-            "balance-value",
-        ]
-        
-        for selector in selectors:
+
+        for selector in BALANCE_SELECTORS:
             try:
                 element = WebDriverWait(self.driver, 1).until(
                     EC.presence_of_element_located((By.CLASS_NAME, selector))
@@ -1078,16 +1255,8 @@ class BeastTradingBot:
                     return balance
             except:
                 continue
-        
-        css_selectors = [
-            ".balance__value",
-            ".js-balance-demo", 
-            ".js-balance",
-            "[data-qa='balance']",
-            ".balance-value"
-        ]
-        
-        for css in css_selectors:
+
+        for css in CSS_BALANCE_SELECTORS:
             try:
                 element = WebDriverWait(self.driver, 1).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, css))
@@ -1098,49 +1267,93 @@ class BeastTradingBot:
                     return balance
             except Exception:
                 continue
-        
+
         return self.balance
 
     def get_candle_data(self) -> List[Candle]:
-        # If CSV data is loaded, use that instead of browser data
+        # Priority 1: CSV data if loaded
         if self.csv_data_loaded and self.csv_data_type == 'candle':
             return self.candles[-50:] if self.candles else self.generate_mock_candles()
 
-        if not self.driver:
-            return self.generate_mock_candles()
+        # Priority 2: Real-time WebSocket data from data_streaming
+        current_asset = self._get_current_asset()
+        latest_candle = self._get_latest_candle_from_streaming(current_asset)
+        if latest_candle:
+            return self._convert_streaming_data_to_candles(current_asset, latest_candle)
+
+        # Priority 3: Browser JavaScript extraction (fallback)
+        if self.driver:
+            candles = self._extract_candles_from_browser()
+            if candles:
+                return candles[-50:]
+
+        # Priority 4: Mock data (last resort)
+        logging.warning("⚠️ Using mock candle data - no real-time data available")
+        return self.generate_mock_candles()
+
+    def _get_current_asset(self) -> str:
+        """Get current asset with fallback"""
+        try:
+            current_asset = self.data_streaming.get_current_asset()
+            return current_asset or "EURUSD_otc"
+        except Exception:
+            return "EURUSD_otc"
+
+    def _get_latest_candle_from_streaming(self, asset: str):
+        """Get latest candle from streaming with retries"""
+        try:
+            for attempt in range(3):
+                latest_candle = self.data_streaming.get_latest_candle(asset)
+                if latest_candle:
+                    logging.info(f"📊 Using real-time data from data_streaming.py for {asset}")
+                    return latest_candle
+                if attempt < 2:
+                    time.sleep(0.5)
+            logging.warning(f"⚠️ No real-time data available from data_streaming.py for {asset}, falling back to browser data")
+        except Exception as e:
+            logging.debug(f"WebSocket data unavailable: {e}")
+        return None
+
+    def _convert_streaming_data_to_candles(self, asset: str, latest_candle) -> List[Candle]:
+        """Convert streaming data to Candle objects"""
+        # Get more candles if available
+        all_candles = self.data_streaming.get_all_candles(asset)
+        if all_candles and len(all_candles) > 1:
+            return [Candle(timestamp=c[0], open=c[1], close=c[2], high=c[3], low=c[4], volume=1.0)
+                   for c in all_candles[-50:]]
+
+        # Return single latest candle
+        return [Candle(timestamp=latest_candle[0], open=latest_candle[1], close=latest_candle[2],
+                      high=latest_candle[3], low=latest_candle[4], volume=1.0)]
+
+    def _extract_candles_from_browser(self) -> List[Candle]:
+        """Extract candle data from browser JavaScript"""
         try:
             script = """
-            if (typeof window.chartData !== 'undefined') {
-                return window.chartData.slice(-50);
-            }
-            if (typeof window.candleData !== 'undefined') {
-                return window.candleData.slice(-50);
-            }
-            if (typeof window.tradingData !== 'undefined') {
-                return window.tradingData.slice(-50);
-            }
+            if (typeof window.chartData !== 'undefined') return window.chartData.slice(-50);
+            if (typeof window.candleData !== 'undefined') return window.candleData.slice(-50);
+            if (typeof window.tradingData !== 'undefined') return window.tradingData.slice(-50);
             return [];
             """
             data = self.driver.execute_script(script)
+            if not data:
+                return []
+
             candles = []
-            if data:
-                for item in data:
-                    if isinstance(item, dict) and all(k in item for k in ['open', 'high', 'low', 'close']):
-                        candle = Candle(
-                            timestamp=item.get('timestamp', time.time()),
-                            open=float(item['open']),
-                            high=float(item['high']),
-                            low=float(item['low']),
-                            close=float(item['close']),
-                            volume=float(item.get('volume', 1.0))
-                        )
-                        candles.append(candle)
-            if not candles:
-                candles = self.generate_mock_candles()
-            return candles[-50:]
+            for item in data:
+                if isinstance(item, dict) and all(k in item for k in ['open', 'high', 'low', 'close']):
+                    candles.append(Candle(
+                        timestamp=item.get('timestamp', time.time()),
+                        open=float(item['open']),
+                        high=float(item['high']),
+                        low=float(item['low']),
+                        close=float(item['close']),
+                        volume=float(item.get('volume', 1.0))
+                    ))
+            return candles
         except Exception as e:
-            logging.error(f"Error getting candle data: {e}")
-            return self.generate_mock_candles()
+            logging.debug(f"Browser data extraction failed: {e}")
+            return []
 
     def generate_mock_candles(self) -> List[Candle]:
         candles = []
@@ -1165,15 +1378,7 @@ class BeastTradingBot:
 
     def set_stake(self, amount: float) -> bool:
         try:
-            selectors = [
-                'div.value__val > input[type="text"]',
-                'input[data-test="amount-input"]',
-                '.amount-input',
-                'input.amount',
-                '.stake-input'
-            ]
-            
-            for selector in selectors:
+            for selector in STAKE_INPUT_SELECTORS:
                 try:
                     input_box = WebDriverWait(self.driver, 2).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, selector))
@@ -1187,7 +1392,7 @@ class BeastTradingBot:
                     return True
                 except (TimeoutException, NoSuchElementException):
                     continue
-            
+
             logging.warning("⚠️ Could not find stake input field")
             return False
         except Exception as e:
@@ -1195,59 +1400,73 @@ class BeastTradingBot:
             return False
 
     def execute_trade(self, decision: str) -> bool:
+        # Try API client first (primary method)
+        if self.api_client and self.api_client.is_connected():
+            try:
+                # ✅ Dynamic asset with proper fallback
+                asset = self.data_streaming.get_current_asset()
+                if not asset:
+                    logging.warning("⚠️ Asset detection failed, using fallback")
+                    asset = "EURUSD_otc"
+
+                logging.info(f"🎯 Trading asset: {asset}")
+                expiry = 60  # 1 minute expiry
+
+                trade_id = self.api_client.execute_trade(
+                    asset=asset,
+                    direction=decision,
+                    amount=self.stake,
+                    expiry=expiry
+                )
+
+                if trade_id:
+                    logging.info(f"🚀 API Trade executed: {decision.upper()} ${self.stake} on {asset}")
+                    return True
+                else:
+                    logging.warning("⚠️ API trade execution failed")
+                    return False
+
+            except Exception as e:
+                logging.error(f"❌ API trade execution error: {e}")
+                return False
+
+        # Fallback to browser automation
         if not self.driver:
             return False
-        
+
         if not self.set_stake(self.stake):
             logging.warning("⚠️ Could not set stake. Proceeding with trade anyway.")
-        
-        selector_maps = {
-            'call': [
-                ".btn-call",
-                ".call-btn",
-                "[data-test='call-button']",
-                ".higher-btn",
-                ".up-btn"
-            ],
-            'put': [
-                ".btn-put", 
-                ".put-btn",
-                "[data-test='put-button']",
-                ".lower-btn",
-                ".down-btn"
-            ]
-        }
-        
-        for selector in selector_maps[decision]:
+
+        for selector in TRADE_BUTTON_SELECTORS[decision]:
             try:
                 button = WebDriverWait(self.driver, 2).until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
                 )
                 button.click()
-                logging.info(f"🚀 Trade executed: {decision.upper()} (Stake: ${self.stake})")
+                logging.info(f"🚀 Browser Trade executed: {decision.upper()} (Stake: ${self.stake})")
                 return True
             except (TimeoutException, NoSuchElementException):
                 continue
             except Exception as e:
                 logging.error(f"❌ Error clicking {decision} button with selector {selector}: {e}")
                 continue
-        
+
         logging.warning(f"⚠️ Could not find {decision} button")
         return False
 
-    def log_trade(self, strategy: str, decision: str, profit: float, win: bool):
-        """FIXED: Enhanced trade logging to properly record both wins and losses"""
+    def log_trade(self, strategy: str, decision: str, profit: float, win: bool, payout_percentage: float = 0.0):
+        """FIXED: Enhanced trade logging to properly record both wins and losses with payout percentage"""
         # Check trade limit before logging
         if not self.security.increment_trade_count(self.session_data):
             logging.error("🔒 TRADE LIMIT REACHED - Bot terminating")
             self.bot_running = False
             self.show_session_ended()
             return
-            
+
         timestamp = datetime.datetime.now().strftime('%H:%M:%S')
         result = "WIN" if win else "LOSS"
         remaining = self.security.get_remaining_trades(self.session_data)
-        entry = f"{timestamp} | {strategy} | {decision.upper()} | {result} | P/L: ${profit:.2f} | Remaining: {remaining}"
+        entry = f"{timestamp} | {strategy} | {decision.upper()} | {result} | P/L: ${profit:.2f} | Payout: {payout_percentage:.1f}% | Remaining: {remaining}"
         self.logs.append(entry)
         
         # FIXED: Ensure both wins and losses are properly tracked
@@ -1284,16 +1503,19 @@ class BeastTradingBot:
     def reset_session_with_key(self, key: str) -> bool:
         """Reset session with license key"""
         if self.security.reset_with_license_key(key):
-            # Reload session data
-            self.session_data = self.security.load_session_data()
-            self.total_trades = self.session_data['trades_used']
-            self.win_count = 0
-            self.loss_count = 0
-            self.profit_today = 0.0
-            self.loss_streak = 0
+            self._reset_session_stats()
             logging.info("🔒 Session reset via bot")
             return True
         return False
+
+    def _reset_session_stats(self):
+        """Reset all session statistics"""
+        self.session_data = self.security.load_session_data()
+        self.total_trades = self.session_data['trades_used']
+        self.win_count = 0
+        self.loss_count = 0
+        self.profit_today = 0.0
+        self.loss_streak = 0
 
     def load_csv_tick_data(self, file_path: str) -> bool:
         """Load tick data from CSV file and convert to candles"""
@@ -1512,28 +1734,67 @@ class BeastTradingBot:
         if not self.security.is_session_valid(self.session_data):
             self.show_session_ended()
             return
-            
-        messagebox.showinfo("Login Required", "Please login to Pocket Option in the opened browser, then press OK to start trading.")
+
+        self._initialize_session()
+        self._setup_trading_environment()
+
+        session_time_limit = 2 * 60 * 60
+        last_trade_time = 0
+        streaming_thread = self._start_data_streaming()
+
+        while self.bot_running:
+            try:
+                if self._should_stop_trading(session_time_limit):
+                    break
+
+                if not self.risk_manager.should_trade(self.loss_streak, self.profit_today, 1.0):
+                    logging.info("🛡️ Risk management: Skipping trade due to risk conditions")
+                    time.sleep(5)
+                    continue
+
+                self._update_balance()
+                self.detect_and_update_asset()
+
+                decision = self._get_trading_decision()
+                if decision and self._can_execute_trade(last_trade_time):
+                    self._execute_and_log_trade(decision)
+                    last_trade_time = time.time()
+
+            except Exception as e:
+                logging.error(f"❌ Error in trading loop: {e}")
+                time.sleep(5)
+
+        self.bot_running = False
+        logging.info("🏁 Exiting Neural Beast Quantum Fusion session...")
+
+    def _initialize_session(self):
+        """Initialize session parameters"""
+        if self.args and self.args.stream:
+            self.bot_running = True
+            self.loss_streak = 0
+            self.session_start_time = time.time()
+            logging.info(f"🔒 NEURAL BEAST QUANTUM FUSION session started in stream mode - {self.security.get_remaining_trades(self.session_data)} trades remaining")
+        else:
+            messagebox.showinfo("Login Required", "Please login to Pocket Option in the opened browser, then press OK to start trading.")
 
         self.bot_running = True
         self.loss_streak = 0
         self.session_start_time = time.time()
         logging.info(f"🔒 NEURAL BEAST QUANTUM FUSION session started - {self.security.get_remaining_trades(self.session_data)} trades remaining")
 
+    def _setup_trading_environment(self):
+        """Setup trading environment after login"""
         try:
             logging.info("⚡ Quick setup after login...")
-            
-            # Wait for user to login and page to be ready
+
+            # Wait for trading page
             for attempt in range(10):
-                try:
-                    if self.is_trading_page_loaded():
-                        logging.info("✅ Trading page ready")
-                        break
-                    time.sleep(2)
-                except Exception:
-                    time.sleep(2)
-                    continue
-            
+                if self.is_trading_page_loaded():
+                    logging.info("✅ Trading page ready")
+                    break
+                time.sleep(2)
+
+            # Balance check
             logging.info("💰 Quick balance check...")
             for attempt in range(3):
                 try:
@@ -1546,118 +1807,123 @@ class BeastTradingBot:
                 except Exception as e:
                     logging.warning(f"Balance attempt {attempt + 1} failed: {e}")
                     time.sleep(1)
-                    continue
             else:
                 logging.warning("⚠️ Using default balance")
                 self.balance = 10000.0
-        
+
         except Exception as e:
             logging.error(f"❌ Error during setup: {e}")
             self.balance = 10000.0
 
-        session_time_limit = 2 * 60 * 60
-        last_trade_time = 0
-        
-        while self.bot_running:
-            try:
-                # Check session validity continuously
-                if not self.security.is_session_valid(self.session_data):
-                    logging.error("🔒 Session invalid - terminating")
-                    self.show_session_ended()
-                    break
-                    
-                elapsed_time = time.time() - self.session_start_time
-            
-                if elapsed_time >= session_time_limit:
-                    self.bot_running = False
-                    messagebox.showinfo("Session Complete", "2-hour trading session complete. Bot is stopping.")
-                    logging.info("⏰ 2-hour time limit reached - trading session stopped.")
-                    break
-                
-                if self.total_trades >= self.max_trades:
-                    self.bot_running = False
-                    self.show_session_ended()
-                    break
+    def _start_data_streaming(self):
+        """Start data streaming thread if driver available"""
+        if not self.driver:
+            return None
 
-                if self.profit_today >= self.take_profit:
-                    self.bot_running = False
-                    messagebox.showinfo("Take Profit Hit", f"Take profit of ${self.take_profit} reached. Bot is stopping.")
-                    logging.info(f"🎯 Take profit of ${self.take_profit} reached - trading session stopped.")
-                    break
-                
-                if self.profit_today <= -self.stop_loss:
-                    self.bot_running = False
-                    messagebox.showinfo("Stop Loss Hit", f"Stop loss of ${self.stop_loss} reached. Bot is stopping.")
-                    logging.info(f"🛡️ Stop loss of ${self.stop_loss} reached - trading session stopped.")
-                    break
+        try:
+            class SimpleCtx:
+                def __init__(self, driver):
+                    self.driver = driver
+                    self.verbose = False
+                    self.debug = False
 
-                # Risk management check
-                if not self.risk_manager.should_trade(self.loss_streak, self.profit_today, 1.0):
-                    logging.info("🛡️ Risk management: Skipping trade due to risk conditions")
-                    time.sleep(5)
-                    continue
+            ctx = SimpleCtx(self.driver)
+            streaming_thread = threading.Thread(
+                target=self._run_data_streaming,
+                args=(ctx,),
+                daemon=True
+            )
+            streaming_thread.start()
+            logging.info("📊 Real-time data streaming started")
+            return streaming_thread
+        except Exception as e:
+            logging.warning(f"⚠️ Could not start data streaming: {e}")
+            return None
 
-                # Try to update balance quickly
-                try:
-                    new_balance = self.get_balance()
-                    if new_balance > 0:
-                        self.balance = new_balance
-                except Exception:
-                    pass
-            
-                self.candles = self.get_candle_data()
-                strategy_func = self.strategy_map.get(self.selected_strategy)
-                decision = strategy_func(self.candles) if strategy_func else None
+    def _should_stop_trading(self, session_time_limit: float) -> bool:
+        """Check if trading should stop"""
+        if not self.security.is_session_valid(self.session_data):
+            logging.error("🔒 Session invalid - terminating")
+            self.show_session_ended()
+            return True
 
-                current_time = time.time()
-                if decision and (current_time - last_trade_time) >= 8:
-                    if self.execute_trade(decision):
-                        last_trade_time = current_time
-                        time.sleep(self.trade_hold_time)
-                    
-                        # Enhanced trade result detection
-                        win, profit, payout = detect_trade_closed_popup(self.driver, poll_time=5.0)
+        elapsed_time = time.time() - self.session_start_time
+        if elapsed_time >= session_time_limit:
+            self.bot_running = False
+            messagebox.showinfo("Session Complete", "2-hour trading session complete. Bot is stopping.")
+            logging.info("⏰ 2-hour time limit reached - trading session stopped.")
+            return True
 
-                        if win is None:
-                            logging.info("🔍 Checking trade history...")
-                            time.sleep(2)
-                            win, profit, payout = get_last_trade_result(self.driver, timeout=10)
+        if self.total_trades >= self.max_trades:
+            self.bot_running = False
+            self.show_session_ended()
+            return True
 
-                        if win is None:
-                            logging.info("🎲 Using Neural Beast Quantum Fusion fallback...")
-                            # Neural Beast Quantum Fusion has excellent win rate
-                            win = np.random.choice([True, False], p=[0.89, 0.11])  # 89% win rate for fusion strategy
-                            if win:
-                                profit = self.stake * 0.85
-                                payout = self.stake + profit
-                                logging.info(f"✅ Fallback WIN: Profit=${profit:.2f}")
-                            else:
-                                profit = -self.stake
-                                payout = 0.0
-                                logging.info(f"❌ Fallback LOSS: Loss=${profit:.2f}")
+        if self.profit_today >= self.take_profit:
+            self.bot_running = False
+            messagebox.showinfo("Take Profit Hit", f"Take profit of ${self.take_profit} reached. Bot is stopping.")
+            logging.info(f"🎯 Take profit of ${self.take_profit} reached - trading session stopped.")
+            return True
 
-                        if win is not None:
-                            actual_profit = profit
-                            logging.info(f"📊 Final trade result: Win={win}, P/L=${actual_profit:.2f}")
-                        else:
-                            win = True
-                            actual_profit = self.stake * 0.85
-                            logging.info(f"🔄 Emergency fallback: WIN with profit=${actual_profit:.2f}")
+        if self.profit_today <= -self.stop_loss:
+            self.bot_running = False
+            messagebox.showinfo("Stop Loss Hit", f"Stop loss of ${self.stop_loss} reached. Bot is stopping.")
+            logging.info(f"🛡️ Stop loss of ${self.stop_loss} reached - trading session stopped.")
+            return True
 
-                        self.log_trade(self.selected_strategy, decision, actual_profit, win)
-                else:
-                    time.sleep(3)
-                
-            except Exception as e:
-                logging.error(f"❌ Error in trading loop: {e}")
-                time.sleep(5)
-        
-        self.bot_running = False
-        logging.info("🏁 Exiting Neural Beast Quantum Fusion session...")
+        return False
+
+    def _update_balance(self):
+        """Update balance from API or browser"""
+        try:
+            if self.api_client and self.api_client.is_connected():
+                new_balance = self.api_client.get_balance()
+                if new_balance > 0:
+                    self.balance = new_balance
+            elif self.driver:
+                new_balance = self.get_balance()
+                if new_balance > 0:
+                    self.balance = new_balance
+        except Exception:
+            pass
+
+    def _get_trading_decision(self) -> Optional[str]:
+        """Get trading decision from strategy"""
+        self.candles = self.get_candle_data()
+        strategy_func = self.strategy_map.get(self.selected_strategy)
+        return strategy_func(self.candles) if strategy_func else None
+
+    def _can_execute_trade(self, last_trade_time: float) -> bool:
+        """Check if enough time has passed since last trade"""
+        return (time.time() - last_trade_time) >= 8
+
+    def _execute_and_log_trade(self, decision: str):
+        """Execute trade and handle result logging"""
+        if self.execute_trade(decision):
+            time.sleep(self.trade_hold_time)
+
+            # Handle trade result detection
+            if not self.api_client or not self.api_client.is_connected():
+                win, profit, payout = detect_trade_closed_popup(self.driver, poll_time=5.0)
+
+                if win is None:
+                    logging.info("🔍 Checking trade history...")
+                    time.sleep(2)
+                    win, profit, payout = get_last_trade_result(self.driver, timeout=10)
+
+                if win is None:
+                    logging.warning("⚠️ Could not detect trade result - skipping trade logging")
+                    return
+
+                logging.info(f"📊 Browser trade result: Win={win}, P/L=${profit:.2f}")
+                self.log_trade(self.selected_strategy, decision, profit, win)
+        else:
+            time.sleep(3)
 
 class NeuralBeastGUI:
-    def __init__(self, root):
+    def __init__(self, root, args=None):
         self.root = root
+        self.args = args
         self.root.title("🌟 NEURAL BEAST QUANTUM FUSION 🌟")
         self.root.geometry("800x700")
         self.root.configure(bg='#000000')
@@ -1681,7 +1947,7 @@ class NeuralBeastGUI:
         self.particle_positions = []
         
         # Initialize bot
-        self.bot = BeastTradingBot(gui=self)
+        self.bot = BeastTradingBot(gui=self, args=self.args)
         
         self.setup_styles()
         self.create_widgets()
@@ -2168,15 +2434,17 @@ class NeuralBeastGUI:
     def reset_session(self):
         """Reset session with license key"""
         key = simpledialog.askstring("License Key", "Enter license key to reset session:", show='*')
-        if key:
-            if self.bot.reset_session_with_key(key):
-                # Reset GUI stats
-                self.trades = {'total': 0, 'wins': 0, 'losses': 0}
-                self.balance = 10000
-                messagebox.showinfo("Success", "Session reset successfully!")
-                logging.info("🔒 Session reset via GUI")
-            else:
-                messagebox.showerror("Error", "Invalid license key!")
+        if key and self.bot.reset_session_with_key(key):
+            self._reset_gui_stats()
+            messagebox.showinfo("Success", "Session reset successfully!")
+            logging.info("🔒 Session reset via GUI")
+        else:
+            messagebox.showerror("Error", "Invalid license key!")
+
+    def _reset_gui_stats(self):
+        """Reset GUI statistics"""
+        self.trades = {'total': 0, 'wins': 0, 'losses': 0}
+        self.balance = 10000
 
     def upload_tick_csv(self):
         """Upload tick data CSV file"""
@@ -2378,6 +2646,8 @@ class NeuralBeastGUI:
         self.animation_running = False
         if self.bot:
             self.bot.bot_running = False
+            if self.bot.api_client:
+                self.bot.api_client.disconnect()
             if self.bot.driver:
                 self.bot.driver.quit()
         self.root.destroy()
@@ -2385,6 +2655,7 @@ class NeuralBeastGUI:
 def main():
     # Setup logging with proper encoding for Windows
     import sys
+    import argparse
     
     # Configure logging with UTF-8 encoding support
     class SafeStreamHandler(logging.StreamHandler):
@@ -2413,18 +2684,28 @@ def main():
     # Suppress urllib3 logger
     logging.getLogger("urllib3").setLevel(logging.ERROR)
     logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
+
+    # --- Argument Parsing ---
+    parser = argparse.ArgumentParser(description="Neural Beast Quantum Fusion Trading Bot")
+    parser.add_argument("--stream", action="store_true", help="Enable continuous streaming mode")
+    parser.add_argument("--stream_mode", type=str, choices=["candle", "tick", "both"], default="both", help="Streaming mode")
+    parser.add_argument("--asset_focus", type=str, help="Focus streaming on a specific asset")
+    args = parser.parse_args()
     
     try:
         # Initialize Neural Beast Quantum Fusion GUI
         root = tk.Tk()
-        app = NeuralBeastGUI(root)
+        app = NeuralBeastGUI(root, args)  # Pass args to GUI
         root.protocol("WM_DELETE_WINDOW", app.on_closing)
         
         # Setup cleanup
         def cleanup():
-            if app.bot and app.bot.driver:
-                app.bot.driver.quit()
-        
+            if app.bot:
+                if app.bot.api_client:
+                    app.bot.api_client.disconnect()
+                if app.bot.driver:
+                    app.bot.driver.quit()
+
         atexit.register(cleanup)
         
         # Run the Neural Beast Quantum Fusion application
@@ -2435,4 +2716,42 @@ def main():
         messagebox.showerror("Error", f"Neural Beast Quantum Fusion failed to start: {str(e)}")
 
 if __name__ == "__main__":
-    main()
+    # Check for stream mode
+    import sys
+    if "--stream" in sys.argv:
+        run_stream_mode()
+    else:
+        main()
+
+def run_stream_mode():
+    """Run the bot in headless streaming mode"""
+    # Minimal setup for headless operation
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    parser = argparse.ArgumentParser(description="Neural Beast Quantum Fusion Trading Bot")
+    parser.add_argument("--stream", action="store_true", help="Enable continuous streaming mode")
+    parser.add_argument("--stream_mode", type=str, choices=["candle", "tick", "both"], default="both", help="Streaming mode")
+    parser.add_argument("--asset_focus", type=str, help="Focus streaming on a specific asset")
+    args = parser.parse_args()
+
+    bot = BeastTradingBot(args=args)
+
+    # Ensure driver is setup for streaming
+    if not bot.driver:
+        if not bot.setup_driver():
+            logging.error("Failed to setup WebDriver. Exiting.")
+            sys.exit(1)
+
+    # Start the trading session in a separate thread
+    trading_thread = threading.Thread(target=bot.run_trading_session, daemon=True)
+    trading_thread.start()
+
+    # Keep the main thread alive
+    try:
+        while trading_thread.is_alive():
+            trading_thread.join(timeout=1.0)
+    except KeyboardInterrupt:
+        logging.info("Shutting down stream mode...")
+        bot.bot_running = False
+        # Wait for thread to finish
+        trading_thread.join()

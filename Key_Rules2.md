@@ -10,3 +10,10 @@
 **Notes:**
 1. Use sequential thinking and the File Context Server for more precise analysis and results when necessary.
 2. The Persistent Chrome Session is running, and the backend.py file has already been started.
+
+Key Principles:
+✅ Functional Simplicity - Clear, focused chart enhancements
+✅ Sequential Logic - Build progressively
+✅ Zero Assumptions - Explicit breakpoints and dimensions
+✅ Code Integrity - Backward compatible, no breaking changes
+✅ Maintain clear Separation of Concerns

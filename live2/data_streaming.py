@@ -6,7 +6,7 @@ import os
 import re
 from datetime import datetime, timezone
 import time as time_mod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.by import By
@@ -27,6 +27,22 @@ except ImportError:
 add_utils_to_syspath()
 
 class RealtimeDataStreaming(Capability):
+    """
+    Capability for streaming real-time tick and candle data from PocketOption
+    by intercepting WebSocket messages.
+
+    This class provides a comprehensive system for:
+    - Decoding and parsing WebSocket payloads
+    - Detecting and managing session information (authentication, timeframe)
+    - Dynamically detecting asset changes from the UI
+    - Aggregating tick data into OHLC candles
+    - Applying technical indicators to candle data
+    - Streaming data in various modes (tick, candle, or both)
+
+    The design emphasizes separation of concerns, with this module handling
+    all WebSocket-based data streaming, while another client handles Socket.IO-based
+    authentication and trade execution.
+    """
     id: str = "realtime_data_streaming"
     kind: str = "read"
 
@@ -51,6 +67,9 @@ class RealtimeDataStreaming(Capability):
         self.CANDLE_ONLY_MODE: bool = False
         self.TICK_ONLY_MODE: bool = False
         self.ASSET_FOCUS_MODE: bool = False
+
+        # Asset change callback
+        self.asset_change_callbacks: List[Callable[[str], None]] = []
 
     # ========================================
     # Helper Methods
@@ -85,18 +104,63 @@ class RealtimeDataStreaming(Capability):
         """
         Enable asset focus mode and lock to a specific asset.
         This prevents the capability from auto-switching assets based on Pocket Option UI.
-        
+
         Args:
             asset: The asset symbol to focus on (e.g., 'EURUSD_OTC')
         """
+        old_asset = self.CURRENT_ASSET
         self.ASSET_FOCUS_MODE = True
         self.CURRENT_ASSET = asset
+
+        # Notify callbacks if asset changed
+        if old_asset and old_asset != asset:
+            self._notify_asset_change_callbacks(old_asset, asset)
     
     def release_asset_focus(self) -> None:
         """
         Disable asset focus mode, allowing the capability to auto-sync with Pocket Option UI.
         """
         self.ASSET_FOCUS_MODE = False
+
+    def add_asset_change_callback(self, callback: Callable[[str, str], None]) -> None:
+        """
+        Add a callback function to be called when the asset changes.
+
+        This allows other parts of the application (e.g., the trading bot)
+        to react to asset changes detected by this module.
+
+        Args:
+            callback: Function that takes (old_asset, new_asset) parameters
+        """
+        self.asset_change_callbacks.append(callback)
+
+    def remove_asset_change_callback(self, callback: Callable[[str, str], None]) -> None:
+        """
+        Remove an asset change callback function.
+
+        Args:
+            callback: The callback function to remove
+        """
+        if callback in self.asset_change_callbacks:
+            self.asset_change_callbacks.remove(callback)
+
+    def _notify_asset_change_callbacks(self, old_asset: str, new_asset: str) -> None:
+        """
+        Notify all registered callbacks of an asset change.
+
+        This ensures that all interested components are aware of the asset change
+        and can update their state accordingly.
+
+        Args:
+            old_asset: The previous asset name
+            new_asset: The new asset name
+        """
+        for callback in self.asset_change_callbacks:
+            try:
+                callback(old_asset, new_asset)
+            except Exception as e:
+                if self.ctx and self.ctx.verbose:
+                    print(f"⚠️ Error in asset change callback: {e}")
     
     def set_timeframe(self, minutes: int, lock: bool = True) -> None:
         """
@@ -483,6 +547,9 @@ class RealtimeDataStreaming(Capability):
                 print(f"🎯 [Asset Focus] Keeping focused asset: {self.CURRENT_ASSET}; skipping auto asset sync")
             return
 
+        # Enhanced asset detection for dynamic integration
+        old_asset = self.CURRENT_ASSET
+
         symbol_keys = ['symbol', 'asset', 'pair', 'instrument']
         for key in symbol_keys:
             if key in settings:
@@ -491,6 +558,9 @@ class RealtimeDataStreaming(Capability):
                     self.CURRENT_ASSET = symbol
                     if ctx.verbose:
                         print(f"🎯 [{datetime.now(timezone.utc).strftime('%H:%M:%SZ')}] Current asset synced: {symbol} (from {key})")
+                    # Notify callbacks if asset changed
+                    if old_asset and old_asset != symbol:
+                        self._notify_asset_change_callbacks(old_asset, symbol)
                     return
             
             # Also check in main payload
@@ -500,6 +570,9 @@ class RealtimeDataStreaming(Capability):
                     self.CURRENT_ASSET = symbol
                     if ctx.verbose:
                         print(f"🎯 [{datetime.now(timezone.utc).strftime('%H:%M:%SZ')}] Current asset synced: {symbol} (from payload {key})")
+                    # Notify callbacks if asset changed
+                    if old_asset != symbol:
+                        self._notify_asset_change_callbacks(symbol)
                     return
 
     def _extract_favorites_from_payload(self, payload: Any, ctx: Ctx) -> None:
