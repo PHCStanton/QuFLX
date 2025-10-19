@@ -43,7 +43,8 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "uv run python streaming_server.py"
+args = "python streaming_server.py"
+waitForPort = 3001
 
 [[ports]]
 localPort = 3001

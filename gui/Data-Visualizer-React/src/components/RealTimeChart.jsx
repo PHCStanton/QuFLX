@@ -16,6 +16,7 @@ const RealTimeChart = ({
 }) => {
   const chartRef = useRef(null);
   const streamRef = useRef(null);
+  const isStreamingRef = useRef(false);
   const [data, setData] = useState(initialData);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamStats, setStreamStats] = useState({
@@ -23,6 +24,11 @@ const RealTimeChart = ({
     updateInterval: updateInterval,
     lastUpdate: null
   });
+
+  // Sync ref with state
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming]);
 
   // Initialize real-time data stream
   useEffect(() => {
@@ -38,8 +44,8 @@ const RealTimeChart = ({
           lastUpdate: new Date().toLocaleTimeString()
         });
         
-        // Update chart with new data point
-        if (chartRef.current && isStreaming) {
+        // Update chart with new data point - use ref to avoid stale closure
+        if (chartRef.current && isStreamingRef.current) {
           chartRef.current.addDataPoint(newPoint);
         }
       });
@@ -51,7 +57,7 @@ const RealTimeChart = ({
         }
       };
     }
-  }, [initialData, updateInterval, isStreaming]);
+  }, [initialData, updateInterval]);
 
   // Start streaming
   const startStreaming = () => {

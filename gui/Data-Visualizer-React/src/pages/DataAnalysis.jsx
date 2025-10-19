@@ -5,6 +5,8 @@ import IndicatorManager from '../components/indicators/IndicatorManager';
 import { fetchCurrencyPairs } from '../utils/fileUtils';
 import { parseTradingData } from '../utils/tradingData';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useResponsiveGrid } from '../hooks/useResponsiveGrid';
+import { detectBackendUrl } from '../utils/urlHelper';
 import { colors, typography, spacing, borderRadius } from '../styles/designTokens';
 
 const STREAM_STATES = {
@@ -32,26 +34,8 @@ const DataAnalysis = () => {
   const [streamError, setStreamError] = useState(null);
   const [detectedAsset, setDetectedAsset] = useState(null);
   
-  const [activeIndicators, setActiveIndicators] = useState({
-    'SMA-20': { 
-      type: 'sma', 
-      params: { period: 20 },
-      color: '#22c55e',
-      definition: { name: 'Simple Moving Average (SMA)', renderType: 'line' }
-    },
-    'RSI-14': { 
-      type: 'rsi', 
-      params: { period: 14 },
-      color: '#f59e0b',
-      definition: { name: 'Relative Strength Index (RSI)', renderType: 'line' }
-    },
-    'BB-20': { 
-      type: 'bollinger', 
-      params: { period: 20, std_dev: 2 },
-      color: '#6366f1',
-      definition: { name: 'Bollinger Bands', renderType: 'band' }
-    }
-  });
+  // Start with clean slate - no default indicators
+  const [activeIndicators, setActiveIndicators] = useState({});
   
   const { 
     isConnected, 
@@ -112,7 +96,6 @@ const DataAnalysis = () => {
     } else if (dataSource === 'platform') {
       setAvailableAssets([]);
       setSelectedAsset('');
-      setSelectedAssetFile('');
     }
   }, [dataSource, timeframe, selectedAsset]);
 
@@ -130,15 +113,19 @@ const DataAnalysis = () => {
   useEffect(() => {
     if (isConnected && chartData.length > 0 && dataSource === 'csv' && selectedAsset) {
       console.log('[CSV Mode] Socket connected - calculating indicators for existing chart data');
-      const config = Object.entries(activeIndicators).reduce((acc, [id, ind]) => {
-        acc[ind.type] = ind.params;
+      // Use instance-based format to support multiple indicators of same type
+      const instances = Object.entries(activeIndicators).reduce((acc, [instanceName, ind]) => {
+        acc[instanceName] = {
+          type: ind.type,
+          params: ind.params
+        };
         return acc;
       }, {});
       
       storeCsvCandles(selectedAsset, chartData);
-      calculateIndicators(selectedAsset, config);
+      calculateIndicators(selectedAsset, instances);
     }
-  }, [isConnected, chartData.length]);
+  }, [isConnected, chartData, dataSource, selectedAsset, activeIndicators, storeCsvCandles, calculateIndicators]);
 
   const loadCsvData = async (assetId, tf) => {
     if (!assetId || !selectedAssetFile) return;
@@ -149,7 +136,8 @@ const DataAnalysis = () => {
     
     try {
       // Use the filename to fetch CSV data from backend
-      const response = await fetch(`http://localhost:3001/api/csv-data/${selectedAssetFile}`);
+      const baseUrl = detectBackendUrl();
+      const response = await fetch(`${baseUrl}/api/csv-data/${selectedAssetFile}`);
       if (!response.ok) throw new Error(`Failed to load CSV data: ${response.status}`);
       
       const text = await response.text();
@@ -182,13 +170,17 @@ const DataAnalysis = () => {
 
       setChartData(parsedData);
       
-      const config = Object.entries(activeIndicators).reduce((acc, [id, ind]) => {
-        acc[ind.type] = ind.params;
+      // Use instance-based format to support multiple indicators of same type
+      const instances = Object.entries(activeIndicators).reduce((acc, [instanceName, ind]) => {
+        acc[instanceName] = {
+          type: ind.type,
+          params: ind.params
+        };
         return acc;
       }, {});
       
       await storeCsvCandles(assetId, parsedData);
-      await calculateIndicators(assetId, config);
+      await calculateIndicators(assetId, instances);
       
       setLoadingStatus('Data loaded successfully');
       setTimeout(() => setLoadingStatus(''), 2000);
@@ -304,13 +296,17 @@ const DataAnalysis = () => {
       setChartData([]);
       startStream(detectedAsset.asset);
       
-      const config = Object.entries(activeIndicators).reduce((acc, [id, ind]) => {
-        acc[ind.type] = ind.params;
+      // Use instance-based format to support multiple indicators of same type
+      const instances = Object.entries(activeIndicators).reduce((acc, [instanceName, ind]) => {
+        acc[instanceName] = {
+          type: ind.type,
+          params: ind.params
+        };
         return acc;
       }, {});
       
       setTimeout(() => {
-        calculateIndicators(detectedAsset.asset, config);
+        calculateIndicators(detectedAsset.asset, instances);
       }, 2000);
     }
   };
@@ -324,15 +320,19 @@ const DataAnalysis = () => {
   const handleIndicatorUpdate = async (indicators) => {
     setActiveIndicators(indicators);
     
-    const config = Object.entries(indicators).reduce((acc, [id, ind]) => {
-      acc[ind.type] = ind.params;
+    // Use instance-based format to support multiple indicators of same type
+    const instances = Object.entries(indicators).reduce((acc, [instanceName, ind]) => {
+      acc[instanceName] = {
+        type: ind.type,
+        params: ind.params
+      };
       return acc;
     }, {});
     
     if (dataSource === 'csv' && selectedAsset) {
-      await calculateIndicators(selectedAsset, config);
+      await calculateIndicators(selectedAsset, instances);
     } else if (dataSource === 'platform' && streamAsset) {
-      await calculateIndicators(streamAsset, config);
+      await calculateIndicators(streamAsset, instances);
     }
   };
 
@@ -377,22 +377,7 @@ const DataAnalysis = () => {
     padding: spacing.lg,
   };
 
-  const getResponsiveColumns = () => {
-    if (typeof window === 'undefined') return 'clamp(240px, 20vw, 320px) 1fr clamp(260px, 16vw, 340px)';
-    const width = window.innerWidth;
-    if (width >= 1600) return 'clamp(260px, 18vw, 360px) 1fr clamp(280px, 16vw, 380px)';
-    if (width >= 1280) return 'clamp(240px, 20vw, 320px) 1fr clamp(260px, 16vw, 340px)';
-    if (width >= 1024) return 'clamp(220px, 22vw, 300px) 1fr clamp(240px, 18vw, 320px)';
-    return 'minmax(200px, 220px) 1fr minmax(220px, 240px)';
-  };
-
-  const [gridColumns, setGridColumns] = useState(getResponsiveColumns());
-
-  useEffect(() => {
-    const handleResize = () => setGridColumns(getResponsiveColumns());
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const gridColumns = useResponsiveGrid();
 
   const containerStyle = {
     display: 'grid',
@@ -628,24 +613,6 @@ const DataAnalysis = () => {
             ))}
           </div>
         </div>
-
-        {/* Indicator Manager */}
-        <div style={cardStyle}>
-          <h3 style={{
-            margin: 0,
-            marginBottom: spacing.md,
-            fontSize: typography.fontSize.lg,
-            fontWeight: typography.fontWeight.semibold,
-            color: colors.textPrimary
-          }}>
-            Indicators
-          </h3>
-          
-          <IndicatorManager 
-            indicators={activeIndicators}
-            onChange={handleIndicatorUpdate}
-          />
-        </div>
       </div>
 
       {/* CENTER COLUMN - Chart */}
@@ -713,6 +680,30 @@ const DataAnalysis = () => {
               {loading ? loadingStatus : 'Select asset to view chart'}
             </div>
           )}
+        </div>
+
+        {/* Indicator Manager - Positioned at bottom of chart */}
+        <div style={{ 
+          marginTop: spacing.lg,
+          padding: spacing.md,
+          background: colors.bgSecondary,
+          borderRadius: borderRadius.lg,
+          border: `1px solid ${colors.borderPrimary}`
+        }}>
+          <h3 style={{
+            margin: 0,
+            marginBottom: spacing.md,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.textPrimary
+          }}>
+            Indicators
+          </h3>
+          
+          <IndicatorManager 
+            indicators={activeIndicators}
+            onChange={handleIndicatorUpdate}
+          />
         </div>
       </div>
 

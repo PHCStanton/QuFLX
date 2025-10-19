@@ -1,26 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import io from 'socket.io-client';
-
-// Helper to detect the backend Socket.IO server URL
-const detectSocketUrl = () => {
-  try {
-    // In Replit/production, use the current origin (Vite proxy handles routing to backend)
-    // In local dev with separate ports, use explicit backend URL
-    const protocol = window?.location?.protocol || 'http:';
-    const hostname = window?.location?.hostname || 'localhost';
-    
-    // Allow override via env variable if provided
-    const envUrl = import.meta?.env?.VITE_SOCKET_URL;
-    if (envUrl) return envUrl;
-    
-    // Use current origin (Vite proxies /socket.io to backend:3001)
-    // This works in Replit where frontend and backend share the same domain
-    return `${protocol}//${hostname}${window?.location?.port ? ':' + window?.location?.port : ''}`;
-  } catch {
-    // Fallback to current origin
-    return '';
-  }
-};
+import { detectSocketUrl } from '../utils/urlHelper';
 
 const useWebSocketState = () => {
   const [connectionState, setConnectionState] = useState({
@@ -81,7 +61,7 @@ export const useWebSocket = (url) => {
   useEffect(() => {
     // Create socket connection with polling first to avoid initial errors
     const connectUrl = url || detectSocketUrl();
-    setIsConnecting(true);
+    setConnectionState(prev => ({ ...prev, isConnecting: true }));
     const socket = io(connectUrl, {
       // Prefer WebSocket, but allow polling fallback for Windows/threading backend
       transports: ['websocket', 'polling'],
@@ -129,18 +109,21 @@ export const useWebSocket = (url) => {
     
     socket.on('reconnect_failed', () => {
       console.error('WebSocket reconnection failed after all attempts');
-      setError('Failed to reconnect to server');
-      setIsConnecting(false);
+      setConnectionState(prev => ({
+        ...prev,
+        error: 'Failed to reconnect to server',
+        isConnecting: false
+      }));
     });
 
     socket.on('reconnect_attempt', () => {
       console.log('Attempting to reconnect...');
-      setIsConnecting(true);
+      setConnectionState(prev => ({ ...prev, isConnecting: true }));
     });
 
     socket.on('reconnect', (attemptNumber) => {
       console.log(`Reconnected successfully after ${attemptNumber} attempt(s)`);
-      setIsConnecting(false);
+      setConnectionState(prev => ({ ...prev, isConnecting: false }));
       
       // Trigger reconnection callback if provided
       if (reconnectionCallbackRef.current) {
@@ -277,22 +260,22 @@ export const useWebSocket = (url) => {
   }, [url]);
 
   const startStream = useCallback((asset) => {
-    if (socketRef.current && isConnected) {
+    if (socketRef.current && connectionState.isConnected) {
       socketRef.current.emit('start_stream', { asset });
     }
-  }, [isConnected]);
+  }, [connectionState.isConnected]);
 
   const stopStream = useCallback(() => {
-    if (socketRef.current && isConnected) {
+    if (socketRef.current && connectionState.isConnected) {
       socketRef.current.emit('stop_stream');
     }
-  }, [isConnected]);
+  }, [connectionState.isConnected]);
 
   const changeAsset = useCallback((asset) => {
-    if (socketRef.current && isConnected) {
+    if (socketRef.current && connectionState.isConnected) {
       socketRef.current.emit('change_asset', { asset });
     }
-  }, [isConnected]);
+  }, [connectionState.isConnected]);
 
   const detectAsset = useCallback(() => {
     if (socketRef.current && connectionState.isConnected) {

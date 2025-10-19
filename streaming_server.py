@@ -43,6 +43,12 @@ from base import Ctx  # type: ignore
 # Import persistence manager
 from stream_persistence import StreamPersistenceManager  # type: ignore
 
+# Import indicator adapter for modular indicator calculations
+from strategies.indicator_adapter import get_indicator_adapter  # type: ignore
+
+# Import simulated streaming capability
+from simulated_streaming import SimulatedStreamingCapability  # type: ignore
+
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(
@@ -53,14 +59,37 @@ socketio = SocketIO(
     ping_interval=10
 )
 
+# ================================================================================
+# GLOBAL STREAMING MODE TOGGLE
+# ================================================================================
+# Set to True to use SIMULATED data (for testing indicators without real connection)
+# Set to False to use REAL data (requires Chrome connection to PocketOption)
+# 
+# IMPORTANT: NO automatic fallback - mode must be explicitly selected
+# ================================================================================
+USE_SIMULATED_DATA = False  # Change to True for simulated mode
+# ================================================================================
+
 # Global state for Chrome session and streaming
 chrome_driver = None
 streaming_active = False
 current_asset = "EURUSD_OTC"
 
-# Create data streaming capability instance to reuse its Chrome interception logic
-data_streamer = RealtimeDataStreaming()
-capability_ctx = None  # Will be initialized when Chrome connects
+# Create data streaming capability instance based on mode
+if USE_SIMULATED_DATA:
+    print("\n" + "="*80)
+    print("⚠️  SIMULATED DATA MODE ENABLED")
+    print("   Using simulated data stream for testing - NO real market connection")
+    print("="*80 + "\n")
+    data_streamer = SimulatedStreamingCapability(period_seconds=60)
+else:
+    print("\n" + "="*80)
+    print("✅ REAL DATA MODE ENABLED")
+    print("   Using real market data - requires Chrome connection to PocketOption")
+    print("="*80 + "\n")
+    data_streamer = RealtimeDataStreaming()
+
+capability_ctx = None  # Will be initialized when Chrome connects (real mode only)
 period = 60  # 1 minute candles by default
 
 # Data persistence (optional, configured via --collect-stream argument)
@@ -82,7 +111,15 @@ def attach_to_chrome(verbose=True):
     """
     Attach to existing Chrome instance started with --remote-debugging-port=9222.
     Returns a selenium webdriver.Chrome instance or None on failure.
+    
+    NOTE: Skipped when USE_SIMULATED_DATA=True
     """
+    # Skip Chrome connection in simulated mode
+    if USE_SIMULATED_DATA:
+        if verbose:
+            print("[Chrome] Skipped - using simulated data mode")
+        return None
+    
     import socket
     
     # Quick check if port 9222 is listening
@@ -188,8 +225,11 @@ def reset_backend_state():
     # Clear candle tracking for persistence
     last_closed_candle_index.clear()
     
-    # Reset capability state (clear candle buffers, asset tracking, etc.)
-    data_streamer._reset_stream_state(inputs={'period': period})
+    # Reset capability state (both real and simulated modes support this)
+    if USE_SIMULATED_DATA:
+        data_streamer._reset_stream_state(inputs={'period': data_streamer.PERIOD})
+    else:
+        data_streamer._reset_stream_state(inputs={'period': period})
     
     print("[Reconnection] ✓ Backend state reset complete")
 
@@ -270,27 +310,48 @@ def monitor_chrome_status():
 def stream_from_chrome():
     """
     Background thread to capture WebSocket data from Chrome.
-    Fully delegates to RealtimeDataStreaming capability's logic.
+    In simulated mode, generates synthetic candles instead.
     """
     global chrome_driver, streaming_active, data_streamer, capability_ctx, current_asset
     
-    if not chrome_driver:
-        print("[Stream] Chrome not connected. Attempting to connect...")
-        chrome_driver = attach_to_chrome()
+    # Skip Chrome connection check in simulated mode
+    if not USE_SIMULATED_DATA:
         if not chrome_driver:
-            print("[Stream] Failed to connect to Chrome. Streaming disabled.")
-            return
+            print("[Stream] Chrome not connected. Attempting to connect...")
+            chrome_driver = attach_to_chrome()
+            if not chrome_driver:
+                print("[Stream] Failed to connect to Chrome. Streaming disabled.")
+                return
     
-    # Initialize capability context
-    capability_ctx = Ctx(driver=chrome_driver, artifacts_root=None, debug=False, dry_run=False, verbose=True)
+    # Initialize capability context (real mode only)
+    if not USE_SIMULATED_DATA:
+        capability_ctx = Ctx(driver=chrome_driver, artifacts_root=None, debug=False, dry_run=False, verbose=True)
+        print("[Stream] Starting WebSocket capture from Chrome...")
+    else:
+        print("[Stream] Starting SIMULATED data streaming...")
     
-    print("[Stream] Starting WebSocket capture from Chrome...")
     processed_messages = set()
     
     while True:
         if streaming_active:
             try:
-                # Check if Chrome is still connected before accessing logs
+                # SIMULATED MODE: Generate synthetic candles
+                if USE_SIMULATED_DATA:
+                    candle = data_streamer.get_current_candle(current_asset)
+                    if candle:
+                        # Emit candle update to frontend
+                        socketio.emit('candle_update', {
+                            'asset': current_asset,
+                            'candle': candle,
+                            'timestamp': datetime.now().isoformat()
+                        })
+                    
+                    # Sleep for period duration (simulating real-time streaming)
+                    candle_period = data_streamer.PERIOD if hasattr(data_streamer, 'PERIOD') else 60
+                    time.sleep(candle_period / 10.0)  # Emit updates 10 times per period for smooth visualization
+                    continue
+                
+                # REAL MODE: Check if Chrome is still connected before accessing logs
                 if not chrome_driver:
                     print("[Stream] Chrome disconnected during streaming - stopping stream")
                     streaming_active = False
@@ -610,25 +671,33 @@ def handle_disconnect():
 
 @socketio.on('start_stream')
 def handle_start_stream(data):
-    """Start streaming real-time data"""
+    """Start streaming real-time data (real or simulated based on mode)"""
     global current_asset, streaming_active, data_streamer, chrome_reconnect_enabled
     
-    # Enable Chrome reconnection since Platform mode is active
-    chrome_reconnect_enabled = True
-    
-    # Check if Chrome is connected
-    if not chrome_driver:
-        emit('stream_error', {
-            'error': 'Chrome not connected',
-            'timestamp': datetime.now().isoformat()
-        })
-        return
-    
-    if data and 'asset' in data:
-        current_asset = data['asset']
-        # Use capability API methods instead of direct state manipulation
-        data_streamer.set_asset_focus(current_asset)
-        data_streamer.set_timeframe(minutes=1, lock=True)
+    # Handle based on streaming mode
+    if USE_SIMULATED_DATA:
+        # SIMULATED MODE: No Chrome required
+        print(f"[Socket.IO] Starting SIMULATED stream")
+        if data and 'asset' in data:
+            current_asset = data['asset']
+            data_streamer.start_streaming([current_asset])
+    else:
+        # REAL MODE: Enable Chrome reconnection since Platform mode is active
+        chrome_reconnect_enabled = True
+        
+        # Check if Chrome is connected
+        if not chrome_driver:
+            emit('stream_error', {
+                'error': 'Chrome not connected',
+                'timestamp': datetime.now().isoformat()
+            })
+            return
+        
+        if data and 'asset' in data:
+            current_asset = data['asset']
+            # Use capability API methods instead of direct state manipulation
+            data_streamer.set_asset_focus(current_asset)
+            data_streamer.set_timeframe(minutes=1, lock=True)
     
     streaming_active = True
     
@@ -638,10 +707,37 @@ def handle_start_stream(data):
         'timestamp': datetime.now().isoformat()
     })
     
-    # Stage 1: Seed chart with historical CSV data FIRST, then start live stream
+    # Stage 1: Seed chart with historical data FIRST, then start live stream
     # This provides context for seamless transition from history to real-time
     
-    # Try to load historical candles from CSV files first
+    # SIMULATED MODE: Generate historical candles
+    if USE_SIMULATED_DATA:
+        simulated_candles = data_streamer.get_historical_candles(current_asset, count=200)
+        historical_candles_sim = []
+        for candle in simulated_candles:
+            timestamp, open_price, close_price, high_price, low_price = candle
+            historical_candles_sim.append({
+                'asset': current_asset,
+                'timestamp': timestamp,
+                'open': open_price,
+                'high': high_price,
+                'low': low_price,
+                'close': close_price,
+                'volume': 0,
+                'date': datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).isoformat()
+            })
+        
+        print(f"[Stream] Generated {len(historical_candles_sim)} SIMULATED historical candles")
+        emit('historical_candles_loaded', {
+            'asset': current_asset,
+            'candles': historical_candles_sim,
+            'count': len(historical_candles_sim),
+            'source': 'simulated',
+            'timestamp': datetime.now().isoformat()
+        })
+        return  # Skip CSV/WebSocket loading in simulated mode
+    
+    # REAL MODE: Try to load historical candles from CSV files first
     historical_candles_csv = []
     try:
         import pandas as pd
@@ -727,15 +823,20 @@ def handle_start_stream(data):
 
 @socketio.on('stop_stream')
 def handle_stop_stream():
-    """Stop streaming data"""
+    """Stop streaming data (real or simulated)"""
     global streaming_active
 
     streaming_active = False
     print(f"[Stream] Stopped")
     emit('stream_stopped', {'timestamp': datetime.now().isoformat()})
-    # Release asset focus when stream stops using API method
-    data_streamer.release_asset_focus()
-    data_streamer.unlock_timeframe()
+    
+    # Release resources based on mode
+    if USE_SIMULATED_DATA:
+        data_streamer.stop_streaming(current_asset)
+    else:
+        # Release asset focus when stream stops using API method
+        data_streamer.release_asset_focus()
+        data_streamer.unlock_timeframe()
 
 @socketio.on('change_asset')
 def handle_change_asset(data):
@@ -846,9 +947,9 @@ def handle_store_csv_candles(data):
 def handle_calculate_indicators(data):
     """
     Calculate technical indicators for given asset and configuration.
-    Supports both instance-based and simple indicator configurations.
+    Uses modular TechnicalIndicatorsPipeline via IndicatorAdapter.
     
-    Expected data format (instance-based):
+    Supports instance-based format (recommended):
     {
         'asset': 'EURUSD_OTC',
         'instances': {
@@ -858,23 +959,17 @@ def handle_calculate_indicators(data):
         }
     }
     
-    Legacy format (backward compatible):
-    {
-        'asset': 'EURUSD_OTC',
-        'indicators': {
-            'sma': {'period': 20},
-            'rsi': {'period': 14}
-        }
-    }
+    Now supports all 13+ indicators via TechnicalIndicatorsPipeline:
+    - Trend: SMA, EMA, WMA, MACD, Bollinger Bands
+    - Momentum: RSI, Stochastic, Williams %R, ROC, Schaff TC, DeMarker, CCI
+    - Volatility: ATR, Bollinger Bands
+    - Custom: SuperTrend
     """
     global data_streamer
     
     try:
         asset = data.get('asset')
-        
-        # Support both instance-based and legacy formats
         instances = data.get('instances')
-        legacy_indicators = data.get('indicators')
         
         if not asset:
             emit('indicators_error', {
@@ -883,52 +978,49 @@ def handle_calculate_indicators(data):
             })
             return
         
-        # Convert instance-based format to simple config for backend
-        if instances:
-            # Extract unique indicator types and merge parameters
-            indicators_config = {}
-            for instance_name, instance_config in instances.items():
-                indicator_type = instance_config.get('type')
-                params = instance_config.get('params', {})
-                
-                # For now, use the last instance of each type
-                # Future enhancement: support multiple instances per type
-                indicators_config[indicator_type] = params
-            
-            print(f"[Indicators] Processing {len(instances)} indicator instances for {asset}")
-        elif legacy_indicators:
-            indicators_config = legacy_indicators
-            print(f"[Indicators] Using legacy indicator config for {asset}")
-        else:
-            # Default indicators
-            indicators_config = {
-                'sma': {'period': 20},
-                'rsi': {'period': 14},
-                'bollinger': {'period': 20, 'std_dev': 2}
+        # Get candles from data_streamer
+        if asset not in data_streamer.CANDLES or not data_streamer.CANDLES[asset]:
+            emit('indicators_error', {
+                'error': f'No candle data available for {asset}',
+                'timestamp': datetime.now().isoformat()
+            })
+            return
+        
+        candles = data_streamer.CANDLES[asset]
+        
+        # Handle empty instances (no indicators selected)
+        if not instances:
+            empty_result = {
+                "asset": asset,
+                "indicators": {},
+                "series": {},
+                "signals": {},
+                "timestamp": datetime.now().isoformat()
             }
-            print(f"[Indicators] Using default indicators for {asset}")
+            print(f"[Indicators] No indicators specified for {asset} - sending empty result")
+            emit('indicators_calculated', empty_result)
+            return
         
-        print(f"[Indicators] Config: {indicators_config}")
+        # Use IndicatorAdapter for modular calculation
+        print(f"[Indicators] Processing {len(instances)} indicator instances for {asset} using TechnicalIndicatorsPipeline")
         
-        # Call existing capability method
-        indicators_result = data_streamer.apply_technical_indicators(asset, indicators_config)
+        # Get the actual timeframe period from data_streamer
+        timeframe_seconds = data_streamer.PERIOD if hasattr(data_streamer, 'PERIOD') and data_streamer.PERIOD else 60
         
-        if 'error' in indicators_result:
-            print(f"[Indicators] Error: {indicators_result['error']}")
-            emit('indicators_error', indicators_result)
+        adapter = get_indicator_adapter()
+        result = adapter.calculate_indicators_for_instances(asset, candles, instances, timeframe_seconds)
+        
+        if 'error' in result:
+            print(f"[Indicators] Error: {result['error']}")
+            emit('indicators_error', result)
         else:
-            # Include instance mapping in response if provided
-            if instances:
-                indicators_result['instance_mapping'] = {
-                    instance_name: instance_config.get('type')
-                    for instance_name, instance_config in instances.items()
-                }
-            
-            print(f"[Indicators] Calculated {len(indicators_result.get('indicators', {}))} indicators for {asset}")
-            emit('indicators_calculated', indicators_result)
+            print(f"[Indicators] ✓ Calculated {len(result.get('indicators', {}))} indicator instances for {asset}")
+            emit('indicators_calculated', result)
             
     except Exception as e:
         print(f"[Indicators] Exception: {e}")
+        import traceback
+        traceback.print_exc()
         emit('indicators_error', {
             'error': str(e),
             'timestamp': datetime.now().isoformat()
@@ -1047,24 +1139,33 @@ if __name__ == '__main__':
     else:
         print("\n[Persistence] Stream collection disabled (use --collect-stream to enable)")
     
-    # Try to connect to Chrome on startup
-    print("\n[Startup] Attempting to connect to Chrome...")
-    chrome_driver = attach_to_chrome(verbose=True)
-    
-    # Start Chrome status monitor thread (always running)
-    monitor_thread = threading.Thread(target=monitor_chrome_status, daemon=True)
-    monitor_thread.start()
-    print("[Startup] ✓ Chrome status monitor started")
-    
-    if chrome_driver:
-        print("[Startup] ✓ Chrome connected successfully")
-        # Start background streaming thread
+    # Startup mode handling
+    if USE_SIMULATED_DATA:
+        print("\n[Startup] 🎲 SIMULATED MODE - skipping Chrome connection")
+        print("[Startup] Simulated data will be generated for testing")
+        # Start simulated streaming thread
         stream_thread = threading.Thread(target=stream_from_chrome, daemon=True)
         stream_thread.start()
-        print("[Startup] ✓ WebSocket streaming thread started")
+        print("[Startup] ✓ Simulated streaming thread started")
     else:
-        print("[Startup] ⚠️ Chrome not connected. Live streaming will be unavailable.")
-        print("[Startup] To enable: Start Chrome with --remote-debugging-port=9222")
+        # Try to connect to Chrome on startup
+        print("\n[Startup] Attempting to connect to Chrome...")
+        chrome_driver = attach_to_chrome(verbose=True)
+        
+        # Start Chrome status monitor thread (always running in real mode)
+        monitor_thread = threading.Thread(target=monitor_chrome_status, daemon=True)
+        monitor_thread.start()
+        print("[Startup] ✓ Chrome status monitor started")
+        
+        if chrome_driver:
+            print("[Startup] ✓ Chrome connected successfully")
+            # Start background streaming thread
+            stream_thread = threading.Thread(target=stream_from_chrome, daemon=True)
+            stream_thread.start()
+            print("[Startup] ✓ WebSocket streaming thread started")
+        else:
+            print("[Startup] ⚠️ Chrome not connected. Live streaming will be unavailable.")
+            print("[Startup] To enable: Start Chrome with --remote-debugging-port=9222")
     
     print(f"\n[Startup] Starting server on http://0.0.0.0:3001")
     print("=" * 60)

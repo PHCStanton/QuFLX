@@ -1,21 +1,87 @@
 # QuantumFlux Trading Platform - Development Roadmap
 
-**Last Updated**: October 15, 2025
+**Last Updated**: October 16, 2025
 
 ## 🚀 Current Development Focus
 
-### 🎯 Phase 6: Chart Optimization & Enhancement (October 15, 2025) - **IN PROGRESS**
-**Optimizing chart layout for wider views and adding professional TradingView-inspired features**
+### 🔧 Phase 5.8: Modular Indicator Architecture Refactoring (October 16, 2025) - **IN PROGRESS**
+**Refactor backend to use dedicated indicator module for all technical calculations**
 
-**Priority:** Layout expansion for desktop/tablet, tooltips, visual markers, advanced features
-**Reference:** Solana-UI design, Lightweight Charts library tutorials and plugins
+**Goal:** Implement true separation of concerns by using the existing professional-grade `TechnicalIndicatorsPipeline` from `strategies/technical_indicators.py` instead of inline calculations in the streaming capability.
+
+**Key Design Principles:**
+- ✅ **Functional Simplicity** - Clear, focused modules with single responsibility
+- ✅ **Separation of Concerns** - Streaming capability handles WebSocket/candles only, indicators module handles all calculations
+- ✅ **Code Integrity** - Backward compatible, no breaking changes to frontend
+- ✅ **Zero Assumptions** - Explicit adapter layer for format conversion
+
+**Tasks:**
+- [ ] Create indicator adapter module (`strategies/indicator_adapter.py`)
+- [ ] Refactor `streaming_server.py` to use `TechnicalIndicatorsPipeline`
+- [ ] Remove inline indicator calculations from `data_streaming.py`
+- [ ] Add RSI reference lines (25/75) to frontend rendering
+- [ ] Test all 13 indicators (WMA, Stochastic, Williams %R, ROC, Schaff TC, DeMarker, CCI, ATR, SuperTrend + existing)
+- [ ] Update architecture documentation
+
+**Benefits:**
+- ✅ All 13+ indicators immediately available (WMA, Stochastic, Williams %R, ROC, Schaff TC, DeMarker, CCI, ATR, SuperTrend)
+- ✅ Professional-grade calculations using pandas-ta and talib libraries
+- ✅ Clean streaming capability focused on WebSocket/candle formation
+- ✅ Single source of truth for indicator calculations
+- ✅ Easy to maintain and extend
+
+**Current Status:** Task list created, beginning implementation ⚙️
+
+---
+
+### ✅ Phase 5.7: Indicator System Enhancement (October 16, 2025) - **COMPLETE**
+**Optimized indicator integration with clean initial state and multi-instance support**
+
+**Features Completed:**
+- ✅ Clean chart initialization (no default indicators)
+- ✅ Multi-instance indicator support (e.g., SMA-20 + SMA-50 simultaneously)
+- ✅ Instance-based indicator format with type metadata
+- ✅ Dynamic indicator rendering for overlays and oscillators
+- ✅ IndicatorManager moved to bottom of chart for better UX
+- ✅ Backend multi-instance calculation (each instance computed separately)
+- ✅ Frontend instance-aware rendering (uses instance names as keys)
+
+**Status:** Architect-verified, production-ready ✅
+
+---
+
+### ✅ Sidebar Navigation Implementation (October 16, 2025) - **COMPLETE**
+**Professional expandable/retractable sidebar with custom logo branding**
+
+**Features Completed:**
+- ✅ Expandable sidebar (240px ↔ 64px) with smooth animations
+- ✅ SVG icon navigation (Chart, Flask, Trading icons)
+- ✅ Custom logo integration (Logo1.jpg from attached_assets)
+- ✅ SidebarContext for global state management
+- ✅ App.jsx refactoring with SidebarProvider and AppLayout
+- ✅ Design token consistency fixes
+- ✅ Removed old Header and Navigation components
+
+**Status:** Production-ready ✅
 
 ---
 
 ## 🎉 Recently Completed
 
-### ✅ UI/UX Redesign - Solana-Inspired Professional Trading Terminal (October 15, 2025) - COMPLETE
-**Successfully transformed from data visualization to professional 3-page trading platform**
+### ✅ Sidebar Navigation Implementation (October 16, 2025) - COMPLETE
+**Professional expandable/retractable sidebar with custom logo branding**
+
+- ✅ Expandable sidebar (240px ↔ 64px) with smooth cubic-bezier transitions
+- ✅ SVG icon navigation (Chart, Flask, Trading icons)
+- ✅ Custom logo integration (Logo1.jpg from attached_assets)
+- ✅ SidebarContext for global state management
+- ✅ App.jsx refactoring with SidebarProvider and AppLayout
+- ✅ Design token consistency fixes (accentGreen, textPrimary, cardBorder)
+- ✅ Removed old Header and Navigation components
+
+**Status**: Production-ready, fully integrated ✅
+
+---
 
 ### ✅ Complete UI/UX Redesign - Solana-Inspired 3-Page Platform (October 15, 2025) - COMPLETE
 
@@ -87,38 +153,76 @@
 
 ---
 
-### ✅ Real-Time Streaming Phases 1-6 (October 9-10, 2025) - COMPLETE
+## 📋 Critical Bug Fixes - Phase 5.5 ✅ **COMPLETE** (October 15, 2025)
 
-#### Phase 1-5: Infrastructure & Data Flow
-- [x] Backend infrastructure fixes (eventlet, WebSocket config)
-- [x] Stream data collection (--collect-stream argument)
-- [x] Frontend data provider separation (CSV vs Platform)
-- [x] Asset focus integration
-- [x] Reconnection lifecycle management
+**All 12+ critical bugs identified and fixed - platform now stable**
 
-#### Phase 6: Platform Mode State Machine
-- [x] 6-state pattern: idle, ready, detecting, asset_detected, streaming, error
-- [x] Backend asset detection from PocketOption
-- [x] Stream control panel UI with dynamic states
-- [x] Zero race conditions, production-ready
+### ✅ **CRITICAL RUNTIME ERRORS FIXED**
+
+#### Bug 1: React Hooks Rules Violation in DataAnalysis.jsx ✅ **FIXED**
+- [x] Reviewed all hook calls in DataAnalysis.jsx
+- [x] Ensured no conditional hooks
+- [x] Fixed useEffect dependency arrays
+- [x] Verified hooks called in consistent order
+
+#### Bug 2: Missing Error Boundary in App.jsx ✅ **FIXED**
+- [x] Wrapped `<Routes>` with `<ErrorBoundary>` in App.jsx
+- [x] Tested error recovery with intentional component error
+- [x] Verified error UI displays correctly
+
+#### Bug 3: Unsafe Array Operations ✅ **FIXED**
+- [x] Added null check in PositionList.jsx: `{(positions || []).map(...)}`
+- [x] Added null check in SignalList.jsx: `{(signals || []).map(...)}`
+- [x] Updated keys to use unique identifiers
+- [x] Tested with undefined props
+
+#### Bug 4: Stale Closure in RealTimeChart.jsx ✅ **FIXED**
+- [x] Fixed stale closure issue with isStreaming
+- [x] Tested start/stop streaming behavior
+
+### ✅ **HIGH PRIORITY DATA ISSUES FIXED**
+
+#### Bug 5: Invalid Data in LiveTrading.jsx ✅ **FIXED**
+- [x] Replaced all invalid percentages with valid numeric strings
+- [x] Formatted as: `'90%'`, `'91%'`, etc.
+- [x] Verified display renders correctly
+
+#### Bug 6: Network Fetch Error ✅ **FIXED**
+- [x] Replaced `http://localhost:3001` with dynamic URL
+- [x] Used environment variables for proper configuration
+- [x] Added proper error handling and user feedback
+
+### ✅ **CODE QUALITY ISSUES FIXED**
+
+#### Bug 7: Duplicate Grid Layout Logic ✅ **FIXED**
+- [x] Removed duplicate functions
+- [x] Using `useResponsiveGrid` hook consistently
+- [x] Verified responsive behavior unchanged
+
+#### Bug 8: Inconsistent Logger Usage ✅ **FIXED**
+- [x] Replaced all `console.log()` with logger utility calls
+- [x] Ensured consistent logging patterns
+- [x] Verified no sensitive data logged
+
+#### Bug 9: Missing Dependency in useEffect ✅ **FIXED**
+- [x] Changed dependency from `chartData.length` to `chartData`
+- [x] Verified data updates trigger correctly
+
+#### Bug 10: Unused State Variables ✅ **FIXED**
+- [x] Removed unused state variables
+- [x] Cleaned up related code
+
+**Impact**: All critical bugs resolved, platform stable and production-ready ✅
 
 ---
 
-## 📋 Current Development Phase
+## 📊 Development Tasks - After Bug Fixes
 
-### Phase 6: Chart Optimization & Enhancement 🎯 **CURRENT PRIORITY**
+### Phase 6: Chart Optimization & Enhancement 📅 **QUEUED** (After bugs fixed)
 
 **Goal**: Optimize chart layout for wider views and add professional trading features using TradingView Lightweight Charts capabilities
 
-#### Vision
-- **User Request**: Wider chart views for better analysis (desktop/tablet focus)
-- **Reference Design**: Solana-UI layout (`attached_assets/solana-ui#3_1760485877349.png`)
-- **Foundation**: MultiPaneChart component ready for enhancement ✅
-- **Resources**: Full Lightweight Charts library at our disposal
-
-#### Chart Optimization Features to Implement
-
-**Sub-Phase 6.1: Layout Expansion** ⭐ (High Priority - Desktop/Tablet Only)
+**Sub-Phase 6.1: Layout Expansion** (High Priority - Desktop/Tablet Only)
 - [ ] Adjust 3-column layout widths for wider charts
   - Desktop (1280px+): Left 20%, Center 65%, Right 15%
   - Tablet Horizontal (1024px-1279px): Left 22%, Center 60%, Right 18%
@@ -130,57 +234,22 @@
 
 **Sub-Phase 6.2: Tooltips & Visual Markers** (High Priority)
 - [ ] Floating tooltip implementation
-  - Reference: `gui/lightweight-charts/website/tutorials/how_to/tooltip-floating.js`
-  - Show OHLC data on hover without clutter
-  - Display indicator values at crosshair position
 - [ ] Delta tooltip plugin integration
-  - Reference: `gui/lightweight-charts/plugin-examples/src/plugins/delta-tooltip/`
-  - Professional price change display
 - [ ] Custom series markers for signals
-  - Reference: `gui/lightweight-charts/website/tutorials/how_to/series-markers.js`
-  - Visual BUY/SELL markers on chart
-  - Color-coded (green = buy, red = sell)
-  - Click interaction for trade details
 
 **Sub-Phase 6.3: Visual Polish & UX** (Medium Priority)
 - [ ] Price lines for key levels
-  - Reference: `gui/lightweight-charts/website/tutorials/how_to/price-line.js`
-  - Entry/exit signals, support/resistance zones
 - [ ] Chart watermarks
-  - Reference: `gui/lightweight-charts/website/tutorials/how_to/watermark-simple.js`
-  - Asset/timeframe identification overlay
 - [ ] Cleaner grid & crosshair styling
-  - Very subtle grid lines (match Solana-UI aesthetic)
-  - Enhanced crosshair visibility
 - [ ] Floating legend (top-left overlay)
-  - Asset name, current price, change %
-  - Match Solana-UI design pattern
 
 **Sub-Phase 6.4: Advanced Features** (Medium Priority)
 - [ ] Range switcher for quick timeframe changes
-  - Reference: `gui/lightweight-charts/website/tutorials/demos/range-switcher.js`
 - [ ] Realtime update optimization
-  - Reference: `gui/lightweight-charts/website/tutorials/demos/realtime-updates.js`
-  - Throttling for rapid data updates
 - [ ] User price alerts plugin
-  - Reference: `gui/lightweight-charts/plugin-examples/src/plugins/user-price-alerts/`
-  - Click-to-set price alerts on chart
 - [ ] Trend line drawing tool
-  - Reference: `gui/lightweight-charts/plugin-examples/src/plugins/trend-line/`
-  - Manual technical analysis capability
 - [ ] Session highlighting
-  - Reference: `gui/lightweight-charts/plugin-examples/src/plugins/session-highlighting/`
-  - Highlight trading sessions/market hours
 - [ ] Volume histogram (bottom pane)
-  - Add volume bars below main chart
-  - Match Solana-UI layout
-
-**Architecture Considerations:**
-- Build on existing MultiPaneChart component
-- Maintain backward compatibility (no breaking changes)
-- Focus on desktop/tablet (skip mobile)
-- Use Lightweight Charts best practices
-- Preserve all streaming functionality
 
 ---
 
@@ -243,177 +312,22 @@
 
 ---
 
-## 📊 Development Tasks
-
-### Phase 6.1: Layout Expansion for Wider Charts ⏳ **NEXT**
-- [ ] Update DataAnalysis.jsx - adjust grid columns to 20/65/15 (desktop)
-- [ ] Update StrategyLab.jsx - adjust grid columns to 20/65/15 (desktop)
-- [ ] Update TradingHub.jsx - adjust grid columns to 20/65/15 (desktop)
-- [ ] Add tablet horizontal breakpoint (1024px-1279px) with 22/60/18 split
-- [ ] Remove mobile breakpoints from all pages
-- [ ] Test chart rendering at different viewport sizes
-- [ ] Verify MultiPaneChart adapts to new widths
-
-### Phase 6.2: Tooltip & Marker Implementation 📅 QUEUED
-- [ ] Study `tooltip-floating.js` tutorial implementation
-- [ ] Create floating tooltip component for MultiPaneChart
-- [ ] Integrate delta tooltip plugin for price changes
-- [ ] Study `series-markers.js` for marker implementation
-- [ ] Add marker rendering system to MultiPaneChart
-- [ ] Test tooltip/marker performance with live data
-
-### Phase 6.3: Visual Polish & Grid Styling 📅 QUEUED
-- [ ] Implement price line system (reference: `price-line.js`)
-- [ ] Add watermark component (reference: `watermark-simple.js`)
-- [ ] Update grid line colors to match Solana-UI (very subtle)
-- [ ] Create floating legend overlay component
-- [ ] Test visual consistency across all 3 pages
-
-### Phase 6.4: Advanced Chart Features 📅 QUEUED
-- [ ] Implement range switcher UI component
-- [ ] Add realtime update throttling
-- [ ] Integrate user price alerts plugin
-- [ ] Add trend line drawing tool
-- [ ] Implement session highlighting
-- [ ] Add volume histogram pane below main chart
-
----
-
-## 🎯 Strategic Priorities
-
-### 1. Strategy Design is King 👑 (New Focus)
-- Data Analysis page is now the strategy design interface
-- Fast iteration: Visualize → Tweak → Test → Validate
-- Replay function for strategy behavior understanding
-- Visual signal markers for trade decision clarity
-
-### 2. Backtesting is Validation ✅
-- Strategy Lab is the performance analysis layer
-- Comprehensive metrics and comparison tools
-- Validated strategies ready for live trading
-
-### 3. Live Trading is the Goal 🎯
-- Trading Hub is the execution layer
-- Real-time signal generation from validated strategies
-- One-click execution with safety controls
-
----
-
-## 🏗️ Architecture & Data Flow
-
-### Frontend (React + Vite)
-```
-3-Page System:
-├── Data Analysis (Strategy Design)
-│   ├── CSV/Platform data source toggle
-│   ├── Replay function with playback controls
-│   ├── Visual signal markers on chart
-│   ├── Parameter tweaking with real-time feedback
-│   └── Quick backtest integration
-│
-├── Strategy Lab (Backtesting Core)
-│   ├── Strategy selector + upload
-│   ├── Equity curve + metrics dashboard
-│   ├── Trade history analysis
-│   └── Performance comparison
-│
-└── Trading Hub (Live Trading Execution)
-    ├── Live chart with strategy signals
-    ├── Position monitor + P/L tracker
-    ├── Signal panel with confidence
-    └── Execute trade controls
-```
-
-### Backend Services
-```
-streaming_server.py (Port 3001)
-├── RealtimeDataStreaming capability
-├── Strategy signal generation
-├── Indicator calculations (enhanced)
-├── Backtest engine integration
-└── Trade execution API (PocketOption)
-```
-
----
-
-## 📊 Feature Completion Status
-
-| Feature | Status | Completion |
-|---------|--------|------------|
-| Chrome Session Management | ✅ Complete | 100% |
-| WebSocket Data Collection | ✅ Complete | 100% |
-| Stream Data Persistence | ✅ Complete | 100% |
-| Frontend Data Separation | ✅ Complete | 100% |
-| Asset Focus System | ✅ Complete | 100% |
-| Platform Mode State Machine | ✅ Complete | 100% |
-| Dynamic Indicator System | ✅ Complete | 100% |
-| Multi-Pane Chart Rendering | ✅ Complete | 100% |
-| **UI/UX Redesign (3 Pages)** | ✅ Complete | 100% |
-| **Design System Consistency** | ✅ Complete | 100% |
-| **Chart Layout Optimization** | ⏳ In Progress | 0% |
-| **Tooltip & Visual Markers** | 📅 Queued | 0% |
-| **Chart Visual Polish** | 📅 Queued | 0% |
-| **Advanced Chart Features** | 📅 Queued | 0% |
-| **Replay Function** | 📅 Queued | 0% |
-| **Visual Signal Markers** | 📅 Queued | 0% |
-| **Parameter Tweaking** | 📅 Queued | 0% |
-| **Quick Backtest** | 📅 Queued | 0% |
-| **Live Trading Integration** | 📅 Queued | 0% |
-
----
-
-## 🎨 Visual Design References
-
-### Generated Mockups ✅
-1. **Data Analysis Page Mockup** - Strategy design interface
-   - File: `attached_assets/generated_images/Data_Analysis_page_mockup_design_c5f27fa1.png`
-
-2. **Trading Hub UI Mockup** - Live trading interface with signal panel
-   - File: `attached_assets/generated_images/QuantumFlux_Trading_Hub_UI_mockup_bad1f208.png`
-
-3. **Strategy Lab Mockup** - Backtesting interface with equity curve
-   - File: `attached_assets/generated_images/Strategy_Lab_backtesting_interface_mockup_b7632b2f.png`
-
-4. **System Architecture Diagram** - 3-tier architecture visualization
-   - File: `attached_assets/generated_images/QuantumFlux_system_architecture_diagram_cb864858.png`
-
-5. **Solana-UI Trading Layout Reference** - Great trading tab layout inspiration ✨ **NEW**
-   - File: `attached_assets/solana-ui#3_1760485877349.png`
-   - **Key Features to Adopt:**
-     - Wider chart view (center focus)
-     - Clean grid lines (very subtle)
-     - Volume histogram at bottom
-     - Floating legend overlay
-     - Minimal borders and glass effects
-
-### Design System: Solana-Inspired
-- Very dark theme (#0b0f19 base)
-- Bright green accent (#22c55e)
-- Card-based layouts with clean separation
-- Minimalist professional design
-- High contrast for financial data
-
-### Chart Enhancement Resources 📚
-- **Lightweight Charts Tutorials**: `gui/lightweight-charts/website/tutorials/`
-- **Plugin Examples**: `gui/lightweight-charts/plugin-examples/src/plugins/`
-- **Key References:**
-  - Floating tooltips: `tutorials/how_to/tooltip-floating.js`
-  - Series markers: `tutorials/how_to/series-markers.js`
-  - Price lines: `tutorials/how_to/price-line.js`
-  - Watermarks: `tutorials/how_to/watermark-simple.js`
-  - Range switcher: `tutorials/demos/range-switcher.js`
-  - Realtime updates: `tutorials/demos/realtime-updates.js`
-  - User price alerts: `plugin-examples/user-price-alerts/`
-  - Trend line tool: `plugin-examples/trend-line/`
-  - Session highlighting: `plugin-examples/session-highlighting/`
-
----
-
 ## 🐛 Known Issues & Technical Debt
 
-### Non-Critical
+### Critical (MUST FIX NOW) ✅
+- [x] React Hooks violation in DataAnalysis.jsx **FIXED**
+- [x] Missing Error Boundary wrapper in App.jsx **FIXED**
+- [x] Unsafe array operations (PositionList, SignalList) **FIXED**
+- [x] Stale closure in RealTimeChart **FIXED**
+- [x] Invalid percentage data in LiveTrading **FIXED**
+- [x] Hardcoded localhost URLs **FIXED**
+
+### Non-Critical ✅
+- [x] Duplicate grid layout functions **FIXED**
+- [x] Inconsistent logger usage **FIXED**
+- [x] Unused state variables **FIXED**
 - [ ] Some strategy calibration files unused at runtime
-- [ ] Frontend could benefit from TypeScript migration
+- [ ] Frontend could benefit from TypeScript migration (future enhancement)
 
 ### Nice to Have
 - [ ] Add progress indicators for long-running operations
@@ -425,13 +339,14 @@ streaming_server.py (Port 3001)
 
 ## 🔄 Next Immediate Actions (In Order)
 
-### 1. Chart Layout Expansion ⏳ (Current Priority)
-- Adjust 3-column widths: 20%/65%/15% (desktop), 22%/60%/18% (tablet)
+### 1. **Chart Layout Expansion & Enhancement** 📅 (Next Priority)
+- Adjust 3-column widths for wider charts (desktop/tablet focus)
+- Desktop (1280px+): Left 20%, Center 65%, Right 15%
+- Tablet Horizontal (1024px-1279px): Left 22%, Center 60%, Right 18%
 - Update DataAnalysis.jsx, StrategyLab.jsx, TradingHub.jsx
-- Remove mobile breakpoints (focus on desktop/tablet)
 - Test chart visibility and responsiveness
 
-### 2. Tooltips & Visual Markers 📅 (Next - Phase 6.2)
+### 2. Tooltips & Visual Markers 📅 (Phase 6.2)
 - Implement floating tooltip for OHLC data
 - Add delta tooltip plugin for price changes
 - Create series markers for BUY/SELL signals
@@ -462,10 +377,15 @@ streaming_server.py (Port 3001)
 ### Complete ✅
 - [x] README.md - Project overview
 - [x] QUICKSTART.md - Getting started guide
-- [x] gui/gui_dev_plan_mvp.md - **UPDATED** with complete architecture
-- [x] replit.md - **UPDATED** System architecture
-- [x] TODO.md - **UPDATED** this file
-- [x] .agent-memory/ - **UPDATED** All memory files
+- [x] gui/gui_dev_plan_mvp.md - **UPDATED** with sidebar navigation (October 16, 2025)
+- [x] replit.md - **UPDATED** System architecture with sidebar (October 16, 2025)
+- [x] TODO.md - **UPDATED** this file with sidebar completion (October 16, 2025)
+- [x] .agent-memory/ - **UPDATED** All memory files (October 16, 2025)
+  - [x] activeContext.md - Sidebar navigation added
+  - [x] progress.md - Sidebar implementation documented
+  - [x] project-status.md - Current status updated
+  - [x] productContext.md - No changes needed
+- [x] dev_docs/Heiku4.5_bug_finding.md - Bug audit report (all bugs fixed)
 
 ### Needs Update
 - [ ] API documentation (OpenAPI/Swagger)
@@ -492,10 +412,10 @@ streaming_server.py (Port 3001)
 - No hardcoded defaults
 - Real-time asset detection from platform
 
-### Code Integrity ✅
-- No breaking changes
-- Backward compatible
-- Proper resource cleanup
+### Code Integrity ⚠️ **NEEDS ATTENTION**
+- Some breaking issues found (hooks violations)
+- Backward compatibility at risk
+- Proper resource cleanup ✅
 
 ### Separation of Concerns ✅
 - Clear boundaries between pages
@@ -511,26 +431,26 @@ streaming_server.py (Port 3001)
 - Real-time streaming infrastructure complete (Phases 1-6) ✅
 - Frontend dynamic indicator system production-ready ✅
 - **UI/UX redesign complete** (Solana-inspired 3-page platform) ✅
+- **Phase 5.5 - Critical Bug Fixes COMPLETE** (All 12+ bugs fixed) ✅
+- **Phase 5.6 - Sidebar Navigation COMPLETE** (Expandable sidebar with custom logo) ✅
+- **Phase 5.7 - Indicator System Enhancement COMPLETE** (Multi-instance support, clean initialization) ✅
 - Documentation updated with new architecture ✅
+- **System stable and production-ready** ✅
 
 **To Continue:**
 1. Review this TODO.md for current status
-2. Check gui/gui_dev_plan_mvp.md for detailed architecture
-3. **Current priority: Phase 6 - Chart Optimization & Enhancement**
-   - Sub-Phase 6.1: Layout Expansion (wider charts for desktop/tablet)
-   - Sub-Phase 6.2: Tooltips & Visual Markers (floating tooltips, delta tooltips, series markers)
-   - Sub-Phase 6.3: Visual Polish (price lines, watermarks, grid styling, floating legend)
-   - Sub-Phase 6.4: Advanced Features (range switcher, price alerts, trend lines, volume histogram)
+2. Check gui/gui_dev_plan_mvp.md for development plan
+3. **NEXT: Phase 6 - Chart Optimization & Enhancement**
+4. Then: Phase 7 - Strategy Design Features
+5. Finally: Phase 8 - Live Trading Integration
 
-**Next Priority After Chart Optimization:**
+**Next Priority:**
+- Phase 6: Chart Optimization (layout expansion, tooltips, visual polish, advanced features)
 - Phase 7: Strategy Design Features (replay, signal markers, parameter tweaking, quick backtest)
 - Phase 8: Live trading integration (Trading Hub functionality)
-- Trade execution controls
-- Position monitoring system
-- PocketOption API integration
 
 ---
 
-**Development Status**: Phase 6 (Chart Optimization) In Progress 🎯 | UI/UX Complete ✅
+**Development Status**: Phase 5.7 (Indicator System Enhancement) **COMPLETE** ✅ | Ready for Phase 6
 
-**Last Reviewed**: October 15, 2025
+**Last Reviewed**: October 16, 2025

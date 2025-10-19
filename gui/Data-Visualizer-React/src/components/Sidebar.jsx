@@ -1,53 +1,217 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import designTokens from '../styles/designTokens';
+import { useSidebar } from '../contexts/SidebarContext';
+import logoImage from '../assets/logo.jpg';
+
+const ChartIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="20" x2="12" y2="10"></line>
+    <line x1="18" y1="20" x2="18" y2="4"></line>
+    <line x1="6" y1="20" x2="6" y2="16"></line>
+  </svg>
+);
+
+const FlaskIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"></path>
+    <path d="M6.453 15h11.094"></path>
+  </svg>
+);
+
+const TradingIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+  </svg>
+);
+
+const ChevronLeftIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6"></polyline>
+  </svg>
+);
+
+const ChevronRightIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6"></polyline>
+  </svg>
+);
+
+const menuItems = [
+  { path: '/', icon: ChartIcon, label: 'Data Analysis' },
+  { path: '/backtest', icon: FlaskIcon, label: 'Strategy Lab' },
+  { path: '/live', icon: TradingIcon, label: 'Trading Hub' },
+];
 
 const Sidebar = () => {
-  const [activeItem, setActiveItem] = useState('dashboard');
-  
-  const menuItems = [
-    { id: 'dashboard', name: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-    { id: 'analytics', name: 'Analytics', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-    { id: 'reports', name: 'Reports', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-    { id: 'settings', name: 'Settings', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
-  ];
+  const { isExpanded, toggleSidebar } = useSidebar();
+  const location = useLocation();
+
+  const sidebarStyle = {
+    position: 'fixed',
+    left: 0,
+    top: 0,
+    height: '100vh',
+    width: isExpanded ? '240px' : '64px',
+    backgroundColor: designTokens.colors.cardBg,
+    borderRight: `1px solid ${designTokens.colors.cardBorder}`,
+    transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    zIndex: 1000,
+    display: 'flex',
+    flexDirection: 'column',
+  };
+
+  const headerStyle = {
+    padding: isExpanded ? '20px' : '20px 16px',
+    borderBottom: `1px solid ${designTokens.colors.cardBorder}`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: '72px',
+  };
+
+  const brandStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    overflow: 'hidden',
+  };
+
+  const logoImgStyle = {
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
+    objectFit: 'cover',
+    flexShrink: 0,
+  };
+
+  const brandTextStyle = {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: designTokens.colors.textPrimary,
+    whiteSpace: 'nowrap',
+    opacity: isExpanded ? 1 : 0,
+    transition: 'opacity 0.2s',
+  };
+
+  const toggleButtonStyle = {
+    width: '32px',
+    height: '32px',
+    borderRadius: '6px',
+    backgroundColor: 'transparent',
+    border: `1px solid ${designTokens.colors.cardBorder}`,
+    color: designTokens.colors.textSecondary,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s',
+    flexShrink: 0,
+  };
+
+  const navStyle = {
+    flex: 1,
+    padding: '16px 12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+  };
+
+  const getMenuItemStyle = (isActive) => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: isExpanded ? '12px 16px' : '12px',
+    borderRadius: '8px',
+    textDecoration: 'none',
+    color: isActive ? designTokens.colors.textPrimary : designTokens.colors.textSecondary,
+    backgroundColor: isActive ? `${designTokens.colors.accentGreen}15` : 'transparent',
+    border: isActive ? `1px solid ${designTokens.colors.accentGreen}40` : '1px solid transparent',
+    transition: 'all 0.2s',
+    cursor: 'pointer',
+    position: 'relative',
+    justifyContent: isExpanded ? 'flex-start' : 'center',
+  });
+
+  const iconStyle = {
+    width: '20px',
+    height: '20px',
+    flexShrink: 0,
+  };
+
+  const labelStyle = {
+    fontSize: '14px',
+    fontWeight: '500',
+    whiteSpace: 'nowrap',
+    opacity: isExpanded ? 1 : 0,
+    transition: 'opacity 0.2s',
+  };
+
+  const activeIndicatorStyle = {
+    position: 'absolute',
+    left: 0,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: '3px',
+    height: '20px',
+    backgroundColor: designTokens.colors.accentGreen,
+    borderRadius: '0 2px 2px 0',
+  };
 
   return (
-    <aside className="bg-white shadow-sm w-64 hidden md:block">
-      <div className="p-6">
-        <nav className="mt-4">
-          <ul className="space-y-1">
-            {menuItems.map((item) => (
-              <li key={item.id}>
-                <a
-                  href="#"
-                  className={`flex items-center px-4 py-3 text-sm rounded-md ${
-                    activeItem === item.id
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                  onClick={() => setActiveItem(item.id)}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-3"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d={item.icon}
-                    />
-                  </svg>
-                  {item.name}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
+    <div style={sidebarStyle}>
+      <div style={headerStyle}>
+        <div style={brandStyle}>
+          <img src={logoImage} alt="QuantumFlux Logo" style={logoImgStyle} />
+          <span style={brandTextStyle}>QuantumFlux</span>
+        </div>
+        <button
+          style={toggleButtonStyle}
+          onClick={toggleSidebar}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = designTokens.colors.cardBorder;
+            e.currentTarget.style.color = designTokens.colors.textPrimary;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = designTokens.colors.textSecondary;
+          }}
+        >
+          {isExpanded ? <ChevronLeftIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
+        </button>
       </div>
-    </aside>
+
+      <nav style={navStyle}>
+        {menuItems.map((item) => {
+          const isActive = location.pathname === item.path;
+          const Icon = item.icon;
+          
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              style={getMenuItemStyle(isActive)}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = `${designTokens.colors.cardBorder}80`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              {isActive && <div style={activeIndicatorStyle} />}
+              <Icon className="icon" style={iconStyle} />
+              {isExpanded && <span style={labelStyle}>{item.label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
   );
 };
 
