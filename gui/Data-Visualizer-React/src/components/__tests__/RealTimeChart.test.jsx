@@ -509,7 +509,4 @@ describe('RealTimeChart Component', () => {
       expect(true).toBe(true);
     });
   });
-});</parameter>
-<parameter name="line_count">420</parameter>
-</invoke>
-</function_calls>
+});

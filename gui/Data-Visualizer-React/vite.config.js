@@ -36,5 +36,10 @@ export default defineConfig({
   optimizeDeps: {
     // Exclude lightweight-charts to prevent bundling issues with v5.x
     exclude: ['lightweight-charts']
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['src/tests/setupTests.js'],
+    globals: true
   }
 })

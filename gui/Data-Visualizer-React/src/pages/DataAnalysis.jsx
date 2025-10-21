@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import DataSourceSelector from '../components/DataSourceSelector';
 import AssetSelector from '../components/AssetSelector';
 import PlatformModeControls from '../components/PlatformModeControls';
@@ -50,19 +50,23 @@ const DataAnalysis = () => {
   } = stream;
 
   const {
-    detected: wsDetectedAsset,
-    error: wsDetectionError
+    detected: wsDetectedAsset
   } = asset;
 
   const {
     current: wsChartData,
     historical: historicalCandles,
-    lastUpdate: lastMessage,
-    indicators: {
-      data: indicatorData,
-      error: indicatorError
-    }
+    lastUpdate: lastMessage
   } = data;
+
+  // Safe indicator props (flattened with guards)
+  const indData = useMemo(() => data?.indicators?.data ?? null, [data]);
+  const indError = useMemo(() => data?.indicators?.error ?? null, [data]);
+  const isCalc = useMemo(() => data?.indicators?.isCalculating ?? false, [data]);
+
+  if (process.env.NODE_ENV === 'development' && !indData) {
+    console.warn('[DataAnalysis] Indicator data missing');
+  }
 
   // Update chart data when WebSocket data changes
   useEffect(() => {
@@ -86,9 +90,9 @@ const DataAnalysis = () => {
     asset: getCurrentAsset(dataSource, selectedAsset, streamAsset),
     isConnected,
     calculateIndicators,
-    indicatorData: data.indicators.data,
-    indicatorError: data.indicators.error,
-    isCalculatingIndicators: data.indicators.isCalculating
+    indicatorData: indData,
+    indicatorError: indError,
+    isCalculatingIndicators: isCalc
   });
 
 
@@ -268,7 +272,7 @@ const DataAnalysis = () => {
         <ChartContainer
           data={chartData}
           indicators={activeIndicators}
-          backendIndicators={indicatorData}
+          backendIndicators={indData}
           height={600}
           streamActive={streamActive}
           streamAsset={streamAsset}
@@ -295,8 +299,8 @@ const DataAnalysis = () => {
       {/* RIGHT COLUMN - Stats & Readings */}
       <StatsPanel
         chartData={chartData}
-        indicatorData={indicatorData}
-        indicatorError={indicatorError}
+        indicatorData={indData}
+        indicatorError={indError}
         getLatestPrice={getLatestPrice}
         getPriceChange={getPriceChange}
         getVolume={getVolume}

@@ -110,6 +110,16 @@ const StatsPanel = ({
       </div>
 
       {/* Indicator Readings */}
+      {!indicatorData && !indicatorError && (
+        <div style={{
+          padding: spacing.md,
+          color: colors.textSecondary,
+          background: colors.backgroundSecondary,
+          borderRadius: components.card.borderRadius
+        }}>
+          No indicators available
+        </div>
+      )}
       {(indicatorData?.indicators && Object.keys(indicatorData.indicators).length > 0) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
           <h3 style={{

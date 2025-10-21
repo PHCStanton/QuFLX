@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import LightweightChart from './charts/LightweightChart';
 import ErrorBoundary from './ErrorBoundary';
 import { RealTimeDataStream } from '../utils/realTimeData';
+import { useWebSocket } from '../hooks/useWebSocketV2';
 
 /**
  * Real-time trading chart component with live data streaming
@@ -12,7 +13,9 @@ const RealTimeChart = ({
   updateInterval = 1000,
   enabledIndicators = {},
   height = 400,
-  className = ''
+  className = '',
+  source = 'simulated',
+  allowSourceSwitch = true,
 }) => {
   const chartRef = useRef(null);
   const streamRef = useRef(null);
@@ -24,14 +27,27 @@ const RealTimeChart = ({
     updateInterval: updateInterval,
     lastUpdate: null
   });
+  
+  // Allow user to switch between simulated and Socket.IO sources
+  const [sourceMode, setSourceMode] = useState(source);
+
+  // When using live Socket.IO source, compose WebSocket hooks
+  const { connection, stream, data: wsData, actions } = useWebSocket();
+  const wsConnected = !!connection?.isConnected;
+  const wsDataPoints = Array.isArray(wsData?.current) ? wsData.current.length : 0;
+  const wsLastUpdateText = wsData?.lastUpdate ? new Date().toLocaleTimeString() : null;
+  const effectiveSource = (sourceMode === 'socket' && wsConnected) ? 'socket' : 'simulated';
+  const streamingActive = effectiveSource === 'socket' ? !!stream?.isActive : isStreaming;
 
   // Sync ref with state
   useEffect(() => {
     isStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
-  // Initialize real-time data stream
+  // Initialize simulated real-time data stream only when using simulated source
   useEffect(() => {
+    if (effectiveSource !== 'simulated') return;
+
     if (!streamRef.current) {
       streamRef.current = new RealTimeDataStream(initialData, updateInterval);
       
@@ -57,10 +73,15 @@ const RealTimeChart = ({
         }
       };
     }
-  }, [initialData, updateInterval]);
+  }, [initialData, updateInterval, effectiveSource]);
 
   // Start streaming
   const startStreaming = () => {
+    if (effectiveSource === 'socket') {
+      actions?.stream?.start?.();
+      setIsStreaming(true);
+      return;
+    }
     if (streamRef.current && !isStreaming) {
       streamRef.current.startStreaming();
       setIsStreaming(true);
@@ -69,6 +90,11 @@ const RealTimeChart = ({
 
   // Stop streaming
   const stopStreaming = () => {
+    if (effectiveSource === 'socket') {
+      actions?.stream?.stop?.();
+      setIsStreaming(false);
+      return;
+    }
     if (streamRef.current && isStreaming) {
       streamRef.current.stopStreaming();
       setIsStreaming(false);
@@ -100,10 +126,10 @@ const RealTimeChart = ({
           <h3 className="text-lg font-semibold text-white">Real-Time Data Stream</h3>
           <div className="flex items-center gap-2">
             <div className={`w-3 h-3 rounded-full ${
-              isStreaming ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
+              streamingActive ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
             }`} />
             <span className="text-sm text-slate-300">
-              {isStreaming ? 'Live' : 'Stopped'}
+              {streamingActive ? 'Live' : 'Stopped'}
             </span>
           </div>
         </div>
@@ -111,16 +137,16 @@ const RealTimeChart = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div className="bg-slate-700/50 rounded-lg p-3">
             <div className="text-xs text-slate-400 mb-1">Data Points</div>
-            <div className="text-lg font-semibold text-white">{streamStats.dataPoints}</div>
+            <div className="text-lg font-semibold text-white">{effectiveSource === 'socket' ? wsDataPoints : streamStats.dataPoints}</div>
           </div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <div className="text-xs text-slate-400 mb-1">Update Interval</div>
-            <div className="text-lg font-semibold text-white">{streamStats.updateInterval}ms</div>
+            <div className="text-lg font-semibold text-white">{effectiveSource === 'socket' ? 'N/A' : `${streamStats.updateInterval}ms`}</div>
           </div>
           <div className="bg-slate-700/50 rounded-lg p-3">
             <div className="text-xs text-slate-400 mb-1">Last Update</div>
             <div className="text-lg font-semibold text-white">
-              {streamStats.lastUpdate || 'Never'}
+              {effectiveSource === 'socket' ? (wsLastUpdateText || 'Waiting...') : (streamStats.lastUpdate || 'Never')}
             </div>
           </div>
         </div>
@@ -143,19 +169,43 @@ const RealTimeChart = ({
             </button>
           </div>
           
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-slate-300">Interval:</label>
-            <select
-              value={streamStats.updateInterval}
-              onChange={(e) => handleIntervalChange(Number(e.target.value))}
-              className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-white"
-            >
-              <option value={500}>500ms</option>
-              <option value={1000}>1s</option>
-              <option value={2000}>2s</option>
-              <option value={5000}>5s</option>
-            </select>
-          </div>
+          {effectiveSource === 'simulated' ? (
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-300">Interval:</label>
+              <select
+                value={streamStats.updateInterval}
+                onChange={(e) => handleIntervalChange(Number(e.target.value))}
+                className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-white"
+              >
+                <option value={500}>500ms</option>
+                <option value={1000}>1s</option>
+                <option value={2000}>2s</option>
+                <option value={5000}>5s</option>
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-300">Source: Socket.IO</span>
+              {stream?.currentAsset && (
+                <span className="text-xs text-slate-400">Asset: {stream.currentAsset}</span>
+              )}
+            </div>
+          )}
+
+          {allowSourceSwitch && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-300" htmlFor="sourceMode">Source:</label>
+              <select
+                id="sourceMode"
+                value={sourceMode}
+                onChange={(e) => setSourceMode(e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-white"
+              >
+                <option value="simulated">Simulated</option>
+                <option value="socket">Socket.IO</option>
+              </select>
+            </div>
+          )}
         </div>
       </div>
       
@@ -164,7 +214,7 @@ const RealTimeChart = ({
         <ErrorBoundary>
           <LightweightChart
             ref={chartRef}
-            data={data}
+            data={effectiveSource === 'socket' ? (wsData?.current || []) : data}
             enabledIndicators={enabledIndicators}
             height={height}
             enableRealTime={true}
