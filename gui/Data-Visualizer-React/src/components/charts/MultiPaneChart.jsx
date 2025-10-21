@@ -55,11 +55,17 @@ const MultiPaneChart = forwardRef(({
   const overlaySeriesRef = useRef({});
   const rsiSeriesRef = useRef(null);
   const macdSeriesRef = useRef({});
+  // Generic oscillator pane refs
+  const oscillatorContainersRef = useRef({});
+  const oscillatorChartsRef = useRef({});
+  const oscillatorSeriesRef = useRef({});
+  const oscillatorTimeSyncCallbacksRef = useRef({});
   
   // Track previous data length for performance optimization
   const prevDataLengthRef = useRef(0);
 
-  const hasRSI = React.useMemo(() => {
+  // Memoize expensive computations (moved before usage to fix hoisting bug)
+  const memoizedHasRSI = React.useMemo(() => {
     if (!backendIndicators?.series) return false;
     // Check for any RSI instance (e.g., 'RSI-14')
     return Object.entries(backendIndicators.series).some(([instanceName, data]) => {
@@ -67,7 +73,8 @@ const MultiPaneChart = forwardRef(({
       return type.toLowerCase() === 'rsi' && Array.isArray(data) && data.length > 0;
     });
   }, [backendIndicators]);
-  const hasMACD = React.useMemo(() => {
+
+  const memoizedHasMACD = React.useMemo(() => {
     if (!backendIndicators?.series) return false;
     // Check for any MACD instance
     return Object.entries(backendIndicators.series).some(([instanceName, data]) => {
@@ -77,8 +84,28 @@ const MultiPaneChart = forwardRef(({
   }, [backendIndicators]);
 
   // Calculate heights based on which oscillators are active
-  const mainHeight = height * (hasRSI && hasMACD ? 0.6 : hasRSI || hasMACD ? 0.7 : 1.0);
-  const oscillatorHeight = height * (hasRSI && hasMACD ? 0.2 : 0.3);
+  // Detect additional oscillator instances beyond RSI/MACD
+  const memoizedOscillators = React.useMemo(() => {
+    if (!backendIndicators?.series) return [];
+    return Object.entries(backendIndicators.series).reduce((acc, [instanceName, data]) => {
+      const type = backendIndicators.indicators?.[instanceName]?.type || instanceName;
+      const lowerType = String(type).toLowerCase();
+      if (lowerType === 'rsi' || lowerType === 'macd') return acc;
+      if (!isOscillatorIndicator(lowerType)) return acc;
+      const hasData = (Array.isArray(data) && data.length > 0) ||
+        (data && typeof data === 'object' && Object.values(data).some(arr => Array.isArray(arr) && arr.length > 0));
+      if (hasData) acc.push({ instanceName, type: lowerType });
+      return acc;
+    }, []);
+  }, [backendIndicators]);
+
+  const totalOscillatorCount = (memoizedHasRSI ? 1 : 0) + (memoizedHasMACD ? 1 : 0) + memoizedOscillators.length;
+
+  const minMainHeight = Math.max(160, Math.floor(height * 0.35));
+  const oscillatorHeight = totalOscillatorCount > 0
+    ? Math.max(120, Math.floor((height - minMainHeight) / totalOscillatorCount))
+    : 0;
+  const mainHeight = Math.max(minMainHeight, height - totalOscillatorCount * oscillatorHeight);
 
   const chartConfig = React.useMemo(() => createChartConfig(theme), [theme]);
 
@@ -155,7 +182,7 @@ const MultiPaneChart = forwardRef(({
 
   // Initialize RSI chart
   useEffect(() => {
-    if (!rsiContainerRef.current || !hasRSI) return;
+    if (!rsiContainerRef.current || !memoizedHasRSI) return;
 
     let timeRangeCallback = null;
 
@@ -221,11 +248,11 @@ const MultiPaneChart = forwardRef(({
 
     initializeRSI();
     return cleanup;
-  }, [hasRSI, oscillatorHeight, chartConfig]);
+  }, [memoizedHasRSI, oscillatorHeight, chartConfig]);
 
   // Initialize MACD chart
   useEffect(() => {
-    if (!macdContainerRef.current || !hasMACD) return;
+    if (!macdContainerRef.current || !memoizedHasMACD) return;
 
     let timeRangeCallback = null;
 
@@ -289,7 +316,7 @@ const MultiPaneChart = forwardRef(({
 
     initializeMACD();
     return cleanup;
-  }, [hasMACD, oscillatorHeight, chartConfig]);
+  }, [memoizedHasMACD, oscillatorHeight, chartConfig]);
 
   // Update main chart data - OPTIMIZED: Use setData() for initial load, update() for incremental changes
   useEffect(() => {
@@ -297,7 +324,7 @@ const MultiPaneChart = forwardRef(({
       log.debug('[MultiPaneChart] Skipping data update: series not ready');
       return;
     }
-    
+
     try {
       if (processedData.length === 0) {
         mainSeriesRef.current.setData([]);
@@ -306,7 +333,7 @@ const MultiPaneChart = forwardRef(({
       }
 
       const prevLength = prevDataLengthRef.current;
-      
+
       // Initial load or complete data replacement (e.g., switching assets)
       if (prevLength === 0 || processedData.length < prevLength) {
         mainSeriesRef.current.setData(processedData);
@@ -335,10 +362,11 @@ const MultiPaneChart = forwardRef(({
         mainSeriesRef.current.update(lastCandle);
         log.debug(`[MultiPaneChart] Updated last candle via update()`);
       }
-      
+
       prevDataLengthRef.current = processedData.length;
     } catch (error) {
       log.error('[MultiPaneChart] Failed to update main chart data:', error);
+      throw error; // Let ErrorBoundary handle it
     }
   }, [processedData]);
 
@@ -361,23 +389,23 @@ const MultiPaneChart = forwardRef(({
       // Extract indicator type from metadata (backend now sends instance names as keys)
       const indicatorType = backendIndicators.indicators?.[instanceName]?.type || instanceName;
       const definition = getIndicatorDefinition(indicatorType);
-      
+
       // Skip if not overlay type or no definition
       if (!definition || !isOverlayIndicator(indicatorType)) return;
-      
+
       const params = backendIndicators.indicators?.[instanceName] || {};
-      
+
       // Handle band-type indicators (Bollinger Bands)
       if (definition.renderType === 'band' && typeof data === 'object' && !Array.isArray(data)) {
         const { upper, middle, lower } = data;
-        
+
         // Use band-specific colors if explicitly defined, otherwise use distinct defaults
         const bandColors = definition.bandColors || {
           upper: '#ef5350',   // Red for upper band
           middle: '#ffc107',  // Yellow for middle band
           lower: '#4caf50',   // Green for lower band
         };
-        
+
         if (upper?.length > 0) {
           overlaySeriesRef.current[`${instanceName}_upper`] = mainChartRef.current.addLineSeries({
             color: bandColors.upper,
@@ -424,7 +452,129 @@ const MultiPaneChart = forwardRef(({
     log.debug('[MultiPaneChart] Dynamic overlay indicators rendered on main chart');
   }, [backendIndicators]);
 
-  // hasRSI derived from backendIndicators via useMemo above
+  // Initialize and render generic oscillator charts
+  useEffect(() => {
+    if (!memoizedOscillators || memoizedOscillators.length === 0) {
+      // cleanup any existing charts if oscillators were removed
+      Object.keys(oscillatorChartsRef.current).forEach((name) => {
+        try {
+          const chart = oscillatorChartsRef.current[name];
+          const cb = oscillatorTimeSyncCallbacksRef.current[name];
+          if (cb && mainChartRef.current) {
+            try { mainChartRef.current.timeScale().unsubscribeVisibleTimeRangeChange(cb); } catch {}
+          }
+          if (chart) chart.remove();
+        } catch {}
+        delete oscillatorChartsRef.current[name];
+        delete oscillatorSeriesRef.current[name];
+        delete oscillatorTimeSyncCallbacksRef.current[name];
+      });
+      return;
+    }
+
+    memoizedOscillators.forEach(({ instanceName, type }) => {
+      const container = oscillatorContainersRef.current[instanceName];
+      if (!container || oscillatorChartsRef.current[instanceName]) return;
+
+      try {
+        const width = container.clientWidth || (mainContainerRef.current?.clientWidth ?? 0);
+        const chartHeight = oscillatorHeight;
+        if (width <= 0 || chartHeight <= 0) return;
+
+        const chart = createChart(container, {
+          width,
+          height: chartHeight,
+          layout: chartConfig.layout,
+          rightPriceScale: chartConfig.rightPriceScale,
+          grid: chartConfig.grid,
+          timeScale: chartConfig.timeScale,
+        });
+        oscillatorChartsRef.current[instanceName] = chart;
+
+        const definition = getIndicatorDefinition(type);
+        const color = definition?.color || '#22d3ee';
+        const data = backendIndicators?.series?.[instanceName];
+
+        const addLine = (title, seriesColor) => chart.addLineSeries({
+          color: seriesColor || color,
+          lineWidth: 2,
+          title,
+          priceLineVisible: false,
+        });
+
+        if (Array.isArray(data)) {
+          const line = addLine(instanceName, color);
+          oscillatorSeriesRef.current[instanceName] = { primary: line };
+          line.setData(data);
+        } else if (data && typeof data === 'object') {
+          if (data.k && data.d) {
+            const kSeries = addLine(`${instanceName} %K`, color);
+            const dSeries = addLine(`${instanceName} %D`, '#f59e0b');
+            oscillatorSeriesRef.current[instanceName] = { k: kSeries, d: dSeries };
+            kSeries.setData(data.k);
+            dSeries.setData(data.d);
+          } else {
+            oscillatorSeriesRef.current[instanceName] = {};
+            Object.entries(data).forEach(([key, arr], idx) => {
+              const seriesColor = idx === 0 ? color : ['#f59e0b', '#4ade80', '#a78bfa', '#f97316'][idx % 4];
+              const s = addLine(`${instanceName} ${key}`, seriesColor);
+              oscillatorSeriesRef.current[instanceName][key] = s;
+              if (Array.isArray(arr)) s.setData(arr);
+            });
+          }
+        }
+
+        // Sync with main chart time scale
+        if (mainChartRef.current) {
+          const cb = (range) => {
+            try { chart.timeScale().setVisibleRange({ from: range.from, to: range.to }); } catch {}
+          };
+          mainChartRef.current.timeScale().subscribeVisibleTimeRangeChange(cb);
+          oscillatorTimeSyncCallbacksRef.current[instanceName] = cb;
+        }
+      } catch (e) {
+        log.error(`[MultiPaneChart] Failed to init oscillator pane ${instanceName}`, e);
+      }
+    });
+
+    // Cleanup charts for removed oscillators
+    Object.keys(oscillatorChartsRef.current).forEach((name) => {
+      if (!memoizedOscillators.find(o => o.instanceName === name)) {
+        try {
+          const chart = oscillatorChartsRef.current[name];
+          const cb = oscillatorTimeSyncCallbacksRef.current[name];
+          if (cb && mainChartRef.current) {
+            try { mainChartRef.current.timeScale().unsubscribeVisibleTimeRangeChange(cb); } catch {}
+          }
+          if (chart) chart.remove();
+        } catch {}
+        delete oscillatorChartsRef.current[name];
+        delete oscillatorSeriesRef.current[name];
+        delete oscillatorTimeSyncCallbacksRef.current[name];
+        delete oscillatorContainersRef.current[name];
+      }
+    });
+  }, [memoizedOscillators, chartConfig, oscillatorHeight, backendIndicators]);
+
+  // Update generic oscillator data on backend updates
+  useEffect(() => {
+    if (!backendIndicators?.series) return;
+    memoizedOscillators.forEach(({ instanceName }) => {
+      const series = oscillatorSeriesRef.current[instanceName];
+      const data = backendIndicators.series[instanceName];
+      if (!series || !data) return;
+
+      if (Array.isArray(data) && series.primary) {
+        series.primary.setData(data);
+      } else if (data && typeof data === 'object') {
+        Object.entries(data).forEach(([key, arr]) => {
+          if (series[key] && Array.isArray(arr)) {
+            series[key].setData(arr);
+          }
+        });
+      }
+    });
+  }, [backendIndicators, memoizedOscillators]);
 
   // Render oscillator data (RSI and MACD) when ready
   useEffect(() => {
@@ -434,8 +584,8 @@ const MultiPaneChart = forwardRef(({
       return type.toLowerCase() === 'rsi';
     });
     const rsiData = rsiInstance?.[1];
-    
-    if (hasRSI && rsiData && rsiData.length > 0 && rsiSeriesRef.current) {
+
+    if (memoizedHasRSI && rsiData && rsiData.length > 0 && rsiSeriesRef.current) {
       rsiSeriesRef.current.setData(rsiData);
       log.debug(`[MultiPaneChart] RSI rendered in separate pane: ${rsiData.length} points`);
     }
@@ -446,8 +596,8 @@ const MultiPaneChart = forwardRef(({
       return type.toLowerCase() === 'macd';
     });
     const macdData = macdInstance?.[1];
-    
-    if (hasMACD && macdData?.macd && macdSeriesRef.current.macd) {
+
+    if (memoizedHasMACD && macdData?.macd && macdSeriesRef.current.macd) {
       macdSeriesRef.current.macd.setData(macdData.macd);
       if (macdData.signal) {
         macdSeriesRef.current.signal.setData(macdData.signal);
@@ -462,7 +612,7 @@ const MultiPaneChart = forwardRef(({
       }
       log.debug('[MultiPaneChart] MACD rendered in separate pane');
     }
-  }, [backendIndicators, hasRSI, hasMACD]);
+  }, [backendIndicators, memoizedHasRSI, memoizedHasMACD]);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -506,20 +656,31 @@ const MultiPaneChart = forwardRef(({
   return (
     <div className={`multi-pane-chart ${className}`} style={{ height }}>
       <div ref={mainContainerRef} style={{ height: mainHeight, width: '100%' }} />
-      
-      {hasRSI && (
+
+      {memoizedHasRSI && (
         <div className="rsi-pane" style={{ marginTop: '4px' }}>
           <div className="text-xs text-slate-400 px-2 py-1">RSI</div>
           <div ref={rsiContainerRef} style={{ height: oscillatorHeight - 24, width: '100%' }} />
         </div>
       )}
-      
-      {hasMACD && (
+
+      {memoizedHasMACD && (
         <div className="macd-pane" style={{ marginTop: '4px' }}>
           <div className="text-xs text-slate-400 px-2 py-1">MACD</div>
           <div ref={macdContainerRef} style={{ height: oscillatorHeight - 24, width: '100%' }} />
         </div>
       )}
+
+      {memoizedOscillators.map(({ instanceName, type }) => {
+        const def = getIndicatorDefinition(type);
+        const label = def?.name || instanceName;
+        return (
+          <div className="oscillator-pane" key={`osc-${instanceName}`} style={{ marginTop: '4px' }}>
+            <div className="text-xs text-slate-400 px-2 py-1">{label}</div>
+            <div ref={(el) => { oscillatorContainersRef.current[instanceName] = el; }} style={{ height: Math.max(20, oscillatorHeight - 24), width: '100%' }} />
+          </div>
+        );
+      })}
     </div>
   );
 });

@@ -3,9 +3,17 @@ import { colors, typography, spacing, borderRadius } from '../styles/designToken
 import { useResponsiveGrid } from '../hooks/useResponsiveGrid';
 import PositionList from '../components/PositionList';
 import SignalList from '../components/SignalList';
+import { useWebSocket } from '../hooks/useWebSocketV2';
+import ErrorBoundary from '../components/ErrorBoundary';
+import MultiPaneChart from '../components/charts/MultiPaneChart';
+import { Link } from 'react-router-dom';
 
 const LiveTrading = () => {
   const gridColumns = useResponsiveGrid();
+  // Invoke WebSocket hook to access connection, stream, and live data
+  const { connection, stream, data } = useWebSocket();
+  const streamActive = stream?.isActive;
+  const streamAsset = stream?.currentAsset;
 
   const cardStyle = {
     background: colors.cardBg,
@@ -126,7 +134,7 @@ const LiveTrading = () => {
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              background: colors.accentGreen
+              background: streamActive ? colors.accentGreen : colors.textSecondary
             }}></div>
             <h2 style={{
               margin: 0,
@@ -134,7 +142,7 @@ const LiveTrading = () => {
               fontWeight: typography.fontWeight.bold,
               color: colors.textPrimary
             }}>
-              CAMER
+              {streamAsset || 'Live'}
             </h2>
           </div>
           <div style={{ display: 'flex', gap: spacing.sm }}>
@@ -151,6 +159,29 @@ const LiveTrading = () => {
           </div>
         </div>
 
+        {/* Inserted info banner to enforce separation of concerns */}
+        <div style={{
+          background: colors.bgSecondary,
+          border: `1px dashed ${colors.cardBorder}`,
+          borderRadius: borderRadius.md,
+          padding: spacing.sm,
+          marginBottom: spacing.md,
+          color: colors.textSecondary
+        }}>
+          Live controls (Detect Asset, Start Stream, Add Indicators) are managed in the Data Analysis tab.
+          <span style={{ marginLeft: spacing.sm }}>
+            <Link to="/" style={{
+              padding: `${spacing.xs} ${spacing.sm}`,
+              background: colors.accentGreen,
+              borderRadius: borderRadius.md,
+              color: '#000',
+              textDecoration: 'none',
+              fontWeight: typography.fontWeight.semibold
+            }}>
+              Open Data Analysis →
+            </Link>
+          </span>
+        </div>
         {/* Chart area */}
         <div style={{
           flex: 1,
@@ -160,9 +191,22 @@ const LiveTrading = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: colors.textSecondary
+          color: colors.textSecondary,
+          padding: spacing.sm
         }}>
-          Live Chart Placeholder (integrate MultiPaneChart here)
+          {data?.current?.length > 0 ? (
+            <ErrorBoundary>
+              <MultiPaneChart
+                data={data.current}
+                backendIndicators={data.indicators?.data}
+                height={centerChartMinHeight}
+              />
+            </ErrorBoundary>
+          ) : (
+            <div style={{ textAlign: 'center' }}>
+              Live chart will appear when stream starts
+            </div>
+          )}
         </div>
 
         {/* Recent Trades */}
@@ -223,7 +267,7 @@ const LiveTrading = () => {
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'auto 1fr auto',
+            gridTemplateColumns: 'auto 1fr auto auto auto',
             gap: spacing.md,
             padding: spacing.sm,
             background: colors.bgSecondary,
@@ -232,184 +276,154 @@ const LiveTrading = () => {
             color: colors.textSecondary,
             marginTop: spacing.sm
           }}>
-            {['02:002710938', '02:002710928'].map((id, idx) => (
-              <React.Fragment key={idx}>
-                <div>{id}</div>
-                <div style={{
-                  display: 'flex',
-                  gap: spacing.sm
-                }}>
-                  <div style={{
-                    padding: `${spacing.xs} ${spacing.sm}`,
-                    background: colors.accentGreen,
-                    borderRadius: borderRadius.md,
-                    color: '#000',
-                    fontWeight: typography.fontWeight.semibold
-                  }}>
-                    BUY
-                  </div>
-                  <div style={{
-                    padding: `${spacing.xs} ${spacing.sm}`,
-                    background: colors.accentRed,
-                    borderRadius: borderRadius.md,
-                    color: '#000',
-                    fontWeight: typography.fontWeight.semibold
-                  }}>
-                    SELL
-                  </div>
-                </div>
-                <div>#ef4444</div>
-              </React.Fragment>
-            ))}
+            <div>01e293b</div>
+            <div></div>
+            <div style={{
+              padding: `${spacing.xs} ${spacing.sm}`,
+              background: colors.accentGreen,
+              borderRadius: borderRadius.md,
+              color: '#000',
+              fontWeight: typography.fontWeight.semibold
+            }}>
+              BUY
+            </div>
+            <div style={{
+              padding: `${spacing.xs} ${spacing.sm}`,
+              background: colors.accentRed,
+              borderRadius: borderRadius.md,
+              color: '#000',
+              fontWeight: typography.fontWeight.semibold
+            }}>
+              SUL
+            </div>
+            <div>Actfns</div>
           </div>
         </div>
       </div>
 
       {/* RIGHT COLUMN - Live Signal Panel */}
-      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column' }}>
-        <h3 style={{
-          margin: 0,
-          marginBottom: spacing.lg,
-          fontSize: typography.fontSize.xl,
-          fontWeight: typography.fontWeight.semibold,
-          color: colors.textPrimary
-        }}>
-          Live Signal Panel
-        </h3>
-
-        {/* Confidence */}
+      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: spacing.lg }}>
         <div style={{
-          textAlign: 'center',
-          padding: spacing.xl,
-          background: colors.bgSecondary,
-          borderRadius: borderRadius.xl,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           marginBottom: spacing.lg
         }}>
-          <div style={{
-            fontSize: typography.fontSize.sm,
-            color: colors.textSecondary,
-            marginBottom: spacing.sm
+          <h3 style={{
+            margin: 0,
+            fontSize: typography.fontSize.lg,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.textPrimary
           }}>
-            Confidence
+            Live Signal Panel
+          </h3>
+          <div style={{ display: 'flex', gap: spacing.sm }}>
+            <div style={{ fontSize: typography.fontSize.sm, color: colors.textSecondary }}>⚙️</div>
+            <div style={{ fontSize: typography.fontSize.sm, color: colors.textSecondary }}>♻️</div>
           </div>
-          <div style={{
-            fontSize: '4rem',
-            fontWeight: typography.fontWeight.bold,
-            color: colors.textPrimary,
-            marginBottom: spacing.md
-          }}>
-            87%
-          </div>
-          <div style={{
-            fontSize: typography.fontSize['2xl'],
-            fontWeight: typography.fontWeight.bold,
-            color: colors.textPrimary,
-            marginBottom: spacing.lg
-          }}>
-            CALL
-          </div>
+        </div>
 
-          {/* Indicator readings */}
+        {/* Confidence score */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr auto',
+          gap: spacing.md,
+          alignItems: 'center'
+        }}>
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: spacing.md
-          }}>
-            <div style={{
-              fontSize: typography.fontSize.sm,
-              color: colors.textSecondary
-            }}>
-              RSI: 68
-            </div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: spacing.xs
-            }}>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: colors.accentRed
-              }}></div>
-              <span style={{
-                fontSize: typography.fontSize.sm,
-                color: colors.textSecondary
-              }}>
-                179%
-              </span>
-            </div>
-          </div>
-
+            width: '8px',
+            height: '100%',
+            background: colors.accentGreen,
+            borderRadius: borderRadius.md
+          }}></div>
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: spacing.lg
+            fontSize: typography.fontSize.xs,
+            color: colors.textSecondary
           }}>
-            <div style={{
-              fontSize: typography.fontSize.sm,
-              color: colors.textSecondary
-            }}>
-              MACD: Bullish
-            </div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: spacing.xs
-            }}>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: colors.accentGreen
-              }}></div>
-              <span style={{
-                fontSize: typography.fontSize.sm,
-                color: colors.textSecondary
-              }}>
-                179%
-              </span>
-            </div>
+            Confidence: 45% +10%
           </div>
-
-          {/* Waveform visualization */}
-          <div style={{
-            height: '60px',
-            background: colors.bgPrimary,
-            borderRadius: borderRadius.lg,
-            marginBottom: spacing.lg,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <svg width="280" height="40" style={{ overflow: 'visible' }}>
-              <path
-                d="M 0,20 Q 35,10 70,20 T 140,20 T 210,20 T 280,20"
-                stroke={colors.accentGreen}
-                strokeWidth="2"
-                fill="none"
-              />
-            </svg>
-          </div>
-
-          {/* Execute button */}
           <button style={{
-            width: '100%',
-            padding: spacing.lg,
+            padding: `${spacing.xs} ${spacing.md}`,
             background: colors.accentGreen,
             border: 'none',
-            borderRadius: borderRadius.lg,
-            fontSize: typography.fontSize.base,
-            fontWeight: typography.fontWeight.bold,
+            borderRadius: borderRadius.md,
             color: '#000',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => e.target.style.background = colors.brandHover}
-          onMouseLeave={(e) => e.target.style.background = colors.accentGreen}
-          >
+            fontWeight: typography.fontWeight.semibold,
+            cursor: 'pointer'
+          }}>
             EXECUTE TRADE
           </button>
+        </div>
+
+        {/* Indicator readings */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: spacing.md
+        }}>
+          <div style={{
+            background: colors.bgSecondary,
+            borderRadius: borderRadius.lg,
+            padding: spacing.md
+          }}>
+            <h4 style={{
+              margin: 0,
+              marginBottom: spacing.sm,
+              fontSize: typography.fontSize.md,
+              fontWeight: typography.fontWeight.semibold,
+              color: colors.textPrimary
+            }}>RSI</h4>
+            <div style={{
+              height: '80px',
+              background: colors.bgPrimary,
+              borderRadius: borderRadius.md,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: colors.textSecondary,
+              fontSize: typography.fontSize.xs
+            }}>
+              RSI Chart
+            </div>
+          </div>
+
+          <div style={{
+            background: colors.bgSecondary,
+            borderRadius: borderRadius.lg,
+            padding: spacing.md
+          }}>
+            <h4 style={{
+              margin: 0,
+              marginBottom: spacing.sm,
+              fontSize: typography.fontSize.md,
+              fontWeight: typography.fontWeight.semibold,
+              color: colors.textPrimary
+            }}>MACD</h4>
+            <div style={{
+              height: '80px',
+              background: colors.bgPrimary,
+              borderRadius: borderRadius.md,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: colors.textSecondary,
+              fontSize: typography.fontSize.xs
+            }}>
+              MACD Chart
+            </div>
+          </div>
+        </div>
+
+        {/* Info */}
+        <div style={{
+          background: colors.bgSecondary,
+          borderRadius: borderRadius.lg,
+          padding: spacing.md,
+          fontSize: typography.fontSize.xs,
+          color: colors.textSecondary
+        }}>
+          <div>Executed: 0 | Fail: 25 | Interest: 9.50%</div>
+          <div>RSI: 82.52 | MACD: 0.014</div>
         </div>
       </div>
     </div>

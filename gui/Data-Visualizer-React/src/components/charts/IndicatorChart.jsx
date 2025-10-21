@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { createChart } from 'lightweight-charts';
+import ErrorBoundary from '../ErrorBoundary';
+import { colors } from '../../styles/designTokens';
 import { RSI, MACD } from 'technicalindicators';
 
 /**
@@ -22,28 +24,28 @@ const IndicatorChart = ({
     height,
     layout: {
       background: {
-        color: theme === 'dark' ? '#1e293b' : '#ffffff'
+        color: colors.cardBg
       },
-      textColor: theme === 'dark' ? '#94a3b8' : '#333333',
+      textColor: colors.textPrimary,
     },
     grid: {
-      vertLines: { 
-        color: theme === 'dark' ? '#334155' : '#e5e7eb' 
+      vertLines: {
+        color: colors.borderPrimary
       },
-      horzLines: { 
-        color: theme === 'dark' ? '#334155' : '#e5e7eb' 
+      horzLines: {
+        color: colors.borderPrimary
       },
     },
     crosshair: {
       mode: 1,
     },
     timeScale: {
-      borderColor: theme === 'dark' ? '#475569' : '#d1d5db',
+      borderColor: colors.borderPrimary,
       timeVisible: true,
       secondsVisible: false,
     },
     rightPriceScale: {
-      borderColor: theme === 'dark' ? '#475569' : '#d1d5db',
+      borderColor: colors.borderPrimary,
     },
     handleScroll: {
       mouseWheel: true,
@@ -54,7 +56,7 @@ const IndicatorChart = ({
       mouseWheel: true,
       pinch: true,
     },
-  }), [height, theme]);
+  }), [height]);
 
   // Memoize processed data
   const processedData = useMemo(() => {
@@ -86,6 +88,7 @@ const IndicatorChart = ({
       console.log('[IndicatorChart] Oscillator chart initialized');
     } catch (error) {
       console.error('[IndicatorChart] Failed to initialize oscillator chart:', error);
+      throw error; // Let ErrorBoundary handle it
     }
 
     return () => {
@@ -112,7 +115,7 @@ const IndicatorChart = ({
             lineWidth: 2,
             title: 'RSI(14)',
           });
-          
+
           // Add reference lines for RSI
           seriesRef.current.rsiOverbought = chartRef.current.addLineSeries({
             color: '#ef4444',
@@ -122,7 +125,7 @@ const IndicatorChart = ({
             priceLineVisible: false,
             lastValueVisible: false,
           });
-          
+
           seriesRef.current.rsiOversold = chartRef.current.addLineSeries({
             color: '#10b981',
             lineWidth: 1,
@@ -132,17 +135,17 @@ const IndicatorChart = ({
             lastValueVisible: false,
           });
         }
-        
+
         const rsiValues = RSI.calculate({ period: 14, values: closes });
         const rsiData = rsiValues.map((value, index) => ({
           time: processedData[index + (closes.length - rsiValues.length)].time,
           value: value
         }));
-        
+
         seriesRef.current.rsi.setData(rsiData);
         seriesRef.current.rsiOverbought.setData([{ time: processedData[0].time, value: 70 }, { time: processedData[processedData.length - 1].time, value: 70 }]);
         seriesRef.current.rsiOversold.setData([{ time: processedData[0].time, value: 30 }, { time: processedData[processedData.length - 1].time, value: 30 }]);
-        
+
       } else if (seriesRef.current.rsi) {
         // Remove RSI series if disabled
         chartRef.current.removeSeries(seriesRef.current.rsi);
@@ -165,7 +168,7 @@ const IndicatorChart = ({
           SimpleMASignal: false
         };
         const macdValues = MACD.calculate(macdInput);
-        
+
         // MACD Line
         if (!seriesRef.current.macd) {
           seriesRef.current.macd = chartRef.current.addLineSeries({
@@ -174,7 +177,7 @@ const IndicatorChart = ({
             title: 'MACD',
           });
         }
-        
+
         // Signal Line
         if (!seriesRef.current.signal) {
           seriesRef.current.signal = chartRef.current.addLineSeries({
@@ -183,7 +186,7 @@ const IndicatorChart = ({
             title: 'Signal',
           });
         }
-        
+
         // Histogram (as area series)
         if (!seriesRef.current.histogram) {
           seriesRef.current.histogram = chartRef.current.addHistogramSeries({
@@ -191,27 +194,27 @@ const IndicatorChart = ({
             title: 'Histogram',
           });
         }
-        
+
         const macdData = macdValues.map((macd, index) => ({
           time: processedData[index + (closes.length - macdValues.length)].time,
           value: macd.MACD
         }));
-        
+
         const signalData = macdValues.map((macd, index) => ({
           time: processedData[index + (closes.length - macdValues.length)].time,
           value: macd.signal
         }));
-        
+
         const histogramData = macdValues.map((macd, index) => ({
           time: processedData[index + (closes.length - macdValues.length)].time,
           value: macd.histogram,
           color: macd.histogram >= 0 ? '#10b981' : '#ef4444'
         }));
-        
+
         seriesRef.current.macd.setData(macdData);
         seriesRef.current.signal.setData(signalData);
         seriesRef.current.histogram.setData(histogramData);
-        
+
       } else if (seriesRef.current.macd) {
         // Remove MACD series if disabled
         chartRef.current.removeSeries(seriesRef.current.macd);
@@ -225,6 +228,7 @@ const IndicatorChart = ({
       console.log('[IndicatorChart] Updated indicators with', processedData.length, 'data points');
     } catch (error) {
       console.error('[IndicatorChart] Failed to update indicators:', error);
+      throw error; // Let ErrorBoundary handle it
     }
   }, [processedData, enabledIndicators]);
 
@@ -244,11 +248,13 @@ const IndicatorChart = ({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={`w-full rounded-lg overflow-hidden ${className}`}
-      style={{ height: `${height}px` }}
-    />
+    <ErrorBoundary>
+      <div
+        ref={containerRef}
+        className={`w-full rounded-lg overflow-hidden ${className}`}
+        style={{ height: `${height}px` }}
+      />
+    </ErrorBoundary>
   );
 };
 

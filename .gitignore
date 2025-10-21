@@ -37,6 +37,7 @@ logs_new/
 # Data, artifacts, large/generated files
 archive/
 Historical_Data/
+!data/
 screenshots/
 test_artifacts/
 live2/

@@ -59,35 +59,13 @@ socketio = SocketIO(
     ping_interval=10
 )
 
-# ================================================================================
-# GLOBAL STREAMING MODE TOGGLE
-# ================================================================================
-# Set to True to use SIMULATED data (for testing indicators without real connection)
-# Set to False to use REAL data (requires Chrome connection to PocketOption)
-# 
-# IMPORTANT: NO automatic fallback - mode must be explicitly selected
-# ================================================================================
-USE_SIMULATED_DATA = False  # Change to True for simulated mode
-# ================================================================================
-
 # Global state for Chrome session and streaming
 chrome_driver = None
 streaming_active = False
 current_asset = "EURUSD_OTC"
 
-# Create data streaming capability instance based on mode
-if USE_SIMULATED_DATA:
-    print("\n" + "="*80)
-    print("⚠️  SIMULATED DATA MODE ENABLED")
-    print("   Using simulated data stream for testing - NO real market connection")
-    print("="*80 + "\n")
-    data_streamer = SimulatedStreamingCapability(period_seconds=60)
-else:
-    print("\n" + "="*80)
-    print("✅ REAL DATA MODE ENABLED")
-    print("   Using real market data - requires Chrome connection to PocketOption")
-    print("="*80 + "\n")
-    data_streamer = RealtimeDataStreaming()
+# data_streamer will be initialized in __main__ based on arguments
+data_streamer = None
 
 capability_ctx = None  # Will be initialized when Chrome connects (real mode only)
 period = 60  # 1 minute candles by default
@@ -107,15 +85,15 @@ chrome_reconnect_enabled = False  # Only reconnect when clients need Chrome (Pla
 # Chrome Connection Functions
 # ========================================
 
-def attach_to_chrome(verbose=True):
+def attach_to_chrome(verbose=True, is_simulated_mode=False):
     """
     Attach to existing Chrome instance started with --remote-debugging-port=9222.
     Returns a selenium webdriver.Chrome instance or None on failure.
     
-    NOTE: Skipped when USE_SIMULATED_DATA=True
+    NOTE: Skipped when is_simulated_mode=True
     """
     # Skip Chrome connection in simulated mode
-    if USE_SIMULATED_DATA:
+    if is_simulated_mode:
         if verbose:
             print("[Chrome] Skipped - using simulated data mode")
         return None
@@ -225,11 +203,9 @@ def reset_backend_state():
     # Clear candle tracking for persistence
     last_closed_candle_index.clear()
     
-    # Reset capability state (both real and simulated modes support this)
-    if USE_SIMULATED_DATA:
-        data_streamer._reset_stream_state(inputs={'period': data_streamer.PERIOD})
-    else:
-        data_streamer._reset_stream_state(inputs={'period': period})
+    # Reset capability state
+    # The data_streamer is guaranteed to be initialized at this point
+    data_streamer._reset_stream_state(inputs={'period': data_streamer.PERIOD})
     
     print("[Reconnection] ✓ Backend state reset complete")
 
@@ -309,49 +285,27 @@ def monitor_chrome_status():
 
 def stream_from_chrome():
     """
-    Background thread to capture WebSocket data from Chrome.
-    In simulated mode, generates synthetic candles instead.
+    Background thread to capture WebSocket data from Chrome or generate simulated data.
     """
-    global chrome_driver, streaming_active, data_streamer, capability_ctx, current_asset
+    global chrome_driver, streaming_active, data_streamer, capability_ctx, current_asset, is_simulated_mode_global
     
-    # Skip Chrome connection check in simulated mode
-    if not USE_SIMULATED_DATA:
+
+    # REAL MODE:
+    if not chrome_driver:
+        print("[Stream] Chrome not connected. Attempting to connect...")
+        chrome_driver = attach_to_chrome(is_simulated_mode=is_simulated_mode_global)
         if not chrome_driver:
-            print("[Stream] Chrome not connected. Attempting to connect...")
-            chrome_driver = attach_to_chrome()
-            if not chrome_driver:
-                print("[Stream] Failed to connect to Chrome. Streaming disabled.")
-                return
+            print("[Stream] Failed to connect to Chrome. Streaming disabled.")
+            return
     
-    # Initialize capability context (real mode only)
-    if not USE_SIMULATED_DATA:
-        capability_ctx = Ctx(driver=chrome_driver, artifacts_root=None, debug=False, dry_run=False, verbose=True)
-        print("[Stream] Starting WebSocket capture from Chrome...")
-    else:
-        print("[Stream] Starting SIMULATED data streaming...")
+    capability_ctx = Ctx(driver=chrome_driver, artifacts_root=None, debug=False, dry_run=False, verbose=True)
+    print("[Stream] Starting WebSocket capture from Chrome...")
     
     processed_messages = set()
     
     while True:
         if streaming_active:
             try:
-                # SIMULATED MODE: Generate synthetic candles
-                if USE_SIMULATED_DATA:
-                    candle = data_streamer.get_current_candle(current_asset)
-                    if candle:
-                        # Emit candle update to frontend
-                        socketio.emit('candle_update', {
-                            'asset': current_asset,
-                            'candle': candle,
-                            'timestamp': datetime.now().isoformat()
-                        })
-                    
-                    # Sleep for period duration (simulating real-time streaming)
-                    candle_period = data_streamer.PERIOD if hasattr(data_streamer, 'PERIOD') else 60
-                    time.sleep(candle_period / 10.0)  # Emit updates 10 times per period for smooth visualization
-                    continue
-                
-                # REAL MODE: Check if Chrome is still connected before accessing logs
                 if not chrome_driver:
                     print("[Stream] Chrome disconnected during streaming - stopping stream")
                     streaming_active = False
@@ -361,7 +315,6 @@ def stream_from_chrome():
                     })
                     continue
                 
-                # Get performance logs (contains WebSocket frames)
                 logs = chrome_driver.get_log('performance')
                 
                 for log_entry in logs:
@@ -371,37 +324,28 @@ def stream_from_chrome():
                     
                     processed_messages.add(msg_id)
                     
-                    # Parse log entry
                     message = json.loads(log_entry['message'])['message']
                     response = message.get('params', {}).get('response', {})
                     
-                    # Look for WebSocket frames (opcode 2 = binary frame)
                     if response.get('opcode', 0) == 2:
                         payload_data = response.get('payloadData')
                         if payload_data:
-                            # Use capability's decode method
                             payload = data_streamer._decode_and_parse_payload(payload_data)
                             
                             if payload:
-                                # Delegate chart settings processing to capability
                                 if 'updateCharts' in str(payload) or 'chartPeriod' in str(payload):
                                     data_streamer._process_chart_settings(payload, capability_ctx)
                                 
-                                # Delegate realtime data processing to capability
                                 data_streamer._process_realtime_update(payload, capability_ctx)
                                 
-                                # CSV Persistence: Save tick and candle data if enabled
-                                # This must happen AFTER _process_realtime_update() processes the data
                                 if persistence_manager and collect_stream_mode != 'none':
                                     current_focused_asset = data_streamer.get_current_asset()
                                     if current_focused_asset:
-                                        # Extract tick data from payload for persistence
                                         try:
                                             tick_asset = None
                                             tick_value = None
                                             tick_timestamp = None
                                             
-                                            # Parse tick data from payload (same logic as _process_realtime_update)
                                             if isinstance(payload, list) and len(payload) > 0:
                                                 if isinstance(payload[0], list) and len(payload[0]) >= 3:
                                                     tick_asset = payload[0][0]
@@ -422,29 +366,24 @@ def stream_from_chrome():
                                                 tick_timestamp = int(time.time())
                                                 tick_asset = current_focused_asset
                                             
-                                            # Persist tick data if enabled and we have valid data
                                             if tick_asset and tick_value is not None and tick_timestamp and collect_stream_mode in ['tick', 'both']:
                                                 timestamp_str = datetime.fromtimestamp(tick_timestamp, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
                                                 persistence_manager.add_tick(tick_asset, timestamp_str, tick_value)
                                             
-                                            # Persist candle data if enabled
                                             if tick_asset and collect_stream_mode in ['candle', 'both']:
                                                 candles = data_streamer.get_all_candles(tick_asset)
-                                                # Save all closed candles (all except the last forming one)
                                                 if candles and len(candles) >= 2:
                                                     closed_upto = len(candles) - 2
                                                     last_written = last_closed_candle_index.get(tick_asset, -1)
                                                     
                                                     if closed_upto > last_written:
-                                                        # Determine timeframe from capability's PERIOD with safe fallback
                                                         try:
-                                                            period = getattr(data_streamer, 'PERIOD', 60)  # Default 60 seconds (1 minute)
-                                                            tfm = max(1, int(period // 60))  # Ensure minimum 1 minute
+                                                            period = getattr(data_streamer, 'PERIOD', 60)
+                                                            tfm = max(1, int(period // 60))
                                                         except (TypeError, ValueError, AttributeError) as e:
                                                             print(f"[Persistence] Invalid PERIOD value, using 1m default: {e}")
                                                             tfm = 1
                                                         
-                                                        # Write newly closed candles
                                                         for i in range(last_written + 1, closed_upto + 1):
                                                             c = candles[i]
                                                             persistence_manager.add_candle(
@@ -461,14 +400,14 @@ def stream_from_chrome():
                                         
                                         except Exception as e:
                                             print(f"[Persistence] Error saving data: {e}")
-                                
-                                # Extract processed candle and emit to frontend
-                                # Use capability API method to get current asset
-                                current_focused_asset = data_streamer.get_current_asset()
-                                if current_focused_asset:
-                                    candle_data = extract_candle_for_emit(current_focused_asset)
-                                    if candle_data:
-                                        socketio.emit('candle_update', candle_data)
+
+                                        # Extract processed candle and emit to frontend
+                                        # Use capability API method to get current asset
+                                        current_focused_asset = data_streamer.get_current_asset()
+                                        if current_focused_asset:
+                                            candle_data = extract_candle_for_emit(current_focused_asset)
+                                            if candle_data:
+                                                socketio.emit('candle_update', candle_data)
                 
                 if len(processed_messages) > 10000:
                     processed_messages.clear()
@@ -477,7 +416,6 @@ def stream_from_chrome():
                 
             except Exception as e:
                 print(f"[Stream] Error: {e}")
-                # Check if error is Chrome-related
                 if "chrome" in str(e).lower() or "driver" in str(e).lower():
                     print("[Stream] Chrome connection error detected - stopping stream")
                     streaming_active = False
@@ -674,28 +612,19 @@ def handle_start_stream(data):
     """Start streaming real-time data (real or simulated based on mode)"""
     global current_asset, streaming_active, data_streamer, chrome_reconnect_enabled
     
-    # Handle based on streaming mode
-    if USE_SIMULATED_DATA:
-        # SIMULATED MODE: No Chrome required
-        print(f"[Socket.IO] Starting SIMULATED stream")
-        if data and 'asset' in data:
-            current_asset = data['asset']
+    # The data_streamer is guaranteed to be initialized at this point
+    if data and 'asset' in data:
+        current_asset = data['asset']
+        if is_simulated_mode_global:
             data_streamer.start_streaming([current_asset])
-    else:
-        # REAL MODE: Enable Chrome reconnection since Platform mode is active
-        chrome_reconnect_enabled = True
-        
-        # Check if Chrome is connected
-        if not chrome_driver:
-            emit('stream_error', {
-                'error': 'Chrome not connected',
-                'timestamp': datetime.now().isoformat()
-            })
-            return
-        
-        if data and 'asset' in data:
-            current_asset = data['asset']
-            # Use capability API methods instead of direct state manipulation
+        else:
+            chrome_reconnect_enabled = True
+            if not chrome_driver:
+                emit('stream_error', {
+                    'error': 'Chrome not connected',
+                    'timestamp': datetime.now().isoformat()
+                })
+                return
             data_streamer.set_asset_focus(current_asset)
             data_streamer.set_timeframe(minutes=1, lock=True)
     
@@ -710,13 +639,14 @@ def handle_start_stream(data):
     # Stage 1: Seed chart with historical data FIRST, then start live stream
     # This provides context for seamless transition from history to real-time
     
-    # SIMULATED MODE: Generate historical candles
-    if USE_SIMULATED_DATA:
+    historical_candles_to_emit = []
+    source_type = 'unknown'
+
+    if is_simulated_mode_global:
         simulated_candles = data_streamer.get_historical_candles(current_asset, count=200)
-        historical_candles_sim = []
         for candle in simulated_candles:
             timestamp, open_price, close_price, high_price, low_price = candle
-            historical_candles_sim.append({
+            historical_candles_to_emit.append({
                 'asset': current_asset,
                 'timestamp': timestamp,
                 'open': open_price,
@@ -726,100 +656,78 @@ def handle_start_stream(data):
                 'volume': 0,
                 'date': datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).isoformat()
             })
-        
-        print(f"[Stream] Generated {len(historical_candles_sim)} SIMULATED historical candles")
-        emit('historical_candles_loaded', {
-            'asset': current_asset,
-            'candles': historical_candles_sim,
-            'count': len(historical_candles_sim),
-            'source': 'simulated',
-            'timestamp': datetime.now().isoformat()
-        })
-        return  # Skip CSV/WebSocket loading in simulated mode
-    
-    # REAL MODE: Try to load historical candles from CSV files first
-    historical_candles_csv = []
-    try:
-        import pandas as pd
-        from pathlib import Path
-        
-        # Search for CSV files matching the asset (1m timeframe)
-        data_collect_dir = Path('data/data_output/assets_data/data_collect/1M_candle_data')
-        if data_collect_dir.exists():
-            # Normalize asset name for file matching (EURUSD_OTC -> EURUSD_otc)
-            asset_normalized = current_asset.replace('_', '').lower()
-            matching_files = []
+        source_type = 'simulated'
+        print(f"[Stream] Generated {len(historical_candles_to_emit)} SIMULATED historical candles")
+    else:
+        # REAL MODE: Try to load historical candles from CSV files first
+        try:
+            import pandas as pd
+            from pathlib import Path
             
-            for csv_file in data_collect_dir.glob('*.csv'):
-                # Check if filename contains the asset name
-                if asset_normalized in csv_file.stem.lower().replace('_', ''):
-                    matching_files.append(csv_file)
-            
-            if matching_files:
-                # Use the most recent file
-                latest_file = max(matching_files, key=lambda f: f.stat().st_mtime)
-                print(f"[Stream] Loading historical CSV data from {latest_file.name}")
+            data_collect_dir = Path('data/data_output/assets_data/data_collect/1M_candle_data')
+            if data_collect_dir.exists():
+                asset_normalized = current_asset.replace('_', '').lower()
+                matching_files = []
                 
-                df = pd.read_csv(latest_file)
-                # Take last 200 candles for context
-                df = df.tail(200)
+                for csv_file in data_collect_dir.glob('*.csv'):
+                    if asset_normalized in csv_file.stem.lower().replace('_', ''):
+                        matching_files.append(csv_file)
                 
-                for _, row in df.iterrows():
-                    # Safely convert row values with defaults
-                    timestamp = int(row['timestamp'])
-                    historical_candles_csv.append({
+                if matching_files:
+                    latest_file = max(matching_files, key=lambda f: f.stat().st_mtime)
+                    print(f"[Stream] Loading historical CSV data from {latest_file.name}")
+                    
+                    df = pd.read_csv(latest_file)
+                    df = df.tail(200)
+                    
+                    for _, row in df.iterrows():
+                        timestamp = int(row['timestamp'])
+                        historical_candles_to_emit.append({
+                            'asset': current_asset,
+                            'timestamp': timestamp,
+                            'open': float(row['open']),
+                            'high': float(row['high']),
+                            'low': float(row['low']),
+                            'close': float(row['close']),
+                            'volume': int(row.get('volume', 0) or 0),
+                            'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+                        })
+                    
+                    source_type = 'csv'
+                    print(f"[Stream] Loaded {len(historical_candles_to_emit)} historical candles from CSV")
+        except Exception as e:
+            print(f"[Stream] Could not load CSV historical data: {e}")
+        
+        if not historical_candles_to_emit:
+            # Fallback: Try WebSocket historical candles (usually empty at stream start)
+            historical_candles_ws = data_streamer.get_all_candles(current_asset)
+            if historical_candles_ws and len(historical_candles_ws) > 0:
+                for candle in historical_candles_ws:
+                    timestamp, open_price, close_price, high_price, low_price = candle
+                    historical_candles_to_emit.append({
                         'asset': current_asset,
                         'timestamp': timestamp,
-                        'open': float(row['open']),
-                        'high': float(row['high']),
-                        'low': float(row['low']),
-                        'close': float(row['close']),
-                        'volume': int(row.get('volume', 0) or 0),  # Safely handle None values
+                        'open': open_price,
+                        'high': high_price,
+                        'low': low_price,
+                        'close': close_price,
+                        'volume': 0,
                         'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
                     })
-                
-                print(f"[Stream] Loaded {len(historical_candles_csv)} historical candles from CSV")
-    except Exception as e:
-        print(f"[Stream] Could not load CSV historical data: {e}")
+                source_type = 'websocket'
+                print(f"[Stream] Emitting {len(historical_candles_to_emit)} WebSocket historical candles")
+            else:
+                print(f"[Stream] No historical data available for {current_asset}")
     
-    # If CSV data available, emit it first
-    if historical_candles_csv:
-        print(f"[Stream] Seeding chart with {len(historical_candles_csv)} historical candles")
+    if historical_candles_to_emit:
+        print(f"[Stream] Seeding chart with {len(historical_candles_to_emit)} historical candles from {source_type}")
         emit('historical_candles_loaded', {
             'asset': current_asset,
-            'candles': historical_candles_csv,
-            'count': len(historical_candles_csv),
-            'source': 'csv',
+            'candles': historical_candles_to_emit,
+            'count': len(historical_candles_to_emit),
+            'source': source_type,
             'timestamp': datetime.now().isoformat()
         })
-    else:
-        # Fallback: Try WebSocket historical candles (usually empty at stream start)
-        historical_candles_ws = data_streamer.get_all_candles(current_asset)
-        if historical_candles_ws and len(historical_candles_ws) > 0:
-            formatted_candles = []
-            for candle in historical_candles_ws:
-                timestamp, open_price, close_price, high_price, low_price = candle
-                formatted_candles.append({
-                    'asset': current_asset,
-                    'timestamp': timestamp,
-                    'open': open_price,
-                    'high': high_price,
-                    'low': low_price,
-                    'close': close_price,
-                    'volume': 0,
-                    'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
-                })
-            
-            print(f"[Stream] Emitting {len(formatted_candles)} WebSocket historical candles")
-            emit('historical_candles_loaded', {
-                'asset': current_asset,
-                'candles': formatted_candles,
-                'count': len(formatted_candles),
-                'source': 'websocket',
-                'timestamp': datetime.now().isoformat()
-            })
-        else:
-            print(f"[Stream] No historical data available for {current_asset}")
 
 @socketio.on('stop_stream')
 def handle_stop_stream():
@@ -830,11 +738,10 @@ def handle_stop_stream():
     print(f"[Stream] Stopped")
     emit('stream_stopped', {'timestamp': datetime.now().isoformat()})
     
-    # Release resources based on mode
-    if USE_SIMULATED_DATA:
+    # Release resources
+    if is_simulated_mode_global:
         data_streamer.stop_streaming(current_asset)
     else:
-        # Release asset focus when stream stops using API method
         data_streamer.release_asset_focus()
         data_streamer.unlock_timeframe()
 
@@ -978,15 +885,16 @@ def handle_calculate_indicators(data):
             })
             return
         
-        # Get candles from data_streamer
-        if asset not in data_streamer.CANDLES or not data_streamer.CANDLES[asset]:
+        # Get candles from data_streamer using the public API
+        candles = data_streamer.get_all_candles(asset)
+
+        if not candles:
             emit('indicators_error', {
                 'error': f'No candle data available for {asset}',
                 'timestamp': datetime.now().isoformat()
             })
             return
         
-        candles = data_streamer.CANDLES[asset]
         
         # Handle empty instances (no indicators selected)
         if not instances:
@@ -1087,13 +995,33 @@ if __name__ == '__main__':
         default=1000,
         help='Number of ticks per CSV file chunk (default: 1000)'
     )
+    parser.add_argument(
+        '--simulated-mode',
+        action='store_true',
+        help='Enable simulated data streaming for testing (no real market connection)'
+    )
     
     args = parser.parse_args()
     collect_stream_mode = args.collect_stream
-    
+    is_simulated_mode_global = args.simulated_mode # Set global flag
+
     print("=" * 60)
     print("QuantumFlux Trading Platform - GUI Backend Server")
     print("=" * 60)
+
+    # Initialize data_streamer based on mode
+    if is_simulated_mode_global:
+        print("\n" + "="*80)
+        print("⚠️  SIMULATED DATA MODE ENABLED")
+        print("   Using simulated data stream for testing - NO real market connection")
+        print("="*80 + "\n")
+        data_streamer = SimulatedStreamingCapability(period_seconds=60)
+    else:
+        print("\n" + "="*80)
+        print("✅ REAL DATA MODE ENABLED")
+        print("   Using real market data - requires Chrome connection to PocketOption")
+        print("="*80 + "\n")
+        data_streamer = RealtimeDataStreaming()
     
     # Initialize persistence manager if collection is enabled
     if collect_stream_mode != 'none':
@@ -1111,28 +1039,21 @@ if __name__ == '__main__':
         print(f"[Persistence]   Tick output: {tick_dir}")
         print(f"[Persistence]   Chunk sizes: candles={args.candle_chunk_size}, ticks={args.tick_chunk_size}")
         
-        # NOTE: CSV persistence is now handled directly in stream_from_chrome() 
-        # This patch is kept as a fallback for any code paths that use _output_streaming_data
-        # (e.g., if data_streamer is used via stream_continuous() instead of stream_from_chrome())
         if collect_stream_mode in ['tick', 'both']:
-            # Save reference to original bound method
             original_output = data_streamer._output_streaming_data
             
             def patched_output(self, asset, current_value, timestamp_str, change_indicator):
-                # Keep original console behavior
                 try:
                     original_output(asset, current_value, timestamp_str, change_indicator)
                 except Exception:
                     pass
                 
-                # Persist tick data (fallback path)
                 try:
                     if persistence_manager:
                         persistence_manager.add_tick(asset, timestamp_str, current_value)
                 except Exception as e:
                     print(f"[Persistence] Error saving tick: {e}")
             
-            # Bind the patched method
             import types
             data_streamer._output_streaming_data = types.MethodType(patched_output, data_streamer)
             print(f"[Persistence] ✓ Tick persistence fallback hook installed")
@@ -1140,26 +1061,22 @@ if __name__ == '__main__':
         print("\n[Persistence] Stream collection disabled (use --collect-stream to enable)")
     
     # Startup mode handling
-    if USE_SIMULATED_DATA:
+    if is_simulated_mode_global:
         print("\n[Startup] 🎲 SIMULATED MODE - skipping Chrome connection")
         print("[Startup] Simulated data will be generated for testing")
-        # Start simulated streaming thread
         stream_thread = threading.Thread(target=stream_from_chrome, daemon=True)
         stream_thread.start()
         print("[Startup] ✓ Simulated streaming thread started")
     else:
-        # Try to connect to Chrome on startup
         print("\n[Startup] Attempting to connect to Chrome...")
-        chrome_driver = attach_to_chrome(verbose=True)
+        chrome_driver = attach_to_chrome(verbose=True, is_simulated_mode=is_simulated_mode_global)
         
-        # Start Chrome status monitor thread (always running in real mode)
         monitor_thread = threading.Thread(target=monitor_chrome_status, daemon=True)
         monitor_thread.start()
         print("[Startup] ✓ Chrome status monitor started")
         
         if chrome_driver:
             print("[Startup] ✓ Chrome connected successfully")
-            # Start background streaming thread
             stream_thread = threading.Thread(target=stream_from_chrome, daemon=True)
             stream_thread.start()
             print("[Startup] ✓ WebSocket streaming thread started")

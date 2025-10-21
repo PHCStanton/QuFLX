@@ -11,8 +11,8 @@ NO automatic fallback - must be intentionally selected.
 
 import random
 import time
-from datetime import datetime
-from typing import List, Dict, Optional
+from datetime import datetime, timezone
+from typing import List, Dict, Optional, Any
 import numpy as np
 
 
@@ -307,3 +307,44 @@ class SimulatedStreamingCapability:
     def unlock_timeframe(self):
         """Unlock the timeframe (compatibility method)."""
         pass  # No-op for simulated mode
+
+    def get_stream_data(self, asset: str, driver: Any, ctx: Any) -> List[Dict[str, Any]]:
+        """
+        Generates and processes simulated real-time data.
+        This method is designed to be called by the streaming_server.py to abstract
+        the data source logic.
+        
+        Args:
+            asset: The currently focused asset.
+            driver: Not used in simulated mode.
+            ctx: Not used in simulated mode.
+            
+        Returns:
+            A list of processed data entries (e.g., candle updates, tick data).
+        """
+        stream_data_entries = []
+        
+        try:
+            candle = self.get_current_candle(asset)
+            if candle:
+                timestamp, open_price, close_price, high_price, low_price = candle
+                stream_data_entries.append({
+                    'type': 'candle_update',
+                    'asset': asset,
+                    'candle': {
+                        'asset': asset,
+                        'timestamp': timestamp,
+                        'open': open_price,
+                        'high': high_price,
+                        'low': low_price,
+                        'close': close_price,
+                        'volume': 0,
+                        'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+                    },
+                    'timestamp': datetime.now().isoformat(),
+                    'tick_value': close_price # Include tick value for persistence
+                })
+        except Exception as e:
+            print(f"❌ Error in get_stream_data (SimulatedStreamingCapability): {e}")
+        
+        return stream_data_entries

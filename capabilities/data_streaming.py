@@ -1090,11 +1090,93 @@ class RealtimeDataStreaming(Capability):
     # See: strategies/technical_indicators.py (TechnicalIndicatorsPipeline)
     # Adapter: strategies/indicator_adapter.py (IndicatorAdapter)
     # This capability now focuses exclusively on WebSocket streaming and candle formation.
-    # 
+    #
     # Previous inline calculations (SMA, EMA, RSI, MACD, Bollinger) have been replaced
     # with professional-grade calculations using pandas-ta and talib libraries.
     # Now supports 13+ indicators: WMA, Stochastic, Williams %R, ROC, Schaff TC,
     # DeMarker, CCI, ATR, SuperTrend, and more.
+
+    def get_stream_data(self, asset: str, driver: Any, ctx: Ctx) -> List[Dict[str, Any]]:
+        """
+        Fetches and processes real-time data from Chrome logs.
+        This method is designed to be called by the streaming_server.py to abstract
+        the data source logic.
+        
+        Args:
+            asset: The currently focused asset.
+            driver: The Selenium WebDriver instance.
+            ctx: The capability context.
+            
+        Returns:
+            A list of processed data entries (e.g., candle updates, tick data).
+        """
+        stream_data_entries = []
+        
+        try:
+            logs = driver.get_log('performance')
+            
+            for log_entry in logs:
+                message = json.loads(log_entry['message'])['message']
+                response = message.get('params', {}).get('response', {})
+                
+                if response.get('opcode', 0) == 2:
+                    payload_data = response.get('payloadData')
+                    if payload_data:
+                        payload = self._decode_and_parse_payload(payload_data)
+                        
+                        if payload:
+                            # Process chart settings
+                            if 'updateCharts' in str(payload) or 'chartPeriod' in str(payload):
+                                self._process_chart_settings(payload, ctx)
+                            
+                            # Process real-time update
+                            self._process_realtime_update(payload, ctx)
+                            
+                            # Extract latest candle for emission
+                            current_focused_asset = self.get_current_asset()
+                            if current_focused_asset:
+                                candle_data = self.extract_candle_for_emit(current_focused_asset)
+                                if candle_data:
+                                    stream_data_entries.append({
+                                        'type': 'candle_update',
+                                        'asset': current_focused_asset,
+                                        'candle': candle_data,
+                                        'timestamp': datetime.now().isoformat(),
+                                        'tick_value': candle_data['close'] # Include tick value for persistence
+                                    })
+        except Exception as e:
+            if ctx.verbose:
+                print(f"❌ Error in get_stream_data (RealtimeDataStreaming): {e}")
+        
+        return stream_data_entries
+
+    def extract_candle_for_emit(self, asset: str) -> Optional[Dict]:
+        """
+        Extract latest formed candle from capability's candle data for Socket.IO emission.
+        This emits OHLC candles instead of ticks, eliminating duplicate candle formation.
+        Uses capability's public API instead of direct state access.
+        """
+        try:
+            latest_candle = self.get_latest_candle(asset)
+            
+            if latest_candle:
+                timestamp, open_price, close_price, high_price, low_price = latest_candle
+                
+                return {
+                    'asset': asset,
+                    'timestamp': timestamp,  # Unix timestamp in seconds
+                    'open': open_price,
+                    'high': high_price,
+                    'low': low_price,
+                    'close': close_price,
+                    'volume': 0,
+                    'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+                }
+        
+        except Exception as e:
+            print(f"❌ Error extracting candle for emit: {e}")
+        
+        return None
 
     def _validate_session_sync(self, ctx: Ctx) -> bool:
         """Validate that session synchronization is working correctly."""

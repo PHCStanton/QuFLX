@@ -10,6 +10,7 @@ export const colors = {
   backgroundSecondary: '#181c24', // Alias for bgSecondary (for consistency)
   cardBg: '#1a1f2e',              // Card background (subtle elevation)
   cardBorder: '#2a2f3e',          // Subtle borders (refined contrast)
+  borderPrimary: '#2a2f3e',       // Alias for cardBorder (for consistency)
   
   // Accents (Mockup-matched)
   accentGreen: '#22c55e',         // Brighter green (mockup green)

@@ -20,7 +20,7 @@ A Solana-inspired, minimalist trading terminal focused on **strategy design, bac
 ### 1. **Data Analysis** (Strategy Design & Chart Viewer)
 **Purpose**: Strategy design, chart testing, and indicator configuration
 
-**Implementation Status**: ✅ **COMPLETE** (October 15, 2025)
+**Implementation Status**: ⚠️ **NEEDS REFACTORING** (October 19, 2025) - Targeted rewrite for state management, data processing, and indicator display.
 
 **3-Column Layout:**
 - **Left Column**:
@@ -208,6 +208,10 @@ A Solana-inspired, minimalist trading terminal focused on **strategy design, bac
 - **Volatility**: ATR, Bollinger Bands
 - **Custom**: SuperTrend, Pivot Points
 
+**Current Status**: Frontend indicator display logic requires rewrite for generic handling. Backend indicator calculation is robust but needs better integration with frontend display.
+
+**Current Status**: Frontend indicator display logic requires rewrite for generic handling. Backend indicator calculation is robust but needs better integration with frontend display.
+
 ---
 
 ## 📊 Technical Implementation
@@ -260,13 +264,21 @@ React Components (Data Analysis, Strategy Lab, Trading Hub)
 - [x] Frontend: Multiple instance management
 - [x] Integration: Backend calculation endpoints
 
-### Phase 3: Data Analysis Page Rebuild ✅ **COMPLETE**
+### Phase 3: Data Analysis Page Rebuild ⚠️ **NEEDS REFACTORING**
 - [x] Design mockup generation (Solana-inspired)
 - [x] Apply 3-column layout
 - [x] Integrate Data Source toggle
 - [x] Implement Indicator Manager
 - [x] Add Quick Stats and Indicator Readings panels
 - [x] Preserve CSV/Platform functionality
+- [ ] **Targeted Rewrite**: Simplify state management for `isLiveMode`.
+- [ ] **Targeted Rewrite**: Optimize candle buffering and sorting in `processBufferedCandles`.
+- [ ] **Targeted Rewrite**: Re-architect `getIndicatorReading` for generic indicator display.
+- [ ] **Fix**: Remove recursive `loadCsvData` call.
+- [ ] **Targeted Rewrite**: Simplify state management for `isLiveMode`.
+- [ ] **Targeted Rewrite**: Optimize candle buffering and sorting in `processBufferedCandles`.
+- [ ] **Targeted Rewrite**: Re-architect `getIndicatorReading` for generic indicator display.
+- [ ] **Fix**: Remove recursive `loadCsvData` call.
 
 ### Phase 4: Strategy Lab Rebuild ✅ **COMPLETE**
 - [x] Design 3-column layout with new design system
@@ -376,8 +388,8 @@ React Components (Data Analysis, Strategy Lab, Trading Hub)
 
 ---
 
-### Phase 5.8: Modular Indicator Architecture Refactoring ⚙️ **IN PROGRESS** (October 16, 2025)
-**Goal**: Refactor backend to use dedicated indicator module for clean separation of concerns
+### Phase 5.8: Modular Indicator Architecture Refactoring ⚙️ **IN PROGRESS** (October 19, 2025)
+**Goal**: Refactor backend to use dedicated indicator module for clean separation of concerns and address identified complexities.
 
 **Status**: Task list created, beginning implementation ⚙️
 
@@ -404,36 +416,62 @@ Frontend → streaming_server.py → indicator_adapter.py → TechnicalIndicator
 3. ✅ **Code Integrity** - Backward compatible with frontend, no breaking changes
 4. ✅ **Zero Assumptions** - Explicit adapter layer for format conversion
 
-#### Implementation Plan
+#### Implementation Plan (Targeted Rewrites/Re-architectures)
 
-**1. Create Indicator Adapter Module** (`strategies/indicator_adapter.py`)
-- [ ] Convert candle array format → pandas DataFrame
-- [ ] Invoke `TechnicalIndicatorsPipeline.calculate_indicators()`
-- [ ] Transform results → frontend format `{series: {}, indicators: {}, signals: {}}`
-- [ ] Support instance-based multi-indicator requests
+**Phase 1: Critical Fixes (Targeted Rewrites/Re-architectures)**
 
-**2. Refactor Streaming Server** (`streaming_server.py`)
-- [ ] Import `TechnicalIndicatorsPipeline` and adapter
-- [ ] Replace `data_streamer.apply_technical_indicators()` calls
-- [ ] Use adapter for all indicator calculation requests
-- [ ] Maintain backward compatibility with frontend
+1.  **Unify Indicator Pipeline (Backend-Driven):**
+    *   **Backend (`streaming_server.py`):**
+        *   **Rewrite/Refactor `handle_calculate_indicators`:** Ensure it is the *sole* source of indicator calculations. It should take raw candle data (from `data_streamer` via a dedicated getter, not direct state access) and the desired indicator configurations, then use the `TechnicalIndicatorsPipeline` to compute all indicators.
+        *   Define a clear, consistent JSON structure for indicator results (values, signals, series data) to be emitted to the frontend.
+    *   **Frontend (`DataAnalysis.jsx`, `IndicatorChart.jsx`):**
+        *   **Rewrite `getIndicatorReading` in `DataAnalysis.jsx`:** This function should be generic, designed to consume the standardized indicator results from the backend without any hardcoded logic for specific indicator types.
+        *   **Remove `technicalindicators` library from `IndicatorChart.jsx`:** This component should be rewritten to *only* render indicator data received from `DataAnalysis.jsx`, which in turn receives it from the backend. All local calculation logic must be removed.
 
-**3. Clean Up Data Streaming Capability** (`capabilities/data_streaming.py`)
-- [ ] Remove `apply_technical_indicators()` method entirely
-- [ ] Keep focused on WebSocket interception and candle formation
-- [ ] Update docstrings to reflect clean scope
+2.  **Simplify Streaming State Management:**
+    *   **Frontend (`DataAnalysis.jsx`):**
+        *   **Re-architect `isLiveMode` state:** Consolidate its management to a single, clear source of truth, likely within the `useWebSocket` hook or a dedicated context. Eliminate redundant `setIsLiveMode` calls.
+        *   **Refactor `useWebSocket` hook:** Reduce its complexity by grouping related states or breaking it into smaller, more focused custom hooks if necessary.
+    *   **Backend (`streaming_server.py`):**
+        *   **Re-architect `USE_SIMULATED_DATA`:** Instead of a global flag, consider a more dynamic configuration mechanism (e.g., a command-line argument that influences the *creation* of `data_streamer` at startup, or a runtime switch if truly needed, though this adds complexity).
+        *   **Rewrite `stream_from_chrome`:** Abstract the data source logic more deeply within the `data_streamer` capability. `stream_from_chrome` should primarily focus on fetching data from `data_streamer` (regardless of whether it's real or simulated) and emitting it, reducing the `if USE_SIMULATED_DATA` branching.
 
-**4. Frontend Enhancements**
-- [ ] Add RSI reference lines (25/75) to oscillator pane rendering
-- [ ] Verify all indicator levels render (Stochastic 20/80, Williams %R -20/-80, etc.)
-- [ ] Test multi-instance support with new indicators
+3.  **Fix Memory Management & Data Processing:**
+    *   **Frontend (`DataAnalysis.jsx`):**
+        *   **Rewrite `processBufferedCandles`:** Instead of sorting the entire array on every update, implement a more efficient method for inserting new candles into their sorted position or use a data structure optimized for ordered insertions.
+        *   Ensure robust cleanup for `processTimerRef` and other resources.
+        *   **Address recursive `loadCsvData` call:** Correct the typo at line 133 in `DataAnalysis.jsx` to call the external utility function, not itself.
+    *   **Backend (`streaming_server.py`):**
+        *   **Decompose `handle_start_stream`:** Break this function into smaller, more focused functions, each handling a single responsibility (e.g., `_start_live_stream_backend`, `_load_historical_csv_data`, `_emit_historical_data`). This will make the logic for seeding historical data much clearer and less error-prone.
 
-**5. Testing & Verification**
-- [ ] Test each of 13 indicators individually
-- [ ] Verify multi-instance support (e.g., SMA-20 + SMA-50 + WMA-20)
-- [ ] Confirm oscillator panes render correctly
-- [ ] Check overlay indicators display properly
-- [ ] Validate backward compatibility with existing CSV/Platform modes
+**Phase 2: Architecture Improvements (Building on Phase 1)**
+
+1.  **Component Decomposition**:
+    *   Split `DataAnalysis.jsx` into smaller, more focused components.
+    *   Separate data loading from UI rendering.
+    *   Create dedicated indicator management components.
+
+2.  **Performance Optimization**:
+    *   Implement `React.memo` for expensive components.
+    *   Optimize re-render cycles.
+    *   Use proper dependency arrays.
+
+3.  **Error Handling Enhancement**:
+    *   Add comprehensive error boundaries.
+    *   Implement graceful degradation.
+    *   Add user-friendly error messages.
+
+**Phase 3: Performance & Polish (Building on Phase 2)**
+
+1.  **Configuration Standardization**:
+    *   Use design tokens consistently.
+    *   Remove hardcoded values.
+    *   Implement proper theme switching.
+
+2.  **Testing Implementation**:
+    *   Add unit tests for critical paths.
+    *   Implement integration tests.
+    *   Add performance benchmarks.
 
 **6. Documentation Updates**
 - [ ] Update `replit.md` with new architecture
@@ -706,11 +744,11 @@ Frontend → streaming_server.py → indicator_adapter.py → TechnicalIndicator
 
 ### Completed ✅
 - [x] **Design System**: Color palette, typography, design tokens
-- [x] **Sidebar Navigation**: Expandable sidebar with SVG icons and custom logo (Phase 5.6)
-- [x] **Data Analysis Page**: 3-column layout with CSV/Platform modes
+- [x] **Sidebar Navigation**: Expandable sidebar with SVG icons and custom logo
+- [ ] **Data Analysis Page**: Initial 3-column layout with CSV/Platform modes (needs refactoring)
 - [x] **Strategy Lab Page**: 3-column layout with metrics and history
 - [x] **Trading Hub Page**: 3-column layout with signal panel
-- [x] **Indicator System**: Dynamic configuration with multiple instances
+- [ ] **Indicator System**: Dynamic configuration with multiple instances (needs refactoring for backend-driven approach)
 - [x] **Multi-Pane Charts**: Synchronized oscillator panes
 - [x] **Memory Management**: Zero leaks, proper cleanup
 - [x] **Code Quality**: Zero LSP errors, architect-verified
@@ -746,6 +784,6 @@ Frontend → streaming_server.py → indicator_adapter.py → TechnicalIndicator
 
 ---
 
-**Development Status**: Phase 5.6 Sidebar Navigation Complete ✅ → Chart Optimization Phase 6 Next 🚀
+**Development Status**: Assessment Complete ✅ → Targeted Rewrites/Re-architectures (Phase 1) Next 🚀
 
 **Last Reviewed**: October 16, 2025
