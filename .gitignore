@@ -94,3 +94,11 @@ pip-delete-this-directory.txt
 # Ignore local helper scripts and docs in utils created by the developer
 utils/git-fetch-status.ps1
 utils/README.md
+
+# Project apps to ignore
+QuFLX-Fusion/
+QuFLX-Unify/
+
+# Absolute path variants (non-standard; added per request)
+c:/QuFLX/QuFLX-Fusion/
+c:/QuFLX/QuFLX-Unify/

@@ -47,3 +47,5 @@ scikit-learn
 scipy
 ta-lib
 typer
+
+playwright>=1.55.0
