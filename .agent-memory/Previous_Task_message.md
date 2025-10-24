@@ -1,113 +1,107 @@
-Here’s a cohesive, end-to-end technical summary of the conversation and the work completed, tying together backend pipelines, adapter logic, frontend definitions, chart rendering behavior, and validation workflow. I’ve also captured the current task status and opened a live preview of the UI to visually verify changes.
+## Thorough Investigation Report: Lightweight Charts and Indicators Integration Issues
 
-What we confirmed in the backend
+### Critical Issues Identified
 
-- Indicator calculation pipeline:
-  - technical_indicators.py defines an IndicatorSet dataclass with existing and newer indicators (e.g., schaff_tc, demarker, cci) and a TechnicalIndicatorsPipeline that computes indicators using pandas_ta and TA-Lib.
-  - The pipeline produces a DataFrame with clearly named columns, both single-line (SMA/EMA/RSI/etc.) and multi-line (MACD, Bollinger Bands, Stochastic).
-- Adapter rules for exposing indicators to the frontend:
-  - _find_indicator_columns:
-    - Single-column indicators are detected by prefix matching (e.g., SMA_, RSI_, STC_, DEMARKER_, CCI_).
-    - Multi-column indicators are recognized by specific column sets (MACD: macd/signal/histogram; Bollinger: upper/middle/lower; Stochastic: %K/%D), including compatibility with pandas_ta formats.
-  - _extract_indicator_data:
-    - For single-column indicators, it returns series arrays [{ time, value }] and generates signals for momentum indicators (RSI, Williams %R, ROC, Schaff TC, DeMarker, CCI).
-    - Delegates to _extract_multi_column_indicator for multi-line cases:
-      - MACD: macd, signal, histogram arrays and signal generation.
-      - Bollinger Bands: upper/middle/lower series with band color metadata expected by the frontend.
-      - Stochastic: %K/%D series and stochastic-specific signal generation.
-  - _generate_signal/_generate_stochastic_signal define BUY/SELL/NEUTRAL thresholds and logic.
-- Orchestration:
-  - calculate_indicators_for_instances converts candles to a DataFrame, runs TechnicalIndicatorsPipeline per instance, and returns a structured payload:
-    - asset, timeframe_minutes, data_points, latest_timestamp, latest_price
-    - indicators (instances metadata), series (indicator series keyed by instanceName), and signals.
-What we confirmed in the frontend
+#### 1. **WebSocket Event Name Mismatch (CRITICAL)** 🚨
+**Location**: [`useIndicatorCalculations.js:50-51`](gui/Data-Visualizer-React/src/hooks/useIndicatorCalculations.js:50) vs [`streaming_server.py:926,933`](streaming_server.py:926)
 
-- indicatorDefinitions.js:
-  - Indicator metadata definitions for rendering and configuration include id (type), category (Trend, Momentum, Volatility, Volume, Custom), renderType (line, band, histogram), default parameters, color, and optional levels (e.g., RSI 30/70).
-  - Helper functions: getIndicatorsByCategory, getIndicatorDefinition, createDefaultParams.
-- Chart rendering (MultiPaneChart.jsx):
-  - isOscillatorIndicator: Heuristic based on indicator category (Momentum) or histogram renderType (excluding volume).
-  - isOverlayIndicator: Heuristic for line/band render types (excluding oscillators).
-  - Overlays (line/band) are rendered dynamically from backendIndicators.series with indicator definitions (including band coloring for Bollinger).
-  - RSI and MACD were special-cased as separate panes with dedicated effects and series initialization.
-- Hooks and data flow:
-  - useIndicators.js manages activeIndicators and triggers backend calculations when asset/connection state changes, formatting instances via formatIndicatorInstances ({ type, params }).
-  - useIndicatorCalculations.js emits calculate_indicators and receives indicators_calculated/indicators_error via WebSocket.
-  - DataAnalysis.jsx wires useWebSocket, useIndicators, useLiveMode, and passes backendIndicators into ChartContainer and MultiPaneChart.
-What I just implemented: generic oscillator panes in MultiPaneChart
+**Problem**: Frontend listens for wrong event names
+- Frontend expects: `indicator_data` and `indicator_error`
+- Backend emits: `indicators_calculated` and `indicators_error`
 
-- Before: RSI and MACD were special-cased oscillators; other momentum indicators (stochastic, williams_r, roc, schaff_tc, demarker, cci) did not render in separate panes even if defined as oscillators.
-- Now:
-  - MultiPaneChart detects all oscillator instances beyond RSI and MACD using existing isOscillatorIndicator and backendIndicators.indicators (type) and series presence.
-  - Dynamic pane rendering:
-    - Each oscillator instance gets its own chart with synchronized time scale (visible range) to the main chart.
-    - Series creation logic:
-      - For array data: a single line series.
-      - For stochastic-like data with keys k/d: two line series (%K, %D).
-      - For other object-shaped series: line series per key (with color palette).
-    - Pane labels use the indicator definition name when available, else the instance name.
-  - Height management:
-    - Computes total oscillator count = RSI + MACD + generic oscillators.
-    - Ensures main chart maintains a minimum height and distributes oscillator pane heights evenly within the remaining space.
-  - RSI/MACD special handling remains intact; generic oscillators are additive.
-- Dev Server and Preview:
-  - I started the Vite dev server and opened a live preview at http://localhost:5001/ .
-  - The preview launched with no immediate browser errors, which confirms the new pane generation code doesn’t crash the UI on load.
-How this change fits the cross-stack plan for adding new indicators
+**Impact**: Indicators are calculated but NEVER received by frontend, causing complete indicator failure.
 
-- Backend:
-  - Implement the indicator calculation in strategies/technical_indicators.py with explicit column naming. Update create_indicator_set if new output needs to be added.
-- Adapter:
-  - Map the new indicator type/params in strategies/indicator_adapter.py.
-  - Extend _find_indicator_columns (prefix patterns or multi-column detection).
-  - Extend _extract_indicator_data to populate backendIndicators.series, and optionally signals.
-- Frontend definition:
-  - Add to src/constants/indicatorDefinitions.js with matching id (type), category, renderType (line, band, histogram), default parameters and color so it shows in the indicator dropdown.
-- Frontend charting:
-  - With the new generic oscillator panes now supported, any momentum-type indicator (except RSI/MACD which are already special-cased) will create its own pane automatically once the backend returns series data.
-  - Overlays (line/band) continue to render dynamically on the main chart.
-- Validation:
-  - Use the indicator panel to add the new indicator, verify the payload via useIndicators/formatIndicatorInstances.
-  - Confirm that the backend emits indicators_calculated with a series structure compatible with the chart rules above.
-  - Verify main/overlay/oscillator panes update live as data arrives.
-Current task status
+#### 2. **Candle Buffer Processing Race Condition** ⚠️
+**Location**: [`DataAnalysis.jsx:173-232`](gui/Data-Visualizer-React/src/pages/DataAnalysis.jsx:173)
 
-- I opened the UI preview (Vite dev server) at http://localhost:5001/ and verified there are no immediate runtime errors.
-- I updated MultiPaneChart.jsx to render generic oscillator panes dynamically (completed).
-- The remaining work is mostly backend mapping and front-end definition for your specific new indicator(s), plus roundtrip validation.
-Updated todo list and status
+**Problem**: Complex buffer management with potential data loss
+- Uses both Map and sorted array tracking
+- Timer-based processing can miss rapid updates
+- `processBufferedCandles` may drop candles during high-frequency streaming
 
-- Backend: Implement calculation for the new indicator in strategies/technical_indicators.py. Status: pending.
-- Backend Adapter: Map the new indicator type and params in strategies/indicator_adapter.py (param_mapping), add column detection in _find_indicator_columns, and format output in _extract_indicator_data. Status: pending.
-- Frontend Definition: Add the new indicator to src/constants/indicatorDefinitions.js with matching id, category, renderType, params, color. Status: pending.
-- Frontend Charting: Extend MultiPaneChart.jsx to render generic oscillator panes for non-RSI/non-MACD momentum indicators. Status: completed.
-- Validation (roundtrip):
-  - Use UI to add the new indicator and verify instances payload formatting. Status: pending.
-  - Confirm streaming_server emits indicators_calculated with expected series structure. Status: pending.
-- Preview:
-  - Vite dev preview opened at http://localhost:5001/ (done).
-  - streaming_server live preview at http://localhost:5002/live (to be started; pending).
-- Chart behavior validation:
-  - Confirm candles render and overlays (SMA/EMA/Bands) appear. Status: pending.
-  - Confirm oscillator panes (RSI/MACD + generic oscillators) update with incoming data. Status: pending.
-What you can do next to fully validate
+#### 3. **Function Extraction Anti-Pattern** 🔧
+**Location**: [`DataAnalysis.jsx:74-87`](gui/Data-Visualizer-React/src/pages/DataAnalysis.jsx:74)
 
-- Add one of the momentum indicators you want to test (e.g., Stochastic, CCI, DeMarker, Schaff TC) via the indicator panel.
-- Ensure its definition exists in indicatorDefinitions.js with the correct id and category (Momentum) and renderType (line).
-- Verify that the backend is calculating it and that indicator_adapter returns series data in one of the supported shapes:
-  - Single array: [{ time, value }]
-  - Stochastic object: { k: [...], d: [...] }
-  - Generic object with multiple arrays: { key1: [...], key2: [...] }
-- Confirm the new oscillator pane appears under the main chart and that the time scale stays synchronized with the main chart.
-- If you want to validate the live view ( http://localhost:5002/live ), start the streaming_server and I can open that preview for you as well.
-Notes and known constraints
+**Problem**: Unsafe destructuring pattern
+```javascript
+try {
+    const { actions: { data: { calculateIndicators: calcFunc } } } = useWebSocket();
+    calculateIndicators = calcFunc;
+} catch (error) {
+    calculateIndicators = null;
+}
+```
+This indicates potential undefined access issues that should be handled within the hook.
 
-- The pane height distribution algorithm ensures the main chart retains a minimum height. When many oscillator panes are active, each pane’s height is reduced to fit the container.
-- RSI/MACD keep their existing specialized behavior; generic oscillators now render in additional panes alongside them.
-- Band overlays (e.g., Bollinger Bands) continue to use the bandColors provided by the backend and render on the main chart.
-- If your new indicator outputs multi-line series with unusual keys, the generic oscillator logic will render a line series for each key found in the data object.
-If you want, I can proceed with:
+#### 4. **Asset Name Normalization Issue** 📝
+**Location**: [`streaming_server.py:667-674`](streaming_server.py:667)
 
-- Implementing the backend calculation/mapping for your specific new indicator.
-- Adding its definition in indicatorDefinitions.js with sensible defaults.
-- Starting the streaming server and opening the /live preview for full end-to-end validation.
+**Problem**: CSV file lookup fails due to asset name format mismatch
+- Frontend sends: "EURUSD_OTC"
+- CSV files named: "EURUSD_otc_1m_2025_10_04.csv"
+- Normalization logic doesn't handle underscore removal properly
+
+#### 5. **Chart Update Performance Issue** ⚡
+**Location**: [`MultiPaneChart.jsx:296-346`](gui/Data-Visualizer-React/src/components/charts/MultiPaneChart.jsx:296)
+
+**Problem**: Correctly implements performance optimization but timing issues exist
+- Uses `setData()` for initial load and `update()` for incremental updates (correct)
+- However, the `prevDataLengthRef` tracking can get out of sync during rapid mode switches
+
+#### 6. **Live Streaming Data Flow Issues** 🌊
+**Location**: Multiple locations
+
+**Problems**:
+- **Duplicate Buffering**: Both `DataAnalysis.jsx` and `useDataStream.js` implement candle buffering
+- **State Sync**: `lastMessage` updates don't always trigger chart refreshes
+- **Historical Data Loading**: Race condition between CSV load and stream start
+
+#### 7. **Memory Management Concerns** 💾
+**Location**: [`DataAnalysis.jsx:106-110`](gui/Data-Visualizer-React/src/pages/DataAnalysis.jsx:106)
+
+**Problem**: Multiple buffers without coordinated cleanup
+- `candleBufferRef` Map can grow indefinitely
+- `sortedTimesRef` array not cleaned on mode switch
+- No cleanup when switching between CSV and Platform modes
+
+### Root Cause Analysis
+
+The primary issue that "other AI models might miss" is the **event name mismatch** between frontend and backend. This is subtle because:
+1. The backend successfully calculates indicators
+2. The WebSocket connection is established
+3. The emission happens without errors
+4. But the frontend silently ignores the unrecognized events
+
+### Recommended Fixes
+
+1. **Immediate Fix** (Event Names):
+   - Change `useIndicatorCalculations.js` lines 50-51 to:
+   ```javascript
+   socket.on('indicators_calculated', handleIndicatorData);
+   socket.on('indicators_error', handleIndicatorError);
+   ```
+
+2. **Refactor WebSocket Hook**:
+   - Move function extraction logic inside `useWebSocketV2`
+   - Provide safe defaults to prevent undefined access
+
+3. **Consolidate Buffer Management**:
+   - Use only `useDataStream` for candle buffering
+   - Remove duplicate buffer in `DataAnalysis.jsx`
+
+4. **Fix Asset Normalization**:
+   - Update CSV lookup logic to handle different asset formats
+   - Add fallback patterns for file matching
+
+5. **Improve State Management**:
+   - Add proper cleanup in useEffect returns
+   - Clear buffers on mode switches
+   - Reset chart references when changing data sources
+
+### Key Principle Violations
+
+- **Functional Simplicity**: Over-complicated buffer management
+- **Code Integrity**: Event name mismatch breaks integration
+- **Separation of Concerns**: Duplicate buffering logic in multiple components
+
+The most critical fix is the WebSocket event name mismatch - without this, no indicators will ever display regardless of other optimizations.

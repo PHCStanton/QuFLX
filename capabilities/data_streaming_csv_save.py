@@ -226,7 +226,8 @@ class RealtimeDataStreaming(Capability):
         # Generate filename with timestamp
         now = datetime.now(timezone.utc)
         asset_clean = re.sub(r'[^\w\-_]', '_', asset)
-        filename = f"{asset_clean}_otc_{timeframe_minutes}m_{now.strftime('%Y_%m_%d_%H_%M_%S')}.csv"
+        # Use the asset name as-is (if it already includes _otc, keep it; otherwise do not append it)
+        filename = f"{asset_clean}_{timeframe_minutes}m_{now.strftime('%Y_%m_%d_%H_%M_%S')}.csv"
         filepath = os.path.join(data_collect_dir, filename)
 
         # Write CSV file using helper method
