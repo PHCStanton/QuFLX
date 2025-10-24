@@ -98,6 +98,11 @@ utils/README.md
 # Project apps to ignore
 QuFLX-Fusion/
 QuFLX-Unify/
+powershell_settings/
+Plotly/
+Playwright/
+live2/
+Docker_files/
 
 # Absolute path variants (non-standard; added per request)
 c:/QuFLX/QuFLX-Fusion/
