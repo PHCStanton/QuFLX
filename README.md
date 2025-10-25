@@ -283,6 +283,17 @@ For issues or questions:
 4. Check browser console for JavaScript errors
 5. Ensure CSV data files are accessible
 
+## Documentation Structure
+
+### Redis Integration Documentation
+- **App Integration**: [`dev_docs/redis_docs/`](dev_docs/redis_docs/) - Backend/frontend Redis integration
+- **MCP Documentation**: [`MCP_docs/redis_mcp/`](MCP_docs/redis_mcp/) - Redis MCP server and tools
+
+### Key Documents
+- **Redis Integration Guide**: [`dev_docs/redis_docs/README.md`](dev_docs/redis_docs/README.md)
+- **Redis MCP Usage**: [`MCP_docs/redis_mcp/README.md`](MCP_docs/redis_mcp/README.md)
+- **Complete Status**: [`MCP_docs/redis_mcp/Redis_MCP_Status_Summary.md`](MCP_docs/redis_mcp/Redis_MCP_Status_Summary.md)
+
 ## Next Steps
 
 ### Immediate
