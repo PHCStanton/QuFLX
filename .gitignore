@@ -42,6 +42,11 @@ screenshots/
 test_artifacts/
 live2/
 tmp_tests/
+# Project/documentation and local tools
+/MCP_docs
+/.zencoder
+/.llm-context
+/.kilocode
 
 # Browser/user profile (sensitive)
 Chrome_profile/
