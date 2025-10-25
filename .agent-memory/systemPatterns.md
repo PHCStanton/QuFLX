@@ -49,6 +49,8 @@ QuantumFlux uses a **capabilities-first architecture** with direct integration p
 - **WebSocket Interception**: Captures real-time market data from PocketOption
 - **Candle Formation**: Converts tick data to OHLC candles with configurable timeframes
 - **Automatic Export**: CSV files saved to `data/data_output/assets_data/realtime_stream/` (candles: `1M_candle_data`, ticks: `1M_tick_data`)
+- **Redis Buffering**: Real-time data buffered in Redis with <1ms operations
+- **Pub/Sub Distribution**: Real-time updates published to frontend via Redis pub/sub
 
 ### 5. Session Role Separation Pattern
 - **Collector Session**: `data_stream_collect.py` persists by default (both ticks and closed candles).

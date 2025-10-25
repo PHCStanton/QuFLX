@@ -53,12 +53,16 @@ python start_hybrid_session.py
 - **typer**: CLI framework for command-line interface
 - **pandas**: Data manipulation and CSV export
 - **requests**: HTTP client for API testing
+- **redis**: Python Redis client for high-performance data operations
+- **mcp**: Model Context Protocol framework for AI tool integration
 
 ### Development Dependencies
 - **pytest**: Testing framework
 - **pytest-asyncio**: Async testing support
 - **black**: Code formatting
 - **flake8**: Code linting
+- **redis-py**: Redis Python client
+- **mcp**: Model Context Protocol server framework
 
 ## Technical Constraints
 

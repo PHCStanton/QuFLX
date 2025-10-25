@@ -3,6 +3,7 @@
 Real-time Trading Data Streaming Server for GUI
 Connects to Chrome (port 9222) to intercept PocketOption WebSocket data
 and streams it to the React frontend via Socket.IO
+Enhanced with Redis integration for high-performance data streaming and caching.
 """
 
 # Import eventlet and apply monkey patching FIRST (before any other imports)
@@ -22,6 +23,10 @@ import sys
 import argparse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+# Redis integration imports
+from capabilities.redis_integration import RedisIntegration
+from capabilities.redis_batch_processor import RedisBatchProcessor
 
 # Add paths for imports
 root_dir = Path(__file__).parent
@@ -80,6 +85,10 @@ chrome_reconnection_attempts = 0
 last_reconnection_time = None
 backend_initialized = False  # Track if backend has been initialized with first client
 chrome_reconnect_enabled = False  # Only reconnect when clients need Chrome (Platform mode)
+
+# Redis integration
+redis_integration = None
+batch_processor = None
 
 # ========================================
 # Chrome Connection Functions
@@ -158,23 +167,21 @@ def attach_to_chrome(verbose=True, is_simulated_mode=False):
 
 def extract_candle_for_emit(asset: str) -> Optional[Dict]:
     """
-    Extract latest formed candle from capability's candle data for Socket.IO emission.
-    This emits OHLC candles instead of ticks, eliminating duplicate candle formation.
-    Uses capability's public API instead of direct state access.
-    NOTE: Candle persistence is now handled in stream_from_chrome() directly.
+    Extract latest formed candle and push to Redis.
+    Enhanced with Redis integration for real-time streaming.
     """
-    global data_streamer
+    global data_streamer, redis_integration
     
     try:
-        # Use capability's public API method instead of accessing CANDLES directly
+        # Use capability's public API method
         latest_candle = data_streamer.get_latest_candle(asset)
         
         if latest_candle:
             timestamp, open_price, close_price, high_price, low_price = latest_candle
             
-            return {
+            candle_data = {
                 'asset': asset,
-                'timestamp': timestamp,  # Unix timestamp in seconds
+                'timestamp': timestamp,
                 'open': open_price,
                 'high': high_price,
                 'low': low_price,
@@ -182,6 +189,12 @@ def extract_candle_for_emit(asset: str) -> Optional[Dict]:
                 'volume': 0,
                 'date': datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
             }
+            
+            # Push to Redis for real-time streaming
+            if redis_integration:
+                redis_integration.add_tick_to_buffer(asset, candle_data)
+            
+            return candle_data
     
     except Exception as e:
         print(f"❌ Error extracting candle: {e}")
@@ -974,6 +987,180 @@ def handle_run_backtest(data):
 # Main Entry Point
 # ========================================
 
+def initialize_redis():
+    """Initialize Redis integration and batch processor."""
+    global redis_integration, batch_processor
+    
+    try:
+        redis_integration = RedisIntegration()
+        batch_processor = RedisBatchProcessor(redis_integration)
+        batch_processor.start_processing()
+        
+        print("[Redis] ✓ Redis integration initialized successfully")
+        return True
+    except Exception as e:
+        print(f"[Redis] ✗ Failed to initialize Redis: {e}")
+        return False
+
+@socketio.on('subscribe_redis_updates')
+def handle_subscribe_redis_updates(data):
+    """Subscribe client to Redis updates for an asset."""
+    global redis_integration, batch_processor
+    
+    try:
+        asset = data.get('asset')
+        if not asset:
+            emit('error', {'message': 'No asset specified'})
+            return
+        
+        # Register asset for batch processing
+        if batch_processor:
+            batch_processor.register_asset(asset)
+        
+        # Subscribe to Redis pub/sub
+        def redis_callback(message):
+            # Forward Redis message to client
+            emit('redis_update', {'data': json.loads(message['data'])})
+        
+        if redis_integration.subscribe_to_asset_updates(asset, redis_callback):
+            emit('redis_subscribed', {'asset': asset})
+            print(f"[Redis] Client subscribed to {asset} updates")
+        else:
+            emit('error', {'message': f'Failed to subscribe to {asset} updates'})
+            
+    except Exception as e:
+        emit('error', {'message': f'Subscription error: {str(e)}'})
+
+@socketio.on('unsubscribe_redis_updates')
+def handle_unsubscribe_redis_updates(data):
+    """Unsubscribe client from Redis updates for an asset."""
+    global batch_processor
+    
+    try:
+        asset = data.get('asset')
+        if not asset:
+            emit('error', {'message': 'No asset specified'})
+            return
+        
+        # Unregister from batch processing
+        if batch_processor:
+            batch_processor.unregister_asset(asset)
+        
+        emit('redis_unsubscribed', {'asset': asset})
+        print(f"[Redis] Client unsubscribed from {asset} updates")
+        
+    except Exception as e:
+        emit('error', {'message': f'Unsubscription error: {str(e)}'})
+
+@socketio.on('get_cached_historical_data')
+def handle_get_cached_historical_data(data):
+    """Get cached historical data from Redis."""
+    global redis_integration
+    
+    try:
+        asset = data.get('asset')
+        timeframe = data.get('timeframe', '1M')
+        
+        if not asset:
+            emit('error', {'message': 'No asset specified'})
+            return
+        
+        # Get cached data from Redis
+        cached_data = redis_integration.get_cached_historical_candles(asset, timeframe)
+        
+        if cached_data:
+            emit('cached_historical_data', {
+                'asset': asset,
+                'timeframe': timeframe,
+                'data': cached_data,
+                'source': 'redis_cache'
+            })
+        else:
+            emit('cached_historical_data', {
+                'asset': asset,
+                'timeframe': timeframe,
+                'data': None,
+                'source': 'cache_miss'
+            })
+            
+    except Exception as e:
+        emit('error', {'message': f'Cache retrieval error: {str(e)}'})
+
+@socketio.on('cache_historical_data')
+def handle_cache_historical_data(data):
+    """Cache historical data in Redis."""
+    global redis_integration
+    
+    try:
+        asset = data.get('asset')
+        timeframe = data.get('timeframe', '1M')
+        candles_data = data.get('data', [])
+        
+        if not asset or not candles_data:
+            emit('error', {'message': 'Invalid cache request'})
+            return
+        
+        # Cache data in Redis
+        if redis_integration.cache_historical_candles(asset, timeframe, candles_data):
+            emit('historical_data_cached', {
+                'asset': asset,
+                'timeframe': timeframe,
+                'count': len(candles_data)
+            })
+        else:
+            emit('error', {'message': 'Failed to cache historical data'})
+            
+    except Exception as e:
+        emit('error', {'message': f'Cache storage error: {str(e)}'})
+
+@socketio.on('clear_cached_historical_data')
+def handle_clear_cached_historical_data(data):
+    """Clear cached historical data for an asset."""
+    global redis_integration
+    
+    try:
+        asset = data.get('asset')
+        timeframe = data.get('timeframe', '1M')
+        
+        if not asset:
+            emit('error', {'message': 'No asset specified'})
+            return
+        
+        # Clear specific cache key
+        cache_key = f"historical:{asset}:{timeframe}"
+        redis_integration.redis_client.delete(cache_key)
+        
+        emit('historical_data_cache_cleared', {
+            'asset': asset,
+            'timeframe': timeframe
+        })
+        
+    except Exception as e:
+        emit('error', {'message': f'Cache clear error: {str(e)}'})
+
+@socketio.on('get_redis_status')
+def handle_get_redis_status():
+    """Get Redis server status and statistics."""
+    global redis_integration, batch_processor
+    
+    try:
+        redis_info = redis_integration.get_redis_info()
+        batch_status = batch_processor.get_processing_status() if batch_processor else {}
+        
+        emit('redis_status', {
+            'connected': True,
+            'redis_info': redis_info,
+            'batch_status': batch_status,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        emit('redis_status', {
+            'connected': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
+
 if __name__ == '__main__':
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description='QuantumFlux Trading Platform - GUI Backend Server')
@@ -1059,6 +1246,10 @@ if __name__ == '__main__':
             print(f"[Persistence] ✓ Tick persistence fallback hook installed")
     else:
         print("\n[Persistence] Stream collection disabled (use --collect-stream to enable)")
+    
+    # Initialize Redis integration
+    if not initialize_redis():
+        print("[Startup] ⚠️ Redis integration failed - continuing without Redis")
     
     # Startup mode handling
     if is_simulated_mode_global:

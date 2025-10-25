@@ -8,6 +8,12 @@
         "--access-token",
         "sbp_537d45fbd5473412eb36d7abd1eef3592b4edbb8"
       ]
+    },
+    "redis": {
+      "command": "python",
+      "args": [
+        "mcp_server_redis_custom.py"
+      ]
     }
   }
 }
