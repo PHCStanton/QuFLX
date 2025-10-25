@@ -12,13 +12,19 @@ from dataclasses import dataclass, asdict
 import logging
 from pathlib import Path
 
+# Suppress pandas-ta compatibility warning for Python 3.11
+import warnings
+warnings.filterwarnings('ignore', message='.*pandas-ta not available.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*pandas-ta not available.*', category=Warning)
+
 # Technical Analysis Libraries
 try:
     import pandas_ta as ta
     PANDAS_TA_AVAILABLE = True
 except ImportError:
     PANDAS_TA_AVAILABLE = False
-    print("Warning: pandas-ta not available. Install with: pip install pandas-ta")
+    # Warning suppressed - pandas-ta not available for Python 3.11
+    pass
 
 try:
     import talib

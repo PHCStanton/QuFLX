@@ -24,6 +24,11 @@ import argparse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# Suppress pandas-ta compatibility warning for Python 3.11
+import warnings
+warnings.filterwarnings('ignore', message='.*pandas-ta not available.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*pandas-ta not available.*', category=Warning)
+
 # Redis integration imports
 from capabilities.redis_integration import RedisIntegration
 from capabilities.redis_batch_processor import RedisBatchProcessor
